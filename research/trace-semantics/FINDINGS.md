@@ -17,7 +17,7 @@ What intermediate representation (IR) can translate raw DSL trace logs from stru
 
 ## Status
 
-IN PROGRESS — Steps 1-4 and all synthesis steps (1d, 2c, 3b) complete. Step 5a (candidate IR schemas) complete: Hybrid LEL+DGR recommended (94/100). Step 5b (prototype: LEL on OpenMM traces) is next.
+IN PROGRESS — Steps 1-5b and all synthesis steps (1d, 2c, 3b) complete. Step 5a (candidate IR schemas) complete: Hybrid LEL+DGR recommended (94/100). Step 5b (LEL prototype) complete: Rust crate compiled, 11/11 tests pass, clippy clean. Open threads from Step 5a are next.
 
 ## Key Definitions
 
@@ -917,7 +917,8 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 
 | Filename | Purpose | Status | Demonstrated |
 | :--- | :--- | :--- | :--- |
-| `codex-prompt-5b-lel-prototype.md` | Codex prompt to produce the LEL IR Rust crate prototype (Step 5b) | Active | Specifies LEL core types (§1/§2), OpenMM mock adapter, builder helpers, 11 unit tests; validates event typing, layer tagging, spec separation, Hybrid upgrade path fields |
+| `codex-prompt-5b-lel-prototype.md` | Codex prompt to produce the LEL IR Rust crate prototype (Step 5b) | Complete | Specifies LEL core types (§1/§2), OpenMM mock adapter, builder helpers, 11 unit tests; validates event typing, layer tagging, spec separation, Hybrid upgrade path fields |
+| `lel-ir-prototype/` | LEL IR Rust crate (produced from Codex prompt) | Complete | Compiles clean, 11/11 tests pass, clippy zero warnings. Validates: event typing (12 EventKind variants), layer tagging (Theory/Methodology/Implementation), spec separation (AP1 avoidance), serde roundtrip, Hybrid upgrade fields (dag_node_ref/spec_ref/causal_refs) |
 
 ## Next Steps
 
@@ -929,7 +930,7 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 
 4. ~~**Characterize the 21% baseline and DSL improvement**~~ — **COMPLETE** (pending verification of source). See baseline characterization investigation log above. Key action item: verify the 21% source with web access.
 
-5. **Draft candidate IR schemas** — **Step 5a COMPLETE.** Three candidates (LEL, DGR, Hybrid LEL+DGR) evaluated against R1-R29, 9 anti-patterns, streaming constraints, and 7-criterion weighted framework. Recommendation: Hybrid (94/100). Step 5b (prototype) is next: LEL core on OpenMM traces, Stage 1 scope, with Hybrid upgrade path preserved. See `dsl-evaluation/candidate-ir-schemas.md` and investigation log above. (Bead: athena-axc)
+5. **Draft candidate IR schemas and prototype** — **Step 5a COMPLETE. Step 5b COMPLETE.** Three candidates (LEL, DGR, Hybrid LEL+DGR) evaluated against R1-R29, 9 anti-patterns, streaming constraints, and 7-criterion weighted framework. Recommendation: Hybrid (94/100). LEL prototype implemented as Rust crate (`prototypes/lel-ir-prototype/`): 11/11 tests pass, clippy clean. Validates event typing, layer tagging, spec separation, Hybrid upgrade fields. See `dsl-evaluation/candidate-ir-schemas.md`, `prototypes/codex-prompt-5b-lel-prototype.md`, and investigation logs above. (Beads: athena-axc, athena-9uv)
 
 **Synthesis steps needed before Step 5:**
 
