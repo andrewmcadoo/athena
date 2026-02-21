@@ -17,7 +17,7 @@ What intermediate representation (IR) can translate raw DSL trace logs from stru
 
 ## Status
 
-IN PROGRESS — Steps 1-5b and all synthesis steps (1d, 2c, 3b) complete. Step 5a (candidate IR schemas) complete: Hybrid LEL+DGR recommended (94/100). Step 5b (LEL prototype) complete: Rust crate compiled, 11/11 tests pass, clippy clean. Open threads from Step 5a are next.
+IN PROGRESS — Steps 1-5c and all synthesis steps (1d, 2c, 3b) complete. Step 5a (candidate IR schemas) complete: Hybrid LEL+DGR recommended (94/100). Step 5b (LEL prototype) complete: Rust crate compiled, 11/11 tests pass, clippy clean. Step 5c (open thread resolution) complete: 5/5 threads resolved/narrowed/deferred with evidence.
 
 ## Key Definitions
 
@@ -27,6 +27,38 @@ IN PROGRESS — Steps 1-5b and all synthesis steps (1d, 2c, 3b) complete. Step 5
 - **Theory-implementation separation**: The API-enforced structural distinction in DSL frameworks between what the user specifies (theory) and how the framework executes it (implementation).
 
 ## Investigation Log
+
+### 2026-02-21: Open Thread Resolution (Step 5c)
+
+**Scope:** Resolve or narrow 5 open threads from Step 5a (candidate IR schemas) using LEL prototype evidence and analytical reasoning.
+
+**Method:** Empirical benchmark (#31: overlay construction cost), analytical reasoning from prototype evidence (#32: references from day one, #34: OverlayEntity sufficiency), document-driven analysis against DSL survey findings (#33: ExperimentSpec sufficiency), theoretical analysis (#35: arena allocation).
+
+**Findings:**
+
+1. **Thread #31 RESOLVED: Overlay construction cost is empirically bounded.** Benchmark (`src/bench.rs`) measures O(n) HashMap-building pass over synthetic LEL events at 4 scales. Results at 10^6 events: overlay construction 80.53ms, log construction 488.96ms, ~10.7MB overlay memory, ~300K overlay entities, ~200K derivation edges. Linear scaling confirmed: 10^5→10^6 scales ~9x for overlay (8.97→80.53ms). The O(n) pass is tractable for megabyte-scale traces on commodity hardware. [bench.rs benchmark, release mode]
+
+2. **Thread #32 NARROWED: "From day one" is the safer default; deferred resolution is a viable escape hatch.** Prototype evidence: (a) `dag_node_ref`, `spec_ref`, `causal_refs` compile and serialize with None/empty values (`test_hybrid_upgrade_fields_present`, `test_serde_roundtrip`); (b) mock adapter in adapter.rs leaves `dag_node_ref`/`spec_ref` as None — adapters can defer without structural penalty; (c) `EventIndexes.by_dag_node` index populates incrementally during `index_event()` (lel.rs:141-146) — works whether references are upfront or via deferred pass. Deferred resolution is viable via a parallel reference map (`HashMap<EventId, (Option<String>, Option<SpecElementId>)>`) applied at Stage 1→2 boundary as an O(n) pass. Remaining question narrowed to: is the two-phase adapter protocol acceptable complexity for specific adapters? This is an adapter API design decision, not an IR correctness question. [LEL prototype: adapter.rs, lel.rs:141-146, tests]
+
+3. **Thread #33 NARROWED: ExperimentSpec sufficient for all three frameworks at Stage 1; two specific VASP Stage 3 gaps identified.** Analysis against each framework's adapter needs using DSL survey findings: OpenMM — sufficient (`createSystem()` chain is adapter-internal, not spec). GROMACS — sufficient (.mdp → `controlled_variables`/`interventions`, grompp → trace events). VASP — two gaps: (a) `ContractTerm` (common.rs:94-99) has only `description: String`, needs `value: Option<Value>` for machine-readable precondition checking (e.g., POTCAR family = PBE); (b) `PredictionRecord.predicted_value: Value` cannot represent spectral data (band structure over k-points), would need `KnownMatrix` or function variant in `Value` enum. Both gaps are non-blocking for current scope (OpenMM Stage 1). [DSL surveys: OpenMM, GROMACS, VASP; common.rs:94-99, common.rs:102-108]
+
+4. **Thread #34 NARROWED: Lightweight OverlayEntity sufficient for Stage 2-3 queries; one missing index identified.** Analysis of three actual query patterns: R14 (confounder) traverses `causal_ancestors` → common ancestors → `dag_node_ref` against controlled variables → event lookup — OverlayEntity fields sufficient. R17 (comparison) uses `spec_ref` for prediction, `event_id` for observation — sufficient. R18 (causal implication) traverses derivation edges → `dag_node_ref` — sufficient. One gap: `EventIndexes` lacks `by_id: HashMap<EventId, usize>` for O(1) event lookup by ID. Currently `events` is `Vec<TraceEvent>` with no ID→index mapping. OverlayEntity's `event_id` field requires this to avoid O(n) linear search. Small addition (~8 bytes/event). [LEL prototype: lel.rs:88-96 EventIndexes, lel.rs:51-85 TraceEvent]
+
+5. **Thread #35 DEFERRED with concrete guidance: Vec-first, benchmark at Phase 2.** The Hybrid's overlay construction is a single batch O(n) pass — all OverlayEntities allocated in one sweep. For batch allocation, `Vec<OverlayEntity>` with `Vec::with_capacity(n)` achieves the same cache locality as an arena allocator. Arena provides benefit only when allocations are interleaved with other work (preventing heap fragmentation) — not the Hybrid's pattern. Recommendation: start with Vec, benchmark at 10^6 scale during Phase 2, add arena crate (`bumpalo` or `typed-arena`) only if allocation overhead is measurable. [Theoretical analysis; benchmark confirms batch pattern at scale]
+
+6. **Benchmark artifact produced.** `src/bench.rs` as `[[bin]]` target, zero new dependencies (uses `std::time::Instant`). Tests construction at 4 scales (10^3, 10^4, 10^5, 10^6) with realistic event distributions (70/20/10 layer split, 30% `dag_node_ref`, 10% `causal_refs`). Reports wall-clock time, entity/edge counts, memory estimates. [bench.rs]
+
+**Implications:**
+- All 5 open threads from Step 5a are now resolved (1), narrowed (3), or deferred with concrete guidance (1). No thread remains open-ended.
+- The Hybrid LEL+DGR architecture's key performance claim (O(n) overlay construction at megabyte scale) is now empirically validated.
+- Two concrete tasks for future work identified: (a) add `by_id: HashMap<EventId, usize>` to `EventIndexes` for Phase 2 CausalOverlay; (b) add `value: Option<Value>` to `ContractTerm` for VASP Stage 3.
+- The deferred reference resolution strategy provides a viable escape hatch for adapters where per-event entity resolution is costly, without requiring IR structural changes.
+- Arena allocation is deferred with clear trigger: benchmark Vec at Phase 2 scale; adopt arena only if measurable overhead.
+
+**Open Threads:**
+- None. All threads resolved, narrowed, or deferred with concrete guidance.
+
+---
 
 ### 2026-02-20: Candidate IR Schemas with Hybrid LEL-DGR Recommendation (Step 5a)
 
@@ -775,6 +807,12 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 
 47. **The causal reasoning substrate question has a per-stage answer.** Stage 1: sequential search sufficient (filter-and-inspect on implementation-tagged events). Stages 2-3: graph traversal required (transitive causal ancestry for R14 confounders, structural path finding for R18 causal implications). This per-stage resolution directly motivates the Hybrid design. [Candidate IR schemas log 2026-02-20; candidate-ir-schemas.md §8 OQ3]
 
+**Open Thread Resolution**
+
+48. **Overlay construction cost is empirically bounded: ~81ms at 10^6 events.** Benchmark measures O(n) HashMap-building pass at 4 scales. Linear scaling confirmed (10^5→10^6: 9.0→80.5ms). ~10.7MB overlay memory for 300K entities and 200K edges at 10^6 scale. The Hybrid LEL+DGR architecture's key performance claim is validated on commodity hardware. [Open thread resolution log 2026-02-21; bench.rs benchmark]
+
+49. **Lightweight OverlayEntity is sufficient for all three Stage 2-3 query patterns (R14, R17, R18) with one prerequisite: a `by_id` index on EventIndexes.** The indirection from overlay entity to LEL event works for confounder queries, prediction-observation comparison, and causal implication traversal. The missing `by_id: HashMap<EventId, usize>` index (~8 bytes/event) is the only addition needed for Phase 2 CausalOverlay work. [Open thread resolution log 2026-02-21; LEL prototype analysis]
+
 ### What We Suspect
 
 **DSL Trace Architecture**
@@ -905,13 +943,21 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 
 **Candidate IR Schemas**
 
-31. **DGR overlay construction cost at the Stage 1/2 boundary for megabyte-scale traces.** The Hybrid design's O(n) overlay construction pass is theoretically fast but untested. For 10^5-10^6 events, construction time and memory overhead need empirical validation during prototyping. [Candidate IR schemas log 2026-02-20; candidate-ir-schemas.md §4, §7]
+31. ~~**DGR overlay construction cost at the Stage 1/2 boundary for megabyte-scale traces.**~~ RESOLVED: Empirically bounded at ~81ms for 10^6 events via bench.rs benchmark. Linear scaling confirmed (10^5→10^6: 9.0→80.5ms). ~10.7MB overlay memory. See What We Know #48. [Open thread resolution log 2026-02-21; bench.rs benchmark]
 
-32. **Whether HybridIR events need full DGR-compatible references (dag_node_ref, spec_ref, causal_refs) from day one.** The current recommendation is "from day one" for safety, but this pushes entity resolution complexity into the adapter during Stage 1, when these references are not used. A deferred reference-resolution pass could reduce adapter complexity but risks incompleteness. Needs empirical validation during Step 5b. [Candidate IR schemas log 2026-02-20; candidate-ir-schemas.md §8 OQ2]
+32. ~~**Whether HybridIR events need full DGR-compatible references from day one.**~~ NARROWED: "From day one" confirmed as safer default. Deferred resolution is a viable escape hatch via O(n) reference map pass at Stage 1→2 boundary. Remaining question: is the two-phase adapter protocol acceptable complexity for specific adapters? This is an adapter API design decision, not an IR correctness question. [Open thread resolution log 2026-02-21; LEL prototype evidence]
 
-33. **Whether the ExperimentSpec struct is sufficient for all three frameworks.** The current design is generic; framework-specific adapter extensions to the spec may be needed (e.g., VASP multi-file input fusion, OpenMM createSystem compilation chain, GROMACS grompp validation results). [Candidate IR schemas log 2026-02-20; candidate-ir-schemas.md §4]
+33. ~~**Whether the ExperimentSpec struct is sufficient for all three frameworks.**~~ NARROWED: Sufficient for all three at Stage 1. Two specific VASP Stage 3 gaps identified: (a) `ContractTerm` needs `value: Option<Value>` for machine-readable precondition checking; (b) `PredictionRecord.predicted_value` needs `KnownMatrix` or function variant in `Value` for spectral data. See items #35, #36 below. [Open thread resolution log 2026-02-21; DSL surveys]
 
-34. **Whether the OverlayEntity (lightweight reference to LEL event + graph edges) is sufficient for Stage 2-3 queries.** The indirection from overlay entity to LEL event adds a lookup step. Rich overlay entities (carrying computed/derived fields) may be needed for complex causal queries. Performance depends on access patterns not yet characterized. [Candidate IR schemas log 2026-02-20; candidate-ir-schemas.md §4]
+34. ~~**Whether the OverlayEntity is sufficient for Stage 2-3 queries.**~~ NARROWED: Lightweight OverlayEntity is sufficient for R14, R17, R18 query patterns. One prerequisite: add `by_id: HashMap<EventId, usize>` to `EventIndexes` for O(1) event lookup. See What We Know #49 and item #37 below. [Open thread resolution log 2026-02-21; LEL prototype analysis]
+
+35. **Whether `ContractTerm` needs a `value: Option<Value>` field** for machine-readable precondition checking in VASP Stage 3 (e.g., POTCAR family = PBE). Currently `ContractTerm` has only `description: String`. Non-blocking for OpenMM/GROMACS Stage 1. [Open thread resolution log 2026-02-21; common.rs:94-99]
+
+36. **Whether `Value` enum needs a `KnownMatrix` or function variant** for VASP spectral data (band structure over k-points). `PredictionRecord.predicted_value: Value` cannot represent spectral predictions with current variants. Non-blocking for OpenMM Stage 1. [Open thread resolution log 2026-02-21; common.rs:102-108]
+
+37. **Whether `EventIndexes` needs a `by_id: HashMap<EventId, usize>` index** for O(1) event lookup by ID. Currently events is `Vec<TraceEvent>` with no ID→index mapping. Required for Phase 2 CausalOverlay work where OverlayEntity's `event_id` field needs efficient lookup. Small addition (~8 bytes/event). [Open thread resolution log 2026-02-21; lel.rs:88-96]
+
+38. **Whether arena allocation provides measurable benefit for CausalOverlay construction.** Theoretical analysis suggests Vec with `with_capacity(n)` is equivalent for the Hybrid's batch O(n) construction pattern. Arena benefits apply only to interleaved allocation patterns. Deferred to Phase 2: benchmark Vec at 10^6 scale; adopt arena (`bumpalo` or `typed-arena`) only if overhead is measurable. [Open thread resolution log 2026-02-21; theoretical analysis]
 
 ## Prototype Index
 
@@ -919,6 +965,7 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 | :--- | :--- | :--- | :--- |
 | `codex-prompt-5b-lel-prototype.md` | Codex prompt to produce the LEL IR Rust crate prototype (Step 5b) | Complete | Specifies LEL core types (§1/§2), OpenMM mock adapter, builder helpers, 11 unit tests; validates event typing, layer tagging, spec separation, Hybrid upgrade path fields |
 | `lel-ir-prototype/` | LEL IR Rust crate (produced from Codex prompt) | Complete | Compiles clean, 11/11 tests pass, clippy zero warnings. Validates: event typing (12 EventKind variants), layer tagging (Theory/Methodology/Implementation), spec separation (AP1 avoidance), serde roundtrip, Hybrid upgrade fields (dag_node_ref/spec_ref/causal_refs) |
+| `lel-ir-prototype/src/bench.rs` | CausalOverlay construction benchmark (Step 5c, Thread #31) | Complete | Measures O(n) overlay construction at 4 scales (10^3-10^6). Results: 80.53ms at 10^6 events, linear scaling, ~10.7MB overlay memory. Confirms Hybrid architecture tractability. |
 
 ## Next Steps
 
@@ -930,7 +977,7 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 
 4. ~~**Characterize the 21% baseline and DSL improvement**~~ — **COMPLETE** (pending verification of source). See baseline characterization investigation log above. Key action item: verify the 21% source with web access.
 
-5. **Draft candidate IR schemas and prototype** — **Step 5a COMPLETE. Step 5b COMPLETE.** Three candidates (LEL, DGR, Hybrid LEL+DGR) evaluated against R1-R29, 9 anti-patterns, streaming constraints, and 7-criterion weighted framework. Recommendation: Hybrid (94/100). LEL prototype implemented as Rust crate (`prototypes/lel-ir-prototype/`): 11/11 tests pass, clippy clean. Validates event typing, layer tagging, spec separation, Hybrid upgrade fields. See `dsl-evaluation/candidate-ir-schemas.md`, `prototypes/codex-prompt-5b-lel-prototype.md`, and investigation logs above. (Beads: athena-axc, athena-9uv)
+5. **Draft candidate IR schemas and prototype** — **Steps 5a, 5b, 5c COMPLETE.** Three candidates (LEL, DGR, Hybrid LEL+DGR) evaluated against R1-R29, 9 anti-patterns, streaming constraints, and 7-criterion weighted framework. Recommendation: Hybrid (94/100). LEL prototype implemented as Rust crate (`prototypes/lel-ir-prototype/`): 11/11 tests pass, clippy clean. Validates event typing, layer tagging, spec separation, Hybrid upgrade fields. Step 5c resolved all 5 open threads from 5a: overlay cost empirically bounded (81ms at 10^6), references-from-day-one confirmed, ExperimentSpec sufficient (two VASP gaps tracked), OverlayEntity sufficient (one index addition needed), arena allocation deferred. See `dsl-evaluation/candidate-ir-schemas.md`, `prototypes/codex-prompt-5b-lel-prototype.md`, and investigation logs above. (Beads: athena-axc, athena-9uv)
 
 **Synthesis steps needed before Step 5:**
 
