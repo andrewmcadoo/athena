@@ -17,7 +17,7 @@ What intermediate representation (IR) can translate raw DSL trace logs from stru
 
 ## Status
 
-IN PROGRESS — Steps 1-4 substantially complete (7 parallel investigations merged). Step 1d (cross-framework trace synthesis) and Step 2c (comparative IR synthesis) are next. Step 5 (candidate IR schemas) remains blocked by synthesis steps.
+IN PROGRESS — Steps 1-4 and all synthesis steps (1d, 2c, 3b) complete. Step 5a (candidate IR schemas) complete: Hybrid LEL+DGR recommended (94/100). Step 5b (prototype: LEL on OpenMM traces) is next.
 
 ## Key Definitions
 
@@ -27,6 +27,50 @@ IN PROGRESS — Steps 1-4 substantially complete (7 parallel investigations merg
 - **Theory-implementation separation**: The API-enforced structural distinction in DSL frameworks between what the user specifies (theory) and how the framework executes it (implementation).
 
 ## Investigation Log
+
+### 2026-02-20: Candidate IR Schemas with Hybrid LEL-DGR Recommendation (Step 5a)
+
+**Scope:** Synthesize all accumulated evidence (R1-R29 requirements, coverage matrix, pattern catalog, cross-framework synthesis) into concrete IR schema designs. Evaluate candidates against requirements, anti-patterns, streaming constraints, and stage-specific performance. Produce a recommendation for Step 5b prototyping.
+
+**Method:** Schema design driven by three inputs: (1) requirements-coverage-matrix.md (R1-R29 coverage codes, gap analysis, three-input data flow architecture), (2) ir-pattern-catalog.md (7 transferable patterns, 9 anti-patterns, candidate previews, unified architecture), (3) cross-framework-synthesis.md (adapter contract, failure modes, boundary parameters). Candidates evaluated against a 7-criterion weighted framework (R1-R29 coverage 25%, anti-pattern compliance 20%, streaming 15%, Stage 1 efficiency 15%, Stage 2-3 causal reasoning 15%, implementation complexity 5%, incremental adoptability 5%). Key design decision: 2 candidates + 1 hybrid, replacing TAL standalone with LEL-DGR Hybrid based on coverage matrix conclusions.
+
+**Findings:**
+
+1. **TAL deferred to query-layer role, replaced by LEL-DGR Hybrid.** The coverage matrix (requirements-coverage-matrix.md §8) concluded TAL "works better as a query interface layer than a data representation." TAL has the highest novelty risk (no close precedent), weakest causal graph traversal support, and its core strength (sequential assertion checking) functions identically as a query interface over LEL or DGR substrates. TAL's assertion-checking pattern is preserved as the recommended LFI query interface. The Hybrid candidate addresses open questions #2 (incremental path) and #5 (LEL→DGR viability), which are more architecturally informative than a high-risk novelty candidate. [candidate-ir-schemas.md §0]
+
+2. **A common structural foundation shared by all candidates was defined.** Seven shared types: `Layer` enum (Theory/Methodology/Implementation) for R19, `BoundaryClassification` enum (PrimaryLayer/DualAnnotated/ContextDependent) resolving OQ4, `ObservationMode` enum for R28, `Value` enum with `Havoc` variant (Boogie P6) for R26, `TemporalCoord` struct (simulation_step/wall_clock_ns/logical_sequence) for R21, `ProvenanceAnchor` struct for R20, `ExperimentRef` struct for R22/R29, and `ConfidenceMeta` struct for R25. These types ensure consistent semantics regardless of which candidate is chosen. [candidate-ir-schemas.md §1]
+
+3. **LEL (Layered Event Log) scores 82/100.** STRONG for Stage 1 (7/7 requirements), streaming (pure append-only), and implementation simplicity. WEAK for R14 (confounder query — requires multi-way joins unsupported by flat log) and R18 (causal implication — requires transitive causal ancestry unsupported without graph traversal). PARTIAL on AP7 (implicit causal ordering — causal_refs are optional best-effort). [candidate-ir-schemas.md §2, §5, §6, §9]
+
+4. **DGR (Dual-Graph IR) scores 82/100.** STRONG for all R1-R29 requirements (full coverage including R14 and R18 via graph traversal) and Stages 2-3 causal reasoning. PARTIAL on AP2 (post-mortem-only — spec_graph pre-built before trace, acceptable). MODERATE for streaming (graph construction from streaming data requires forward-reference management) and Stage 1 efficiency (graph construction overhead for the most common classification path). Same total as LEL but with inverted strengths/weaknesses. [candidate-ir-schemas.md §3, §5, §6, §9]
+
+5. **Hybrid (LEL core + DGR overlay) scores 94/100.** Captures LEL's strengths (streaming, Stage 1 efficiency) and DGR's strengths (causal reasoning, R1-R29 coverage). PASS on all 9 anti-patterns (the only candidate with no PARTIAL ratings). Stage 1 operates as pure LEL (append-only, early termination if implementation fault found). CausalOverlay built at Stage 1→2 boundary via single O(n) pass over events. Key constraint: LEL events must carry `dag_node_ref` and `spec_ref` from the start to enable overlay construction. [candidate-ir-schemas.md §4, §5, §6, §9]
+
+6. **R17 (prediction-observation comparison) resolved structurally via ComparisonResult + DivergenceMeasure.** The IR provides a structural container with six divergence measure variants (AbsoluteDifference, ZScore, BayesFactor, KLDivergence, EffectSize, Custom). The comparison method is pluggable — the IR stores results, not logic. The LFI selects the appropriate measure per prediction type. The comparison formalization research question is now scoped to LFI logic, not IR structure. [candidate-ir-schemas.md §3, §8 OQ1]
+
+7. **The LEL→DGR incremental path is viable.** The Hybrid demonstrates viability by construction. Key constraint identified: LEL events must include DGR-compatible references (dag_node_ref, spec_ref, causal_refs) from day one. If these are omitted during initial implementation, overlay construction requires re-parsing. Implication for Step 5b: the LEL prototype must include these fields even though Stage 1 does not use them. [candidate-ir-schemas.md §4, §8 OQ2]
+
+8. **Causal reasoning substrate is per-stage.** Stage 1: sequential search sufficient (filter-and-inspect on implementation-tagged events, O(n) with early termination). Stages 2-3: graph traversal required (transitive causal ancestry for R14 confounder queries, structural path finding for R18 causal implication). This per-stage answer directly motivates the Hybrid design. [candidate-ir-schemas.md §8 OQ3]
+
+9. **BoundaryClassification enum resolves the boundary parameter representation question.** Three variants: PrimaryLayer (unambiguous), DualAnnotated (primary layer for routing + secondary layer annotation, e.g., GROMACS dt), ContextDependent (default layer + context note, e.g., VASP ALGO). Avoids both a fourth "boundary" layer and entity duplication. [candidate-ir-schemas.md §1, §8 OQ4]
+
+10. **Step 5b recommendation: LEL prototype on OpenMM traces.** Scope: R1-R7 + R19 + R20 + R21. Target: validate event typing, layer tagging, specification separation with minimal complexity. Critical: include dag_node_ref/spec_ref/causal_refs fields for Hybrid upgrade path. Evolution: LEL → Hybrid (overlay) → full DGR as Stages 2-3 mature. [candidate-ir-schemas.md §10]
+
+**Implications:**
+- The IR design question is now resolved to a recommended architecture (Hybrid LEL+DGR) with a concrete prototyping plan (LEL first, OpenMM target).
+- Step 5b can proceed immediately with a well-scoped prototype: LEL core on OpenMM traces, Stage 1 requirements only, with Hybrid upgrade path preserved.
+- The common structural foundation (Section 1 types) should be implemented first and shared across any candidate, ensuring consistent semantics regardless of which IR representation is used.
+- The R17 comparison formalization is now scoped to LFI logic, not IR structure — it can be researched independently of IR prototyping.
+- TAL as a query-layer interface should be designed alongside the LFI, not as an IR component.
+
+**Open Threads:**
+- DGR overlay construction cost at the Stage 1/2 boundary for megabyte-scale traces (10^5-10^6 events). The O(n) pass is theoretically fast but untested empirically. Performance validation needed during Step 5b or an early Hybrid prototype.
+- Whether HybridIR events need full DGR-compatible references (dag_node_ref, spec_ref, causal_refs) from day one, or whether a deferred reference-resolution pass is acceptable. The current recommendation is "from day one" for safety, but this pushes entity resolution complexity into the adapter during Stage 1, when it's not needed.
+- Arena allocation strategy for the CausalOverlay. The overlay entities reference back to LEL events — the allocation pattern and cache friendliness of this indirection need benchmarking.
+- Whether the ExperimentSpec struct is sufficient for all three frameworks or whether framework-specific extensions are needed. The current design is generic; adapter-specific spec fields may be needed.
+- The OverlayEntity is lightweight (wraps an LEL event reference + graph relationships). Whether this indirection is sufficient for Stage 2-3 queries or whether richer overlay entities (carrying computed fields, derived values) are needed.
+
+---
 
 ### 2026-02-20: Requirements Coverage Matrix and Gap Analysis (Step 3b)
 
@@ -715,6 +759,22 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 
 40. **Six specific structural properties of traces improve RCA accuracy** (with estimated improvements): temporal/causal ordering (+15-25%), event type taxonomies (+10-20%), schema conformance (+10-20%), causal annotations/dependency graphs (+20-35%), severity levels (+5-10%), layer/component separation (+10-15%). Improvements interact positively. [Baseline log 2026-02-20; evidence quality B]
 
+**Candidate IR Schemas**
+
+41. **Hybrid LEL+DGR is the recommended IR architecture.** Scores 94/100 vs. 82/100 for either standalone candidate (LEL or DGR). Provides per-stage optimized operation: LEL streaming efficiency for Stage 1 (the common classification path) and DGR-like causal reasoning for Stages 2-3 (the differentiating path). PASS on all 9 anti-patterns. Supersedes the suspicion that DGR alone was strongest. [Candidate IR schemas log 2026-02-20; candidate-ir-schemas.md §9-10]
+
+42. **The LEL→DGR incremental implementation path is viable.** Demonstrated by the Hybrid candidate's construction: LEL events carry dag_node_ref/spec_ref/causal_refs from day one; CausalOverlay built at Stage 1→2 boundary via single O(n) pass. Key constraint: LEL events must include DGR-compatible references from initial construction, pushing some entity resolution into the adapter even during Stage 1. [Candidate IR schemas log 2026-02-20; candidate-ir-schemas.md §4, §8 OQ2]
+
+43. **A common structural foundation (7 shared types) is independent of candidate choice.** Layer enum, BoundaryClassification enum, ObservationMode enum, Value enum with Havoc variant, TemporalCoord struct, ProvenanceAnchor struct, ExperimentRef struct, and ConfidenceMeta struct are shared across all candidates. These can be implemented first and reused regardless of which IR representation is chosen. [Candidate IR schemas log 2026-02-20; candidate-ir-schemas.md §1]
+
+44. **TAL is better as a query interface than a storage format.** The coverage matrix and candidate evaluation confirm that TAL's assertion-checking pattern functions identically as a query layer over LEL or DGR substrates. TAL's core strength (sequential audit assertions with evidence chains) does not require a standalone IR representation. Adopted as the recommended LFI query interface. [Candidate IR schemas log 2026-02-20; candidate-ir-schemas.md §0, §10]
+
+45. **BoundaryClassification enum resolves the boundary parameter representation question.** Three variants (PrimaryLayer, DualAnnotated, ContextDependent) handle the full spectrum from unambiguous parameters to context-dependent ones like VASP ALGO. Primary layer determines LFI routing; secondary annotations provide diagnostic context. Avoids both a fourth "boundary" layer and entity duplication. [Candidate IR schemas log 2026-02-20; candidate-ir-schemas.md §1, §8 OQ4]
+
+46. **R17 comparison is structurally resolved as a pluggable container.** ComparisonResult + DivergenceMeasure enum (6 variants: AbsoluteDifference, ZScore, BayesFactor, KLDivergence, EffectSize, Custom) provides the IR's structural slot. The comparison method is pluggable — the IR stores results, the LFI supplies logic. The R17 formalization research is now scoped to LFI logic, not IR structure. [Candidate IR schemas log 2026-02-20; candidate-ir-schemas.md §3, §8 OQ1]
+
+47. **The causal reasoning substrate question has a per-stage answer.** Stage 1: sequential search sufficient (filter-and-inspect on implementation-tagged events). Stages 2-3: graph traversal required (transitive causal ancestry for R14 confounders, structural path finding for R18 causal implications). This per-stage resolution directly motivates the Hybrid design. [Candidate IR schemas log 2026-02-20; candidate-ir-schemas.md §8 OQ3]
+
 ### What We Suspect
 
 **DSL Trace Architecture**
@@ -763,9 +823,9 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 
 **Cross-Framework and IR Synthesis**
 
-20. **DGR (Dual-Graph IR) is likely the strongest candidate for Step 5a.** Supported by both surveys' pattern synthesis AND the coverage matrix: the IR's three-input composite nature (31% NT, high cross-referencing DE requirements) favors graph structure for representing entities from multiple sources with qualified relationships. LEL remains strongest for Stage 1 (high DA density). TAL works better as a query interface layer than standalone IR. [IR synthesis log 2026-02-20; ir-pattern-catalog.md §6; Coverage matrix log 2026-02-20; requirements-coverage-matrix.md §8]
+20. ~~**DGR (Dual-Graph IR) is likely the strongest candidate for Step 5a.**~~ PROMOTED to What We Know #41. Full candidate evaluation confirms Hybrid LEL+DGR is the recommended architecture, combining LEL streaming efficiency for Stage 1 with DGR causal reasoning for Stages 2-3. Scores 94/100 vs. 82/100 for either standalone candidate. [Candidate IR schemas log 2026-02-20; candidate-ir-schemas.md §9-10]
 
-21. **The unified architecture (MLIR-dialects + PROV-DM + Boogie-contracts) can likely be incrementally implemented** — start with LEL for a Stage 1 prototype, add graph structure for Stages 2-3, evolve toward DGR. This reduces risk by validating incrementally. [IR synthesis log 2026-02-20; ir-pattern-catalog.md §7]
+21. ~~**The unified architecture can likely be incrementally implemented.**~~ PROMOTED to What We Know #42. The Hybrid candidate proves incremental implementation by construction: LEL core for Stage 1, CausalOverlay added at Stage 1→2 boundary via O(n) pass. Key constraint: LEL events must carry dag_node_ref/spec_ref/causal_refs from day one for overlay construction. [Candidate IR schemas log 2026-02-20; candidate-ir-schemas.md §4, §8 OQ2]
 
 22. **Classification tables for new DSL frameworks may be partially automatable** via LLM-assisted documentation analysis, reducing the per-DSL engineering cost. Untested. [Cross-framework synthesis log 2026-02-20; cross-framework-synthesis.md §6.4]
 
@@ -825,9 +885,9 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 
 **Cross-Framework and IR Synthesis**
 
-23. **Which causal reasoning substrate (log search, graph traversal, or assertion chains) best matches the LFI's actual query patterns.** Requires enumerating specific queries derived from R1-R29 and benchmarking each candidate. [IR synthesis log 2026-02-20; ir-pattern-catalog.md §7]
+23. ~~**Which causal reasoning substrate best matches the LFI's actual query patterns.**~~ RESOLVED: per-stage answer. Stage 1: sequential search sufficient. Stages 2-3: graph traversal required. See What We Know #47. [Candidate IR schemas log 2026-02-20; candidate-ir-schemas.md §8 OQ3]
 
-24. **How boundary parameters (GROMACS dt, VASP PREC) should be represented in a dialect-based IR.** Options: assign to primary dialect with cross-reference, create a "boundary" sub-dialect, or duplicate with explicit derivation link. [IR synthesis log 2026-02-20; ir-pattern-catalog.md §7]
+24. ~~**How boundary parameters should be represented in a dialect-based IR.**~~ RESOLVED: BoundaryClassification enum with PrimaryLayer/DualAnnotated/ContextDependent variants. See What We Know #45. [Candidate IR schemas log 2026-02-20; candidate-ir-schemas.md §1, §8 OQ4]
 
 25. **The practical impact of VASP's closed-source ceiling.** How often does correct fault classification require information not present in vasprun.xml + OUTCAR + stdout? Needs stress-testing with real VASP failure cases. [Cross-framework synthesis log 2026-02-20; cross-framework-synthesis.md §6.4]
 
@@ -839,9 +899,19 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 
 28. **How to formalize the quantitative prediction-observation comparison method (R17).** This is the single unresolved research element blocking Stage 3 feasibility. Must define effect size measures, divergence metrics, and tolerance thresholds for scientific predictions. Related to the DRAT propositional-to-statistical adaptation gap. [Coverage matrix log 2026-02-20; requirements-coverage-matrix.md §4, §6.3]
 
-29. **Whether the LEL→DGR incremental implementation path is viable.** The coverage matrix shows LEL is best for Stage 1 (high DA density) and DGR for Stages 2-3 (graph structure for NT/DE cross-referencing). Can LEL be extended incrementally with graph structure, or does DGR require up-front design? [Coverage matrix log 2026-02-20; requirements-coverage-matrix.md §8; ir-pattern-catalog.md §7 Q5]
+29. ~~**Whether the LEL→DGR incremental implementation path is viable.**~~ RESOLVED: Yes. The Hybrid candidate demonstrates viability by construction. See What We Know #42. [Candidate IR schemas log 2026-02-20; candidate-ir-schemas.md §4, §8 OQ2]
 
 30. **The per-force-group energy decomposition overhead in OpenMM (R6 DI).** This is the largest unknown affecting OpenMM adapter feasibility. If overhead is prohibitive, alternative R6 strategies are needed (e.g., statistical anomaly detection on total energy only). [Coverage matrix log 2026-02-20; What We Don't Know #2]
+
+**Candidate IR Schemas**
+
+31. **DGR overlay construction cost at the Stage 1/2 boundary for megabyte-scale traces.** The Hybrid design's O(n) overlay construction pass is theoretically fast but untested. For 10^5-10^6 events, construction time and memory overhead need empirical validation during prototyping. [Candidate IR schemas log 2026-02-20; candidate-ir-schemas.md §4, §7]
+
+32. **Whether HybridIR events need full DGR-compatible references (dag_node_ref, spec_ref, causal_refs) from day one.** The current recommendation is "from day one" for safety, but this pushes entity resolution complexity into the adapter during Stage 1, when these references are not used. A deferred reference-resolution pass could reduce adapter complexity but risks incompleteness. Needs empirical validation during Step 5b. [Candidate IR schemas log 2026-02-20; candidate-ir-schemas.md §8 OQ2]
+
+33. **Whether the ExperimentSpec struct is sufficient for all three frameworks.** The current design is generic; framework-specific adapter extensions to the spec may be needed (e.g., VASP multi-file input fusion, OpenMM createSystem compilation chain, GROMACS grompp validation results). [Candidate IR schemas log 2026-02-20; candidate-ir-schemas.md §4]
+
+34. **Whether the OverlayEntity (lightweight reference to LEL event + graph edges) is sufficient for Stage 2-3 queries.** The indirection from overlay entity to LEL event adds a lookup step. Rich overlay entities (carrying computed/derived fields) may be needed for complex causal queries. Performance depends on access patterns not yet characterized. [Candidate IR schemas log 2026-02-20; candidate-ir-schemas.md §4]
 
 ## Prototype Index
 
@@ -859,7 +929,7 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 
 4. ~~**Characterize the 21% baseline and DSL improvement**~~ — **COMPLETE** (pending verification of source). See baseline characterization investigation log above. Key action item: verify the 21% source with web access.
 
-5. **Draft candidate IR schemas** — **NOT STARTED.** Blocked by synthesis steps (1d, 2c, 3b below). Based on the above, propose 2-3 candidate IR designs with explicit tradeoffs (resolution vs. generality vs. implementation cost). Each should be evaluated against the R1-R29 requirements.
+5. **Draft candidate IR schemas** — **Step 5a COMPLETE.** Three candidates (LEL, DGR, Hybrid LEL+DGR) evaluated against R1-R29, 9 anti-patterns, streaming constraints, and 7-criterion weighted framework. Recommendation: Hybrid (94/100). Step 5b (prototype) is next: LEL core on OpenMM traces, Stage 1 scope, with Hybrid upgrade path preserved. See `dsl-evaluation/candidate-ir-schemas.md` and investigation log above. (Bead: athena-axc)
 
 **Synthesis steps needed before Step 5:**
 
