@@ -87,6 +87,7 @@ pub struct TraceEvent {
 /// Secondary indexes for R24 queryability.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EventIndexes {
+    pub by_id: HashMap<EventId, usize>,
     pub by_layer: HashMap<Layer, Vec<EventId>>,
     pub by_kind: HashMap<EventKindTag, Vec<EventId>>,
     /// simulation_step -> first event at that step.
@@ -99,6 +100,7 @@ impl EventIndexes {
     /// Create empty indexes.
     pub fn new() -> Self {
         Self {
+            by_id: HashMap::new(),
             by_layer: HashMap::new(),
             by_kind: HashMap::new(),
             by_time_range: BTreeMap::new(),
@@ -108,7 +110,9 @@ impl EventIndexes {
     }
 
     /// Index a single event. Called during log construction.
-    pub fn index_event(&mut self, event: &TraceEvent) {
+    pub fn index_event(&mut self, event: &TraceEvent, position: usize) {
+        self.by_id.insert(event.id, position);
+
         // By layer
         self.by_layer.entry(event.layer).or_default().push(event.id);
 
@@ -302,7 +306,7 @@ impl LayeredEventLogBuilder {
 
     /// Add an event and update indexes.
     pub fn add_event(mut self, event: TraceEvent) -> Self {
-        self.indexes.index_event(&event);
+        self.indexes.index_event(&event, self.events.len());
         self.events.push(event);
         self
     }

@@ -1,10 +1,9 @@
 //! CausalOverlay construction benchmark for Thread #31 resolution.
 //!
-//! Measures wall-clock time for LEL log construction and simulated
-//! overlay construction at 4 scales (10^3 to 10^6 events).
+//! Measures wall-clock time for LEL log construction and real
+//! `CausalOverlay::from_log` construction at 4 scales (10^3 to 10^6 events).
 //! Zero external dependencies — uses std::time::Instant only.
 
-use std::collections::HashMap;
 use std::time::Instant;
 
 use lel_ir_prototype::common::{
@@ -14,6 +13,7 @@ use lel_ir_prototype::event_kinds::EventKind;
 use lel_ir_prototype::lel::{
     reset_event_id_counter, ExperimentSpec, LayeredEventLogBuilder, TraceEventBuilder,
 };
+use lel_ir_prototype::overlay::CausalOverlay;
 
 fn main() {
     println!("LEL IR Prototype — CausalOverlay Construction Benchmark");
@@ -119,40 +119,14 @@ fn run_benchmark(n: usize) {
 
     // ── Phase 2: Overlay construction (single O(n) pass) ───────
     let t_overlay_start = Instant::now();
-
-    let mut entity_by_dag_node: HashMap<String, Vec<u64>> = HashMap::new();
-    let mut causal_ancestors: HashMap<u64, Vec<u64>> = HashMap::new();
-    let mut overlay_entity_count: u64 = 0;
-    let mut edge_count: u64 = 0;
-
-    for event in &log.events {
-        if let Some(dag_ref) = &event.dag_node_ref {
-            entity_by_dag_node
-                .entry(dag_ref.clone())
-                .or_default()
-                .push(event.id.0);
-            overlay_entity_count += 1;
-        }
-        if !event.causal_refs.is_empty() {
-            let refs: Vec<u64> = event.causal_refs.iter().map(|e| e.0).collect();
-            edge_count += refs.len() as u64;
-            causal_ancestors.insert(event.id.0, refs);
-        }
-    }
+    let overlay = CausalOverlay::from_log(&log);
+    let edge_count = overlay
+        .entities
+        .iter()
+        .map(|entity| entity.causal_parents.len())
+        .sum::<usize>();
 
     let overlay_ms = t_overlay_start.elapsed().as_secs_f64() * 1_000.0;
-
-    // ── Memory estimate ────────────────────────────────────────
-    // HashMap overhead: ~64 bytes per bucket + key + value payload
-    let entity_mem_bytes: usize = entity_by_dag_node
-        .iter()
-        .map(|(k, v)| k.len() + v.len() * 8 + 64)
-        .sum();
-    let ancestor_mem_bytes: usize = causal_ancestors
-        .values()
-        .map(|v| 8 + v.len() * 8 + 64)
-        .sum();
-    let total_overlay_kb = (entity_mem_bytes + ancestor_mem_bytes) as f64 / 1_024.0;
 
     // ── Report ─────────────────────────────────────────────────
     println!("Scale: {:>10} events", n);
@@ -166,8 +140,8 @@ fn run_benchmark(n: usize) {
     );
     println!(
         "  Overlay entities:     {:>10}  (~{:.0}% of events)",
-        overlay_entity_count,
-        overlay_entity_count as f64 / n as f64 * 100.0
+        overlay.len(),
+        overlay.len() as f64 / n as f64 * 100.0
     );
     println!(
         "  Derivation edges:     {:>10}  (~{:.0}% of events)",
@@ -176,11 +150,7 @@ fn run_benchmark(n: usize) {
     );
     println!(
         "  DAG node groups:      {:>10}",
-        entity_by_dag_node.len()
-    );
-    println!(
-        "  Estimated overlay mem:{:>10.1} KB",
-        total_overlay_kb
+        overlay.entity_by_dag_node.len()
     );
     println!();
 }

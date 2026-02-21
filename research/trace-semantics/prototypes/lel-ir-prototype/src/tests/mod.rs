@@ -1,11 +1,15 @@
+use std::sync::Once;
+
 use crate::adapter::{DslAdapter, MockOpenMmAdapter};
 use crate::common::*;
 use crate::event_kinds::EventKind;
 use crate::lel::*;
+use crate::overlay::CausalOverlay;
 
-/// Helper: reset the global event ID counter before each test.
+/// Helper: initialize the global event ID counter once for the test process.
 fn setup() {
-    reset_event_id_counter();
+    static INIT_EVENT_COUNTER: Once = Once::new();
+    INIT_EVENT_COUNTER.call_once(reset_event_id_counter);
 }
 
 /// Helper: create a minimal provenance anchor for tests.
@@ -240,7 +244,1050 @@ fn test_log_append_and_query_by_layer() {
     let impl_ids = log.indexes.by_layer.get(&Layer::Implementation).unwrap();
     assert_eq!(impl_ids.len(), 2);
 
-    assert!(log.indexes.by_layer.get(&Layer::Methodology).is_none());
+    assert!(!log.indexes.by_layer.contains_key(&Layer::Methodology));
+}
+
+#[test]
+fn test_by_id_index_populated() {
+    setup();
+    let log = LayeredEventLogBuilder::new(test_experiment_ref(), test_spec())
+        .add_event(
+            TraceEventBuilder::new()
+                .layer(Layer::Theory)
+                .kind(EventKind::ParameterRecord {
+                    name: "alpha".to_string(),
+                    specified_value: None,
+                    actual_value: Value::Known(1.0, "nm".to_string()),
+                    units: Some("nm".to_string()),
+                    observation_mode: ObservationMode::Observational,
+                })
+                .temporal(TemporalCoord {
+                    simulation_step: 0,
+                    wall_clock_ns: None,
+                    logical_sequence: 1,
+                })
+                .build(),
+        )
+        .add_event(
+            TraceEventBuilder::new()
+                .layer(Layer::Implementation)
+                .kind(EventKind::ExecutionStatus {
+                    status: ExecutionOutcome::Success,
+                    framework_error_id: None,
+                })
+                .temporal(TemporalCoord {
+                    simulation_step: 1,
+                    wall_clock_ns: None,
+                    logical_sequence: 2,
+                })
+                .build(),
+        )
+        .build();
+
+    assert_eq!(log.indexes.by_id.len(), log.events.len());
+    for event in &log.events {
+        assert!(log.indexes.by_id.contains_key(&event.id));
+    }
+}
+
+#[test]
+fn test_by_id_index_correct_positions() {
+    setup();
+    let log = LayeredEventLogBuilder::new(test_experiment_ref(), test_spec())
+        .add_event(
+            TraceEventBuilder::new()
+                .layer(Layer::Theory)
+                .kind(EventKind::ParameterRecord {
+                    name: "force_field".to_string(),
+                    specified_value: None,
+                    actual_value: Value::KnownCat("amber14".to_string()),
+                    units: None,
+                    observation_mode: ObservationMode::Observational,
+                })
+                .temporal(TemporalCoord {
+                    simulation_step: 0,
+                    wall_clock_ns: None,
+                    logical_sequence: 1,
+                })
+                .build(),
+        )
+        .add_event(
+            TraceEventBuilder::new()
+                .layer(Layer::Implementation)
+                .kind(EventKind::ResourceStatus {
+                    platform_type: "CPU".to_string(),
+                    device_ids: vec![],
+                    memory_allocated: None,
+                    memory_peak: None,
+                    parallelization: None,
+                    warnings: vec![],
+                })
+                .temporal(TemporalCoord {
+                    simulation_step: 1,
+                    wall_clock_ns: None,
+                    logical_sequence: 2,
+                })
+                .build(),
+        )
+        .add_event(
+            TraceEventBuilder::new()
+                .layer(Layer::Implementation)
+                .kind(EventKind::EnergyRecord {
+                    total: Value::Known(-100.0, "kJ/mol".to_string()),
+                    components: vec![],
+                })
+                .temporal(TemporalCoord {
+                    simulation_step: 2,
+                    wall_clock_ns: None,
+                    logical_sequence: 3,
+                })
+                .build(),
+        )
+        .build();
+
+    for (position, event) in log.events.iter().enumerate() {
+        let indexed_position = log
+            .indexes
+            .by_id
+            .get(&event.id)
+            .expect("by_id must contain every event id");
+        assert_eq!(*indexed_position, position);
+    }
+}
+
+#[test]
+fn test_by_id_serde_roundtrip() {
+    setup();
+    let adapter = MockOpenMmAdapter;
+    let original = adapter.parse_trace("").unwrap();
+
+    let json = serde_json::to_string(&original).expect("Serialization must succeed");
+    let restored: LayeredEventLog =
+        serde_json::from_str(&json).expect("Deserialization must succeed");
+
+    assert_eq!(original.indexes.by_id.len(), restored.indexes.by_id.len());
+    for (event_id, position) in &original.indexes.by_id {
+        assert_eq!(restored.indexes.by_id.get(event_id), Some(position));
+    }
+}
+
+#[test]
+fn test_overlay_empty_log() {
+    setup();
+    let log = LayeredEventLogBuilder::new(test_experiment_ref(), test_spec()).build();
+    let overlay = CausalOverlay::from_log(&log);
+
+    assert_eq!(overlay.len(), 0);
+    assert!(overlay.is_empty());
+    assert!(overlay.entity(0).is_none());
+}
+
+#[test]
+fn test_overlay_one_to_one_mapping() {
+    setup();
+    let log = LayeredEventLogBuilder::new(test_experiment_ref(), test_spec())
+        .add_event(
+            TraceEventBuilder::new()
+                .layer(Layer::Theory)
+                .kind(EventKind::ParameterRecord {
+                    name: "a".to_string(),
+                    specified_value: None,
+                    actual_value: Value::Known(1.0, "nm".to_string()),
+                    units: Some("nm".to_string()),
+                    observation_mode: ObservationMode::Observational,
+                })
+                .temporal(TemporalCoord {
+                    simulation_step: 0,
+                    wall_clock_ns: None,
+                    logical_sequence: 1,
+                })
+                .build(),
+        )
+        .add_event(
+            TraceEventBuilder::new()
+                .layer(Layer::Implementation)
+                .kind(EventKind::ExecutionStatus {
+                    status: ExecutionOutcome::Success,
+                    framework_error_id: None,
+                })
+                .temporal(TemporalCoord {
+                    simulation_step: 1,
+                    wall_clock_ns: None,
+                    logical_sequence: 2,
+                })
+                .build(),
+        )
+        .build();
+
+    let overlay = CausalOverlay::from_log(&log);
+    assert_eq!(overlay.len(), log.events.len());
+    for idx in 0..log.events.len() {
+        assert_eq!(overlay.entity(idx).unwrap().event_idx, idx);
+    }
+}
+
+#[test]
+fn test_overlay_dag_node_index() {
+    setup();
+    let log = LayeredEventLogBuilder::new(test_experiment_ref(), test_spec())
+        .add_event(
+            TraceEventBuilder::new()
+                .layer(Layer::Implementation)
+                .kind(EventKind::ExecutionStatus {
+                    status: ExecutionOutcome::Success,
+                    framework_error_id: None,
+                })
+                .temporal(TemporalCoord {
+                    simulation_step: 0,
+                    wall_clock_ns: None,
+                    logical_sequence: 1,
+                })
+                .dag_node_ref("node_x".to_string())
+                .build(),
+        )
+        .add_event(
+            TraceEventBuilder::new()
+                .layer(Layer::Implementation)
+                .kind(EventKind::ExecutionStatus {
+                    status: ExecutionOutcome::Success,
+                    framework_error_id: None,
+                })
+                .temporal(TemporalCoord {
+                    simulation_step: 1,
+                    wall_clock_ns: None,
+                    logical_sequence: 2,
+                })
+                .dag_node_ref("node_x".to_string())
+                .build(),
+        )
+        .add_event(
+            TraceEventBuilder::new()
+                .layer(Layer::Theory)
+                .kind(EventKind::ParameterRecord {
+                    name: "alpha".to_string(),
+                    specified_value: None,
+                    actual_value: Value::Known(2.0, "nm".to_string()),
+                    units: Some("nm".to_string()),
+                    observation_mode: ObservationMode::Observational,
+                })
+                .temporal(TemporalCoord {
+                    simulation_step: 2,
+                    wall_clock_ns: None,
+                    logical_sequence: 3,
+                })
+                .dag_node_ref("node_y".to_string())
+                .build(),
+        )
+        .build();
+
+    let overlay = CausalOverlay::from_log(&log);
+    assert_eq!(overlay.entity_by_dag_node.get("node_x"), Some(&vec![0, 1]));
+    assert_eq!(overlay.entity_by_dag_node.get("node_y"), Some(&vec![2]));
+}
+
+#[test]
+fn test_overlay_causal_parents_resolution() {
+    setup();
+    let event1 = TraceEventBuilder::new()
+        .layer(Layer::Theory)
+        .kind(EventKind::ParameterRecord {
+            name: "p0".to_string(),
+            specified_value: None,
+            actual_value: Value::Known(1.0, "nm".to_string()),
+            units: Some("nm".to_string()),
+            observation_mode: ObservationMode::Observational,
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 0,
+            wall_clock_ns: None,
+            logical_sequence: 1,
+        })
+        .build();
+    let event1_id = event1.id;
+
+    let event2 = TraceEventBuilder::new()
+        .layer(Layer::Implementation)
+        .kind(EventKind::ExecutionStatus {
+            status: ExecutionOutcome::Success,
+            framework_error_id: None,
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 1,
+            wall_clock_ns: None,
+            logical_sequence: 2,
+        })
+        .causal_refs(vec![event1_id])
+        .build();
+
+    let log = LayeredEventLogBuilder::new(test_experiment_ref(), test_spec())
+        .add_event(event1)
+        .add_event(event2)
+        .build();
+
+    let overlay = CausalOverlay::from_log(&log);
+    assert_eq!(overlay.entity(0).unwrap().causal_parents, Vec::<usize>::new());
+    assert_eq!(overlay.entity(1).unwrap().causal_parents, vec![0]);
+}
+
+#[test]
+fn test_overlay_dangling_ref_skipped() {
+    setup();
+    let parent = TraceEventBuilder::new()
+        .layer(Layer::Theory)
+        .kind(EventKind::ParameterRecord {
+            name: "k".to_string(),
+            specified_value: None,
+            actual_value: Value::Known(1.0, "nm".to_string()),
+            units: Some("nm".to_string()),
+            observation_mode: ObservationMode::Observational,
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 0,
+            wall_clock_ns: None,
+            logical_sequence: 1,
+        })
+        .build();
+    let parent_id = parent.id;
+
+    let child = TraceEventBuilder::new()
+        .layer(Layer::Implementation)
+        .kind(EventKind::ExecutionStatus {
+            status: ExecutionOutcome::Success,
+            framework_error_id: None,
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 1,
+            wall_clock_ns: None,
+            logical_sequence: 2,
+        })
+        .causal_refs(vec![parent_id, EventId(999_999)])
+        .build();
+
+    let log = LayeredEventLogBuilder::new(test_experiment_ref(), test_spec())
+        .add_event(parent)
+        .add_event(child)
+        .build();
+    let overlay = CausalOverlay::from_log(&log);
+
+    assert_eq!(overlay.entity(1).unwrap().causal_parents, vec![0]);
+}
+
+#[test]
+fn test_overlay_linear_chain_ancestors() {
+    setup();
+    let e0 = TraceEventBuilder::new()
+        .layer(Layer::Theory)
+        .kind(EventKind::ParameterRecord {
+            name: "e0".to_string(),
+            specified_value: None,
+            actual_value: Value::Known(1.0, "nm".to_string()),
+            units: Some("nm".to_string()),
+            observation_mode: ObservationMode::Observational,
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 0,
+            wall_clock_ns: None,
+            logical_sequence: 1,
+        })
+        .build();
+    let e0_id = e0.id;
+
+    let e1 = TraceEventBuilder::new()
+        .layer(Layer::Implementation)
+        .kind(EventKind::ExecutionStatus {
+            status: ExecutionOutcome::Success,
+            framework_error_id: None,
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 1,
+            wall_clock_ns: None,
+            logical_sequence: 2,
+        })
+        .causal_refs(vec![e0_id])
+        .build();
+    let e1_id = e1.id;
+
+    let e2 = TraceEventBuilder::new()
+        .layer(Layer::Implementation)
+        .kind(EventKind::ExecutionStatus {
+            status: ExecutionOutcome::Success,
+            framework_error_id: None,
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 2,
+            wall_clock_ns: None,
+            logical_sequence: 3,
+        })
+        .causal_refs(vec![e1_id])
+        .build();
+
+    let log = LayeredEventLogBuilder::new(test_experiment_ref(), test_spec())
+        .add_event(e0)
+        .add_event(e1)
+        .add_event(e2)
+        .build();
+    let overlay = CausalOverlay::from_log(&log);
+
+    assert_eq!(overlay.transitive_ancestors(2), vec![1, 0]);
+}
+
+#[test]
+fn test_overlay_diamond_ancestors() {
+    setup();
+    let root = TraceEventBuilder::new()
+        .layer(Layer::Theory)
+        .kind(EventKind::ParameterRecord {
+            name: "root".to_string(),
+            specified_value: None,
+            actual_value: Value::Known(1.0, "nm".to_string()),
+            units: Some("nm".to_string()),
+            observation_mode: ObservationMode::Observational,
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 0,
+            wall_clock_ns: None,
+            logical_sequence: 1,
+        })
+        .build();
+    let root_id = root.id;
+
+    let left = TraceEventBuilder::new()
+        .layer(Layer::Implementation)
+        .kind(EventKind::ExecutionStatus {
+            status: ExecutionOutcome::Success,
+            framework_error_id: None,
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 1,
+            wall_clock_ns: None,
+            logical_sequence: 2,
+        })
+        .causal_refs(vec![root_id])
+        .build();
+    let left_id = left.id;
+
+    let right = TraceEventBuilder::new()
+        .layer(Layer::Implementation)
+        .kind(EventKind::ExecutionStatus {
+            status: ExecutionOutcome::Success,
+            framework_error_id: None,
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 1,
+            wall_clock_ns: None,
+            logical_sequence: 3,
+        })
+        .causal_refs(vec![root_id])
+        .build();
+    let right_id = right.id;
+
+    let sink = TraceEventBuilder::new()
+        .layer(Layer::Implementation)
+        .kind(EventKind::ExecutionStatus {
+            status: ExecutionOutcome::Success,
+            framework_error_id: None,
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 2,
+            wall_clock_ns: None,
+            logical_sequence: 4,
+        })
+        .causal_refs(vec![left_id, right_id])
+        .build();
+
+    let log = LayeredEventLogBuilder::new(test_experiment_ref(), test_spec())
+        .add_event(root)
+        .add_event(left)
+        .add_event(right)
+        .add_event(sink)
+        .build();
+    let overlay = CausalOverlay::from_log(&log);
+
+    let mut ancestors = overlay.transitive_ancestors(3);
+    ancestors.sort_unstable();
+    assert_eq!(ancestors, vec![0, 1, 2]);
+}
+
+#[test]
+fn test_overlay_serde_roundtrip() {
+    setup();
+    let log = LayeredEventLogBuilder::new(test_experiment_ref(), test_spec())
+        .add_event(
+            TraceEventBuilder::new()
+                .layer(Layer::Theory)
+                .kind(EventKind::ParameterRecord {
+                    name: "a".to_string(),
+                    specified_value: None,
+                    actual_value: Value::Known(1.0, "nm".to_string()),
+                    units: Some("nm".to_string()),
+                    observation_mode: ObservationMode::Observational,
+                })
+                .temporal(TemporalCoord {
+                    simulation_step: 0,
+                    wall_clock_ns: None,
+                    logical_sequence: 1,
+                })
+                .dag_node_ref("node_a".to_string())
+                .build(),
+        )
+        .add_event(
+            TraceEventBuilder::new()
+                .layer(Layer::Implementation)
+                .kind(EventKind::ExecutionStatus {
+                    status: ExecutionOutcome::Success,
+                    framework_error_id: None,
+                })
+                .temporal(TemporalCoord {
+                    simulation_step: 1,
+                    wall_clock_ns: None,
+                    logical_sequence: 2,
+                })
+                .build(),
+        )
+        .build();
+    let original = CausalOverlay::from_log(&log);
+
+    let json = serde_json::to_string(&original).expect("Serialization must succeed");
+    let restored: CausalOverlay =
+        serde_json::from_str(&json).expect("Deserialization must succeed");
+
+    assert_eq!(original.len(), restored.len());
+    assert_eq!(original.entity_by_dag_node, restored.entity_by_dag_node);
+    assert_eq!(
+        original.entity(0).unwrap().dag_node,
+        restored.entity(0).unwrap().dag_node
+    );
+}
+
+#[test]
+fn test_detect_confounders_all_controlled() {
+    setup();
+    let mut spec = test_spec();
+    spec.controlled_variables = vec![ControlledVariable {
+        id: SpecElementId(99),
+        parameter: "conf".to_string(),
+        held_value: Value::Known(1.0, "arb".to_string()),
+    }];
+
+    let conf = TraceEventBuilder::new()
+        .layer(Layer::Methodology)
+        .kind(EventKind::ParameterRecord {
+            name: "conf".to_string(),
+            specified_value: None,
+            actual_value: Value::Known(1.0, "arb".to_string()),
+            units: Some("arb".to_string()),
+            observation_mode: ObservationMode::Observational,
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 0,
+            wall_clock_ns: None,
+            logical_sequence: 1,
+        })
+        .dag_node_ref("conf".to_string())
+        .build();
+    let conf_id = conf.id;
+
+    let intervention = TraceEventBuilder::new()
+        .layer(Layer::Methodology)
+        .kind(EventKind::ParameterRecord {
+            name: "dose".to_string(),
+            specified_value: None,
+            actual_value: Value::Known(2.0, "mg".to_string()),
+            units: Some("mg".to_string()),
+            observation_mode: ObservationMode::Interventional,
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 1,
+            wall_clock_ns: None,
+            logical_sequence: 2,
+        })
+        .causal_refs(vec![conf_id])
+        .dag_node_ref("dose".to_string())
+        .build();
+
+    let observable = TraceEventBuilder::new()
+        .layer(Layer::Implementation)
+        .kind(EventKind::ObservableMeasurement {
+            variable_name: "outcome".to_string(),
+            measurement_method: "synthetic".to_string(),
+            value: Value::Known(10.0, "unit".to_string()),
+            uncertainty: None,
+            conditions: "test".to_string(),
+            observation_mode: ObservationMode::Observational,
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 2,
+            wall_clock_ns: None,
+            logical_sequence: 3,
+        })
+        .causal_refs(vec![conf_id])
+        .dag_node_ref("outcome".to_string())
+        .build();
+
+    let log = LayeredEventLogBuilder::new(test_experiment_ref(), spec)
+        .add_event(conf)
+        .add_event(intervention)
+        .add_event(observable)
+        .build();
+    let overlay = CausalOverlay::from_log(&log);
+
+    let candidates = overlay.detect_confounders(&log, "outcome", "dose");
+    assert!(candidates.is_empty());
+}
+
+#[test]
+fn test_detect_confounders_uncontrolled_detected() {
+    setup();
+    let spec = test_spec();
+
+    let conf = TraceEventBuilder::new()
+        .layer(Layer::Methodology)
+        .kind(EventKind::ParameterRecord {
+            name: "conf".to_string(),
+            specified_value: None,
+            actual_value: Value::Known(5.0, "arb".to_string()),
+            units: Some("arb".to_string()),
+            observation_mode: ObservationMode::Observational,
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 0,
+            wall_clock_ns: None,
+            logical_sequence: 1,
+        })
+        .dag_node_ref("conf".to_string())
+        .build();
+    let conf_id = conf.id;
+
+    let intervention = TraceEventBuilder::new()
+        .layer(Layer::Methodology)
+        .kind(EventKind::ParameterRecord {
+            name: "dose".to_string(),
+            specified_value: None,
+            actual_value: Value::Known(2.0, "mg".to_string()),
+            units: Some("mg".to_string()),
+            observation_mode: ObservationMode::Interventional,
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 1,
+            wall_clock_ns: None,
+            logical_sequence: 2,
+        })
+        .causal_refs(vec![conf_id])
+        .dag_node_ref("dose".to_string())
+        .build();
+
+    let observable = TraceEventBuilder::new()
+        .layer(Layer::Implementation)
+        .kind(EventKind::ObservableMeasurement {
+            variable_name: "outcome".to_string(),
+            measurement_method: "synthetic".to_string(),
+            value: Value::Known(12.0, "unit".to_string()),
+            uncertainty: None,
+            conditions: "test".to_string(),
+            observation_mode: ObservationMode::Observational,
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 2,
+            wall_clock_ns: None,
+            logical_sequence: 3,
+        })
+        .causal_refs(vec![conf_id])
+        .dag_node_ref("outcome".to_string())
+        .build();
+
+    let log = LayeredEventLogBuilder::new(test_experiment_ref(), spec)
+        .add_event(conf)
+        .add_event(intervention)
+        .add_event(observable)
+        .build();
+    let overlay = CausalOverlay::from_log(&log);
+
+    let candidates = overlay.detect_confounders(&log, "outcome", "dose");
+    assert_eq!(candidates.len(), 1);
+    assert_eq!(candidates[0].dag_node, "conf");
+    assert_eq!(candidates[0].observable_ancestor_events, vec![0]);
+    assert_eq!(candidates[0].intervention_ancestor_events, vec![0]);
+}
+
+#[test]
+fn test_detect_confounders_intervention_excluded() {
+    setup();
+    let spec = test_spec();
+
+    let intervention_root = TraceEventBuilder::new()
+        .layer(Layer::Methodology)
+        .kind(EventKind::ParameterRecord {
+            name: "dose".to_string(),
+            specified_value: None,
+            actual_value: Value::Known(1.0, "mg".to_string()),
+            units: Some("mg".to_string()),
+            observation_mode: ObservationMode::Interventional,
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 0,
+            wall_clock_ns: None,
+            logical_sequence: 1,
+        })
+        .dag_node_ref("dose".to_string())
+        .build();
+    let intervention_root_id = intervention_root.id;
+
+    let intervention_child = TraceEventBuilder::new()
+        .layer(Layer::Methodology)
+        .kind(EventKind::ParameterRecord {
+            name: "dose".to_string(),
+            specified_value: None,
+            actual_value: Value::Known(2.0, "mg".to_string()),
+            units: Some("mg".to_string()),
+            observation_mode: ObservationMode::Interventional,
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 1,
+            wall_clock_ns: None,
+            logical_sequence: 2,
+        })
+        .causal_refs(vec![intervention_root_id])
+        .dag_node_ref("dose".to_string())
+        .build();
+    let intervention_child_id = intervention_child.id;
+
+    let observable = TraceEventBuilder::new()
+        .layer(Layer::Implementation)
+        .kind(EventKind::ObservableMeasurement {
+            variable_name: "outcome".to_string(),
+            measurement_method: "synthetic".to_string(),
+            value: Value::Known(8.0, "unit".to_string()),
+            uncertainty: None,
+            conditions: "test".to_string(),
+            observation_mode: ObservationMode::Observational,
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 2,
+            wall_clock_ns: None,
+            logical_sequence: 3,
+        })
+        .causal_refs(vec![intervention_child_id])
+        .dag_node_ref("outcome".to_string())
+        .build();
+
+    let log = LayeredEventLogBuilder::new(test_experiment_ref(), spec)
+        .add_event(intervention_root)
+        .add_event(intervention_child)
+        .add_event(observable)
+        .build();
+    let overlay = CausalOverlay::from_log(&log);
+
+    let candidates = overlay.detect_confounders(&log, "outcome", "dose");
+    assert!(candidates.is_empty());
+}
+
+#[test]
+fn test_detect_confounders_no_common_ancestors() {
+    setup();
+    let spec = test_spec();
+
+    let left_root = TraceEventBuilder::new()
+        .layer(Layer::Theory)
+        .kind(EventKind::ParameterRecord {
+            name: "left_root".to_string(),
+            specified_value: None,
+            actual_value: Value::Known(1.0, "arb".to_string()),
+            units: Some("arb".to_string()),
+            observation_mode: ObservationMode::Observational,
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 0,
+            wall_clock_ns: None,
+            logical_sequence: 1,
+        })
+        .dag_node_ref("left_root".to_string())
+        .build();
+    let left_root_id = left_root.id;
+
+    let right_root = TraceEventBuilder::new()
+        .layer(Layer::Theory)
+        .kind(EventKind::ParameterRecord {
+            name: "right_root".to_string(),
+            specified_value: None,
+            actual_value: Value::Known(2.0, "arb".to_string()),
+            units: Some("arb".to_string()),
+            observation_mode: ObservationMode::Interventional,
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 1,
+            wall_clock_ns: None,
+            logical_sequence: 2,
+        })
+        .dag_node_ref("right_root".to_string())
+        .build();
+    let right_root_id = right_root.id;
+
+    let intervention = TraceEventBuilder::new()
+        .layer(Layer::Methodology)
+        .kind(EventKind::ParameterRecord {
+            name: "dose".to_string(),
+            specified_value: None,
+            actual_value: Value::Known(3.0, "mg".to_string()),
+            units: Some("mg".to_string()),
+            observation_mode: ObservationMode::Interventional,
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 2,
+            wall_clock_ns: None,
+            logical_sequence: 3,
+        })
+        .causal_refs(vec![right_root_id])
+        .dag_node_ref("dose".to_string())
+        .build();
+
+    let observable = TraceEventBuilder::new()
+        .layer(Layer::Implementation)
+        .kind(EventKind::ObservableMeasurement {
+            variable_name: "outcome".to_string(),
+            measurement_method: "synthetic".to_string(),
+            value: Value::Known(9.0, "unit".to_string()),
+            uncertainty: None,
+            conditions: "test".to_string(),
+            observation_mode: ObservationMode::Observational,
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 3,
+            wall_clock_ns: None,
+            logical_sequence: 4,
+        })
+        .causal_refs(vec![left_root_id])
+        .dag_node_ref("outcome".to_string())
+        .build();
+
+    let log = LayeredEventLogBuilder::new(test_experiment_ref(), spec)
+        .add_event(left_root)
+        .add_event(right_root)
+        .add_event(intervention)
+        .add_event(observable)
+        .build();
+    let overlay = CausalOverlay::from_log(&log);
+
+    let candidates = overlay.detect_confounders(&log, "outcome", "dose");
+    assert!(candidates.is_empty());
+}
+
+#[test]
+fn test_detect_confounders_unknown_variable() {
+    setup();
+    let spec = test_spec();
+
+    let event = TraceEventBuilder::new()
+        .layer(Layer::Implementation)
+        .kind(EventKind::ObservableMeasurement {
+            variable_name: "outcome".to_string(),
+            measurement_method: "synthetic".to_string(),
+            value: Value::Known(1.0, "unit".to_string()),
+            uncertainty: None,
+            conditions: "test".to_string(),
+            observation_mode: ObservationMode::Observational,
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 0,
+            wall_clock_ns: None,
+            logical_sequence: 1,
+        })
+        .build();
+
+    let log = LayeredEventLogBuilder::new(test_experiment_ref(), spec)
+        .add_event(event)
+        .build();
+    let overlay = CausalOverlay::from_log(&log);
+
+    assert!(overlay
+        .detect_confounders(&log, "unknown_observable", "dose")
+        .is_empty());
+    assert!(overlay
+        .detect_confounders(&log, "outcome", "unknown_intervention")
+        .is_empty());
+}
+
+#[test]
+fn test_detect_confounders_multiple_confounders() {
+    setup();
+    let spec = test_spec();
+
+    let conf_a = TraceEventBuilder::new()
+        .layer(Layer::Theory)
+        .kind(EventKind::ParameterRecord {
+            name: "conf_a".to_string(),
+            specified_value: None,
+            actual_value: Value::Known(1.0, "arb".to_string()),
+            units: Some("arb".to_string()),
+            observation_mode: ObservationMode::Observational,
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 0,
+            wall_clock_ns: None,
+            logical_sequence: 1,
+        })
+        .dag_node_ref("conf_a".to_string())
+        .build();
+    let conf_a_id = conf_a.id;
+
+    let conf_b = TraceEventBuilder::new()
+        .layer(Layer::Theory)
+        .kind(EventKind::ParameterRecord {
+            name: "conf_b".to_string(),
+            specified_value: None,
+            actual_value: Value::Known(2.0, "arb".to_string()),
+            units: Some("arb".to_string()),
+            observation_mode: ObservationMode::Observational,
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 0,
+            wall_clock_ns: None,
+            logical_sequence: 2,
+        })
+        .dag_node_ref("conf_b".to_string())
+        .build();
+    let conf_b_id = conf_b.id;
+
+    let intervention = TraceEventBuilder::new()
+        .layer(Layer::Methodology)
+        .kind(EventKind::ParameterRecord {
+            name: "dose".to_string(),
+            specified_value: None,
+            actual_value: Value::Known(4.0, "mg".to_string()),
+            units: Some("mg".to_string()),
+            observation_mode: ObservationMode::Interventional,
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 1,
+            wall_clock_ns: None,
+            logical_sequence: 3,
+        })
+        .causal_refs(vec![conf_a_id, conf_b_id])
+        .dag_node_ref("dose".to_string())
+        .build();
+
+    let observable = TraceEventBuilder::new()
+        .layer(Layer::Implementation)
+        .kind(EventKind::ObservableMeasurement {
+            variable_name: "outcome".to_string(),
+            measurement_method: "synthetic".to_string(),
+            value: Value::Known(7.0, "unit".to_string()),
+            uncertainty: None,
+            conditions: "test".to_string(),
+            observation_mode: ObservationMode::Observational,
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 2,
+            wall_clock_ns: None,
+            logical_sequence: 4,
+        })
+        .causal_refs(vec![conf_a_id, conf_b_id])
+        .dag_node_ref("outcome".to_string())
+        .build();
+
+    let log = LayeredEventLogBuilder::new(test_experiment_ref(), spec)
+        .add_event(conf_a)
+        .add_event(conf_b)
+        .add_event(intervention)
+        .add_event(observable)
+        .build();
+    let overlay = CausalOverlay::from_log(&log);
+
+    let candidates = overlay.detect_confounders(&log, "outcome", "dose");
+    assert_eq!(candidates.len(), 2);
+    assert_eq!(candidates[0].dag_node, "conf_a");
+    assert_eq!(candidates[1].dag_node, "conf_b");
+}
+
+#[test]
+fn test_detect_confounders_transitive_chain() {
+    setup();
+    let spec = test_spec();
+
+    let root = TraceEventBuilder::new()
+        .layer(Layer::Theory)
+        .kind(EventKind::ParameterRecord {
+            name: "root".to_string(),
+            specified_value: None,
+            actual_value: Value::Known(1.0, "arb".to_string()),
+            units: Some("arb".to_string()),
+            observation_mode: ObservationMode::Observational,
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 0,
+            wall_clock_ns: None,
+            logical_sequence: 1,
+        })
+        .build();
+    let root_id = root.id;
+
+    let mid = TraceEventBuilder::new()
+        .layer(Layer::Methodology)
+        .kind(EventKind::ParameterRecord {
+            name: "mid".to_string(),
+            specified_value: None,
+            actual_value: Value::Known(2.0, "arb".to_string()),
+            units: Some("arb".to_string()),
+            observation_mode: ObservationMode::Observational,
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 1,
+            wall_clock_ns: None,
+            logical_sequence: 2,
+        })
+        .causal_refs(vec![root_id])
+        .dag_node_ref("mid".to_string())
+        .build();
+    let mid_id = mid.id;
+
+    let intervention = TraceEventBuilder::new()
+        .layer(Layer::Methodology)
+        .kind(EventKind::ParameterRecord {
+            name: "dose".to_string(),
+            specified_value: None,
+            actual_value: Value::Known(5.0, "mg".to_string()),
+            units: Some("mg".to_string()),
+            observation_mode: ObservationMode::Interventional,
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 2,
+            wall_clock_ns: None,
+            logical_sequence: 3,
+        })
+        .causal_refs(vec![mid_id])
+        .dag_node_ref("dose".to_string())
+        .build();
+
+    let observable = TraceEventBuilder::new()
+        .layer(Layer::Implementation)
+        .kind(EventKind::ObservableMeasurement {
+            variable_name: "outcome".to_string(),
+            measurement_method: "synthetic".to_string(),
+            value: Value::Known(6.0, "unit".to_string()),
+            uncertainty: None,
+            conditions: "test".to_string(),
+            observation_mode: ObservationMode::Observational,
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 3,
+            wall_clock_ns: None,
+            logical_sequence: 4,
+        })
+        .causal_refs(vec![mid_id])
+        .dag_node_ref("outcome".to_string())
+        .build();
+
+    let log = LayeredEventLogBuilder::new(test_experiment_ref(), spec)
+        .add_event(root)
+        .add_event(mid)
+        .add_event(intervention)
+        .add_event(observable)
+        .build();
+    let overlay = CausalOverlay::from_log(&log);
+
+    let candidates = overlay.detect_confounders(&log, "outcome", "dose");
+    assert_eq!(candidates.len(), 1);
+    assert_eq!(candidates[0].dag_node, "mid");
+    assert_eq!(candidates[0].observable_ancestor_events, vec![1]);
 }
 
 #[test]
@@ -304,11 +1351,10 @@ fn test_query_by_event_kind() {
     let energy_ids = log.indexes.by_kind.get(&EventKindTag::EnergyRecord).unwrap();
     assert_eq!(energy_ids.len(), 1);
 
-    assert!(log
+    assert!(!log
         .indexes
         .by_kind
-        .get(&EventKindTag::ExceptionEvent)
-        .is_none());
+        .contains_key(&EventKindTag::ExceptionEvent));
 }
 
 #[test]
