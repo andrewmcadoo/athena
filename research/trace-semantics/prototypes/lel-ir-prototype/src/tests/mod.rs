@@ -4,7 +4,7 @@ use crate::adapter::{DslAdapter, MockOpenMmAdapter};
 use crate::common::*;
 use crate::event_kinds::EventKind;
 use crate::lel::*;
-use crate::overlay::CausalOverlay;
+use crate::overlay::{CausalOverlay, PredictionComparison};
 
 /// Helper: initialize the global event ID counter once for the test process.
 fn setup() {
@@ -40,6 +40,13 @@ fn test_spec() -> ExperimentSpec {
         dag_refs: Vec::new(),
         provenance: test_provenance(),
     }
+}
+
+/// Helper: create a test spec with caller-provided prediction records.
+fn test_spec_with_predictions(predictions: Vec<PredictionRecord>) -> ExperimentSpec {
+    let mut spec = test_spec();
+    spec.predictions = predictions;
+    spec
 }
 
 /// Helper: create a minimal experiment ref for tests.
@@ -1288,6 +1295,922 @@ fn test_detect_confounders_transitive_chain() {
     assert_eq!(candidates.len(), 1);
     assert_eq!(candidates[0].dag_node, "mid");
     assert_eq!(candidates[0].observable_ancestor_events, vec![1]);
+}
+
+#[test]
+fn test_compare_predictions_empty_log() {
+    setup();
+    let log = LayeredEventLogBuilder::new(test_experiment_ref(), test_spec()).build();
+    let overlay = CausalOverlay::from_log(&log);
+
+    assert!(overlay.compare_predictions(&log).is_empty());
+}
+
+#[test]
+fn test_compare_predictions_no_comparison_events() {
+    setup();
+    let spec = test_spec_with_predictions(vec![PredictionRecord {
+        id: SpecElementId(1),
+        variable: "outcome".to_string(),
+        predicted_value: Value::Known(10.0, "unit".to_string()),
+        tolerance: Some(0.5),
+    }]);
+
+    let log = LayeredEventLogBuilder::new(test_experiment_ref(), spec)
+        .add_event(
+            TraceEventBuilder::new()
+                .layer(Layer::Implementation)
+                .kind(EventKind::ObservableMeasurement {
+                    variable_name: "outcome".to_string(),
+                    measurement_method: "synthetic".to_string(),
+                    value: Value::Known(10.1, "unit".to_string()),
+                    uncertainty: None,
+                    conditions: "test".to_string(),
+                    observation_mode: ObservationMode::Observational,
+                })
+                .temporal(TemporalCoord {
+                    simulation_step: 0,
+                    wall_clock_ns: None,
+                    logical_sequence: 1,
+                })
+                .build(),
+        )
+        .build();
+    let overlay = CausalOverlay::from_log(&log);
+
+    assert!(overlay.compare_predictions(&log).is_empty());
+}
+
+#[test]
+fn test_compare_predictions_matched_agreement() {
+    setup();
+    let spec = test_spec_with_predictions(vec![PredictionRecord {
+        id: SpecElementId(101),
+        variable: "energy".to_string(),
+        predicted_value: Value::Known(-100.0, "kJ/mol".to_string()),
+        tolerance: Some(5.0),
+    }]);
+
+    let observation = TraceEventBuilder::new()
+        .layer(Layer::Implementation)
+        .kind(EventKind::ObservableMeasurement {
+            variable_name: "energy".to_string(),
+            measurement_method: "synthetic".to_string(),
+            value: Value::Known(-98.0, "kJ/mol".to_string()),
+            uncertainty: None,
+            conditions: "test".to_string(),
+            observation_mode: ObservationMode::Observational,
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 0,
+            wall_clock_ns: None,
+            logical_sequence: 1,
+        })
+        .build();
+    let observation_id = observation.id;
+
+    let comparison = TraceEventBuilder::new()
+        .layer(Layer::Theory)
+        .kind(EventKind::ComparisonResult {
+            prediction_id: "101".to_string(),
+            observation_id,
+            result: ComparisonOutcome {
+                agreement: true,
+                divergence: None,
+                detail: "within tolerance".to_string(),
+            },
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 1,
+            wall_clock_ns: None,
+            logical_sequence: 2,
+        })
+        .build();
+
+    let log = LayeredEventLogBuilder::new(test_experiment_ref(), spec)
+        .add_event(observation)
+        .add_event(comparison)
+        .build();
+    let overlay = CausalOverlay::from_log(&log);
+
+    let comparisons = overlay.compare_predictions(&log);
+    assert_eq!(comparisons.len(), 1);
+    assert_eq!(comparisons[0].comparison_event_idx, 1);
+    assert_eq!(comparisons[0].prediction_id, Some(SpecElementId(101)));
+    assert_eq!(comparisons[0].variable, "energy");
+    assert!(!comparisons[0].is_falsified);
+    assert!(comparisons[0].outcome.agreement);
+}
+
+#[test]
+fn test_compare_predictions_matched_falsified() {
+    setup();
+    let spec = test_spec_with_predictions(vec![PredictionRecord {
+        id: SpecElementId(202),
+        variable: "rdf_peak".to_string(),
+        predicted_value: Value::Known(1.5, "arb".to_string()),
+        tolerance: Some(0.1),
+    }]);
+
+    let observation = TraceEventBuilder::new()
+        .layer(Layer::Implementation)
+        .kind(EventKind::ObservableMeasurement {
+            variable_name: "rdf_peak".to_string(),
+            measurement_method: "synthetic".to_string(),
+            value: Value::Known(2.2, "arb".to_string()),
+            uncertainty: None,
+            conditions: "test".to_string(),
+            observation_mode: ObservationMode::Observational,
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 0,
+            wall_clock_ns: None,
+            logical_sequence: 1,
+        })
+        .build();
+    let observation_id = observation.id;
+
+    let comparison = TraceEventBuilder::new()
+        .layer(Layer::Theory)
+        .kind(EventKind::ComparisonResult {
+            prediction_id: "202".to_string(),
+            observation_id,
+            result: ComparisonOutcome {
+                agreement: false,
+                divergence: Some(DivergenceMeasure::AbsoluteDifference(0.7)),
+                detail: "outside tolerance".to_string(),
+            },
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 1,
+            wall_clock_ns: None,
+            logical_sequence: 2,
+        })
+        .build();
+
+    let log = LayeredEventLogBuilder::new(test_experiment_ref(), spec)
+        .add_event(observation)
+        .add_event(comparison)
+        .build();
+    let overlay = CausalOverlay::from_log(&log);
+
+    let comparisons = overlay.compare_predictions(&log);
+    assert_eq!(comparisons.len(), 1);
+    assert_eq!(comparisons[0].prediction_id, Some(SpecElementId(202)));
+    assert_eq!(comparisons[0].variable, "rdf_peak");
+    assert!(comparisons[0].is_falsified);
+    assert!(!comparisons[0].outcome.agreement);
+    assert!(matches!(
+        comparisons[0].outcome.divergence,
+        Some(DivergenceMeasure::AbsoluteDifference(_))
+    ));
+}
+
+#[test]
+fn test_compare_predictions_unresolvable_prediction_id() {
+    setup();
+    let spec = test_spec_with_predictions(vec![PredictionRecord {
+        id: SpecElementId(303),
+        variable: "pressure".to_string(),
+        predicted_value: Value::Known(1.0, "bar".to_string()),
+        tolerance: Some(0.05),
+    }]);
+
+    let observation = TraceEventBuilder::new()
+        .layer(Layer::Implementation)
+        .kind(EventKind::ObservableMeasurement {
+            variable_name: "pressure".to_string(),
+            measurement_method: "synthetic".to_string(),
+            value: Value::Known(1.2, "bar".to_string()),
+            uncertainty: None,
+            conditions: "test".to_string(),
+            observation_mode: ObservationMode::Observational,
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 0,
+            wall_clock_ns: None,
+            logical_sequence: 1,
+        })
+        .build();
+    let observation_id = observation.id;
+
+    let comparison = TraceEventBuilder::new()
+        .layer(Layer::Theory)
+        .kind(EventKind::ComparisonResult {
+            prediction_id: "not-a-u64".to_string(),
+            observation_id,
+            result: ComparisonOutcome {
+                agreement: false,
+                divergence: Some(DivergenceMeasure::AbsoluteDifference(0.2)),
+                detail: "malformed prediction id".to_string(),
+            },
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 1,
+            wall_clock_ns: None,
+            logical_sequence: 2,
+        })
+        .build();
+
+    let log = LayeredEventLogBuilder::new(test_experiment_ref(), spec)
+        .add_event(observation)
+        .add_event(comparison)
+        .build();
+    let overlay = CausalOverlay::from_log(&log);
+
+    let comparisons = overlay.compare_predictions(&log);
+    assert_eq!(comparisons.len(), 1);
+    assert_eq!(comparisons[0].prediction_id, None);
+    assert_eq!(comparisons[0].variable, "unknown");
+}
+
+#[test]
+fn test_compare_predictions_multiple_predictions() {
+    setup();
+    let spec = test_spec_with_predictions(vec![
+        PredictionRecord {
+            id: SpecElementId(1),
+            variable: "var_a".to_string(),
+            predicted_value: Value::Known(10.0, "unit".to_string()),
+            tolerance: Some(1.0),
+        },
+        PredictionRecord {
+            id: SpecElementId(2),
+            variable: "var_b".to_string(),
+            predicted_value: Value::Known(20.0, "unit".to_string()),
+            tolerance: Some(1.0),
+        },
+    ]);
+
+    let observation_a = TraceEventBuilder::new()
+        .layer(Layer::Implementation)
+        .kind(EventKind::ObservableMeasurement {
+            variable_name: "var_a".to_string(),
+            measurement_method: "synthetic".to_string(),
+            value: Value::Known(10.2, "unit".to_string()),
+            uncertainty: None,
+            conditions: "test".to_string(),
+            observation_mode: ObservationMode::Observational,
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 0,
+            wall_clock_ns: None,
+            logical_sequence: 1,
+        })
+        .build();
+    let observation_a_id = observation_a.id;
+
+    let observation_b = TraceEventBuilder::new()
+        .layer(Layer::Implementation)
+        .kind(EventKind::ObservableMeasurement {
+            variable_name: "var_b".to_string(),
+            measurement_method: "synthetic".to_string(),
+            value: Value::Known(22.0, "unit".to_string()),
+            uncertainty: None,
+            conditions: "test".to_string(),
+            observation_mode: ObservationMode::Observational,
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 0,
+            wall_clock_ns: None,
+            logical_sequence: 2,
+        })
+        .build();
+    let observation_b_id = observation_b.id;
+
+    let comparison_a = TraceEventBuilder::new()
+        .layer(Layer::Theory)
+        .kind(EventKind::ComparisonResult {
+            prediction_id: "1".to_string(),
+            observation_id: observation_a_id,
+            result: ComparisonOutcome {
+                agreement: true,
+                divergence: None,
+                detail: "prediction A matched".to_string(),
+            },
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 1,
+            wall_clock_ns: None,
+            logical_sequence: 3,
+        })
+        .build();
+
+    let comparison_b = TraceEventBuilder::new()
+        .layer(Layer::Theory)
+        .kind(EventKind::ComparisonResult {
+            prediction_id: "2".to_string(),
+            observation_id: observation_b_id,
+            result: ComparisonOutcome {
+                agreement: false,
+                divergence: Some(DivergenceMeasure::AbsoluteDifference(2.0)),
+                detail: "prediction B falsified".to_string(),
+            },
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 1,
+            wall_clock_ns: None,
+            logical_sequence: 4,
+        })
+        .build();
+
+    let log = LayeredEventLogBuilder::new(test_experiment_ref(), spec)
+        .add_event(observation_a)
+        .add_event(observation_b)
+        .add_event(comparison_a)
+        .add_event(comparison_b)
+        .build();
+    let overlay = CausalOverlay::from_log(&log);
+
+    let comparisons = overlay.compare_predictions(&log);
+    assert_eq!(comparisons.len(), 2);
+    assert_eq!(comparisons[0].prediction_id, Some(SpecElementId(1)));
+    assert_eq!(comparisons[0].variable, "var_a");
+    assert!(!comparisons[0].is_falsified);
+    assert_eq!(comparisons[1].prediction_id, Some(SpecElementId(2)));
+    assert_eq!(comparisons[1].variable, "var_b");
+    assert!(comparisons[1].is_falsified);
+}
+
+#[test]
+fn test_compare_predictions_with_dag_node_ref() {
+    setup();
+    let spec = test_spec_with_predictions(vec![PredictionRecord {
+        id: SpecElementId(7),
+        variable: "temperature".to_string(),
+        predicted_value: Value::Known(300.0, "K".to_string()),
+        tolerance: Some(1.0),
+    }]);
+
+    let observation = TraceEventBuilder::new()
+        .layer(Layer::Implementation)
+        .kind(EventKind::ObservableMeasurement {
+            variable_name: "temperature".to_string(),
+            measurement_method: "synthetic".to_string(),
+            value: Value::Known(300.5, "K".to_string()),
+            uncertainty: None,
+            conditions: "test".to_string(),
+            observation_mode: ObservationMode::Observational,
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 0,
+            wall_clock_ns: None,
+            logical_sequence: 1,
+        })
+        .build();
+    let observation_id = observation.id;
+
+    let comparison = TraceEventBuilder::new()
+        .layer(Layer::Theory)
+        .kind(EventKind::ComparisonResult {
+            prediction_id: "7".to_string(),
+            observation_id,
+            result: ComparisonOutcome {
+                agreement: true,
+                divergence: None,
+                detail: "matched".to_string(),
+            },
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 1,
+            wall_clock_ns: None,
+            logical_sequence: 2,
+        })
+        .dag_node_ref("dag.compare.temperature".to_string())
+        .build();
+
+    let log = LayeredEventLogBuilder::new(test_experiment_ref(), spec)
+        .add_event(observation)
+        .add_event(comparison)
+        .build();
+    let overlay = CausalOverlay::from_log(&log);
+
+    let comparisons = overlay.compare_predictions(&log);
+    assert_eq!(comparisons.len(), 1);
+    assert_eq!(
+        comparisons[0].dag_node,
+        Some("dag.compare.temperature".to_string())
+    );
+}
+
+#[test]
+fn test_implicate_no_ancestors() {
+    setup();
+    let log = LayeredEventLogBuilder::new(test_experiment_ref(), test_spec())
+        .add_event(
+            TraceEventBuilder::new()
+                .layer(Layer::Implementation)
+                .kind(EventKind::ExecutionStatus {
+                    status: ExecutionOutcome::Success,
+                    framework_error_id: None,
+                })
+                .temporal(TemporalCoord {
+                    simulation_step: 0,
+                    wall_clock_ns: None,
+                    logical_sequence: 1,
+                })
+                .build(),
+        )
+        .build();
+    let overlay = CausalOverlay::from_log(&log);
+    let comparison = PredictionComparison {
+        comparison_event_idx: 0,
+        prediction_id: None,
+        variable: "unknown".to_string(),
+        outcome: ComparisonOutcome {
+            agreement: false,
+            divergence: None,
+            detail: "synthetic".to_string(),
+        },
+        is_falsified: true,
+        dag_node: None,
+    };
+
+    let implicated = overlay.implicate_causal_nodes(&log, &comparison);
+    assert!(implicated.is_empty());
+}
+
+#[test]
+fn test_implicate_theory_layer() {
+    setup();
+    let theory_ancestor = TraceEventBuilder::new()
+        .layer(Layer::Theory)
+        .kind(EventKind::ParameterRecord {
+            name: "theory".to_string(),
+            specified_value: None,
+            actual_value: Value::Known(1.0, "arb".to_string()),
+            units: Some("arb".to_string()),
+            observation_mode: ObservationMode::Observational,
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 0,
+            wall_clock_ns: None,
+            logical_sequence: 1,
+        })
+        .dag_node_ref("theory_ancestor".to_string())
+        .build();
+    let theory_ancestor_id = theory_ancestor.id;
+
+    let comparison_event = TraceEventBuilder::new()
+        .layer(Layer::Implementation)
+        .kind(EventKind::ExecutionStatus {
+            status: ExecutionOutcome::Success,
+            framework_error_id: None,
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 1,
+            wall_clock_ns: None,
+            logical_sequence: 2,
+        })
+        .causal_refs(vec![theory_ancestor_id])
+        .build();
+
+    let log = LayeredEventLogBuilder::new(test_experiment_ref(), test_spec())
+        .add_event(theory_ancestor)
+        .add_event(comparison_event)
+        .build();
+    let overlay = CausalOverlay::from_log(&log);
+    let comparison = PredictionComparison {
+        comparison_event_idx: 1,
+        prediction_id: None,
+        variable: "unknown".to_string(),
+        outcome: ComparisonOutcome {
+            agreement: false,
+            divergence: None,
+            detail: "synthetic".to_string(),
+        },
+        is_falsified: true,
+        dag_node: None,
+    };
+
+    let implicated = overlay.implicate_causal_nodes(&log, &comparison);
+    assert_eq!(implicated.len(), 1);
+    assert_eq!(implicated[0].dag_node, "theory_ancestor");
+    assert_eq!(implicated[0].layer, Layer::Theory);
+    assert_eq!(implicated[0].causal_distance, 1);
+    assert_eq!(implicated[0].ancestor_event_indices, vec![0]);
+}
+
+#[test]
+fn test_implicate_implementation_layer() {
+    setup();
+    let impl_ancestor = TraceEventBuilder::new()
+        .layer(Layer::Implementation)
+        .kind(EventKind::ResourceStatus {
+            platform_type: "CPU".to_string(),
+            device_ids: vec![],
+            memory_allocated: None,
+            memory_peak: None,
+            parallelization: None,
+            warnings: vec![],
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 0,
+            wall_clock_ns: None,
+            logical_sequence: 1,
+        })
+        .dag_node_ref("impl_ancestor".to_string())
+        .build();
+    let impl_ancestor_id = impl_ancestor.id;
+
+    let comparison_event = TraceEventBuilder::new()
+        .layer(Layer::Implementation)
+        .kind(EventKind::ExecutionStatus {
+            status: ExecutionOutcome::Success,
+            framework_error_id: None,
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 1,
+            wall_clock_ns: None,
+            logical_sequence: 2,
+        })
+        .causal_refs(vec![impl_ancestor_id])
+        .build();
+
+    let log = LayeredEventLogBuilder::new(test_experiment_ref(), test_spec())
+        .add_event(impl_ancestor)
+        .add_event(comparison_event)
+        .build();
+    let overlay = CausalOverlay::from_log(&log);
+    let comparison = PredictionComparison {
+        comparison_event_idx: 1,
+        prediction_id: None,
+        variable: "unknown".to_string(),
+        outcome: ComparisonOutcome {
+            agreement: false,
+            divergence: None,
+            detail: "synthetic".to_string(),
+        },
+        is_falsified: true,
+        dag_node: None,
+    };
+
+    let implicated = overlay.implicate_causal_nodes(&log, &comparison);
+    assert_eq!(implicated.len(), 1);
+    assert_eq!(implicated[0].dag_node, "impl_ancestor");
+    assert_eq!(implicated[0].layer, Layer::Implementation);
+    assert_eq!(implicated[0].causal_distance, 1);
+}
+
+#[test]
+fn test_implicate_methodology_layer() {
+    setup();
+    let methodology_ancestor = TraceEventBuilder::new()
+        .layer(Layer::Methodology)
+        .kind(EventKind::ParameterRecord {
+            name: "method".to_string(),
+            specified_value: None,
+            actual_value: Value::Known(2.0, "arb".to_string()),
+            units: Some("arb".to_string()),
+            observation_mode: ObservationMode::Observational,
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 0,
+            wall_clock_ns: None,
+            logical_sequence: 1,
+        })
+        .dag_node_ref("methodology_ancestor".to_string())
+        .build();
+    let methodology_ancestor_id = methodology_ancestor.id;
+
+    let comparison_event = TraceEventBuilder::new()
+        .layer(Layer::Implementation)
+        .kind(EventKind::ExecutionStatus {
+            status: ExecutionOutcome::Success,
+            framework_error_id: None,
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 1,
+            wall_clock_ns: None,
+            logical_sequence: 2,
+        })
+        .causal_refs(vec![methodology_ancestor_id])
+        .build();
+
+    let log = LayeredEventLogBuilder::new(test_experiment_ref(), test_spec())
+        .add_event(methodology_ancestor)
+        .add_event(comparison_event)
+        .build();
+    let overlay = CausalOverlay::from_log(&log);
+    let comparison = PredictionComparison {
+        comparison_event_idx: 1,
+        prediction_id: None,
+        variable: "unknown".to_string(),
+        outcome: ComparisonOutcome {
+            agreement: false,
+            divergence: None,
+            detail: "synthetic".to_string(),
+        },
+        is_falsified: true,
+        dag_node: None,
+    };
+
+    let implicated = overlay.implicate_causal_nodes(&log, &comparison);
+    assert_eq!(implicated.len(), 1);
+    assert_eq!(implicated[0].dag_node, "methodology_ancestor");
+    assert_eq!(implicated[0].layer, Layer::Methodology);
+    assert_eq!(implicated[0].causal_distance, 1);
+}
+
+#[test]
+fn test_implicate_mixed_layers() {
+    setup();
+    let methodology_ancestor = TraceEventBuilder::new()
+        .layer(Layer::Methodology)
+        .kind(EventKind::ParameterRecord {
+            name: "method".to_string(),
+            specified_value: None,
+            actual_value: Value::Known(2.0, "arb".to_string()),
+            units: Some("arb".to_string()),
+            observation_mode: ObservationMode::Observational,
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 0,
+            wall_clock_ns: None,
+            logical_sequence: 1,
+        })
+        .dag_node_ref("method_node".to_string())
+        .build();
+    let methodology_ancestor_id = methodology_ancestor.id;
+
+    let theory_ancestor = TraceEventBuilder::new()
+        .layer(Layer::Theory)
+        .kind(EventKind::ParameterRecord {
+            name: "theory".to_string(),
+            specified_value: None,
+            actual_value: Value::Known(1.0, "arb".to_string()),
+            units: Some("arb".to_string()),
+            observation_mode: ObservationMode::Observational,
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 0,
+            wall_clock_ns: None,
+            logical_sequence: 2,
+        })
+        .dag_node_ref("theory_node".to_string())
+        .build();
+    let theory_ancestor_id = theory_ancestor.id;
+
+    let comparison_event = TraceEventBuilder::new()
+        .layer(Layer::Implementation)
+        .kind(EventKind::ExecutionStatus {
+            status: ExecutionOutcome::Success,
+            framework_error_id: None,
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 1,
+            wall_clock_ns: None,
+            logical_sequence: 3,
+        })
+        .causal_refs(vec![methodology_ancestor_id, theory_ancestor_id])
+        .build();
+
+    let log = LayeredEventLogBuilder::new(test_experiment_ref(), test_spec())
+        .add_event(methodology_ancestor)
+        .add_event(theory_ancestor)
+        .add_event(comparison_event)
+        .build();
+    let overlay = CausalOverlay::from_log(&log);
+    let comparison = PredictionComparison {
+        comparison_event_idx: 2,
+        prediction_id: None,
+        variable: "unknown".to_string(),
+        outcome: ComparisonOutcome {
+            agreement: false,
+            divergence: None,
+            detail: "synthetic".to_string(),
+        },
+        is_falsified: true,
+        dag_node: None,
+    };
+
+    let implicated = overlay.implicate_causal_nodes(&log, &comparison);
+    assert_eq!(implicated.len(), 2);
+    assert_eq!(implicated[0].dag_node, "theory_node");
+    assert_eq!(implicated[0].layer, Layer::Theory);
+    assert_eq!(implicated[1].dag_node, "method_node");
+    assert_eq!(implicated[1].layer, Layer::Methodology);
+}
+
+#[test]
+fn test_implicate_depth_ordering() {
+    setup();
+    let far = TraceEventBuilder::new()
+        .layer(Layer::Methodology)
+        .kind(EventKind::ParameterRecord {
+            name: "far".to_string(),
+            specified_value: None,
+            actual_value: Value::Known(1.0, "arb".to_string()),
+            units: Some("arb".to_string()),
+            observation_mode: ObservationMode::Observational,
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 0,
+            wall_clock_ns: None,
+            logical_sequence: 1,
+        })
+        .dag_node_ref("far_node".to_string())
+        .build();
+    let far_id = far.id;
+
+    let near = TraceEventBuilder::new()
+        .layer(Layer::Methodology)
+        .kind(EventKind::ParameterRecord {
+            name: "near".to_string(),
+            specified_value: None,
+            actual_value: Value::Known(2.0, "arb".to_string()),
+            units: Some("arb".to_string()),
+            observation_mode: ObservationMode::Observational,
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 1,
+            wall_clock_ns: None,
+            logical_sequence: 2,
+        })
+        .causal_refs(vec![far_id])
+        .dag_node_ref("near_node".to_string())
+        .build();
+    let near_id = near.id;
+
+    let comparison_event = TraceEventBuilder::new()
+        .layer(Layer::Implementation)
+        .kind(EventKind::ExecutionStatus {
+            status: ExecutionOutcome::Success,
+            framework_error_id: None,
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 2,
+            wall_clock_ns: None,
+            logical_sequence: 3,
+        })
+        .causal_refs(vec![near_id])
+        .build();
+
+    let log = LayeredEventLogBuilder::new(test_experiment_ref(), test_spec())
+        .add_event(far)
+        .add_event(near)
+        .add_event(comparison_event)
+        .build();
+    let overlay = CausalOverlay::from_log(&log);
+    let comparison = PredictionComparison {
+        comparison_event_idx: 2,
+        prediction_id: None,
+        variable: "unknown".to_string(),
+        outcome: ComparisonOutcome {
+            agreement: false,
+            divergence: None,
+            detail: "synthetic".to_string(),
+        },
+        is_falsified: true,
+        dag_node: None,
+    };
+
+    let implicated = overlay.implicate_causal_nodes(&log, &comparison);
+    assert_eq!(implicated.len(), 2);
+    assert_eq!(implicated[0].dag_node, "near_node");
+    assert_eq!(implicated[0].causal_distance, 1);
+    assert_eq!(implicated[1].dag_node, "far_node");
+    assert_eq!(implicated[1].causal_distance, 2);
+}
+
+#[test]
+fn test_implicate_ancestor_without_dag_node() {
+    setup();
+    let ancestor_without_dag = TraceEventBuilder::new()
+        .layer(Layer::Theory)
+        .kind(EventKind::ParameterRecord {
+            name: "unnamed".to_string(),
+            specified_value: None,
+            actual_value: Value::Known(1.0, "arb".to_string()),
+            units: Some("arb".to_string()),
+            observation_mode: ObservationMode::Observational,
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 0,
+            wall_clock_ns: None,
+            logical_sequence: 1,
+        })
+        .build();
+    let ancestor_without_dag_id = ancestor_without_dag.id;
+
+    let comparison_event = TraceEventBuilder::new()
+        .layer(Layer::Implementation)
+        .kind(EventKind::ExecutionStatus {
+            status: ExecutionOutcome::Success,
+            framework_error_id: None,
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 1,
+            wall_clock_ns: None,
+            logical_sequence: 2,
+        })
+        .causal_refs(vec![ancestor_without_dag_id])
+        .build();
+
+    let log = LayeredEventLogBuilder::new(test_experiment_ref(), test_spec())
+        .add_event(ancestor_without_dag)
+        .add_event(comparison_event)
+        .build();
+    let overlay = CausalOverlay::from_log(&log);
+    let comparison = PredictionComparison {
+        comparison_event_idx: 1,
+        prediction_id: None,
+        variable: "unknown".to_string(),
+        outcome: ComparisonOutcome {
+            agreement: false,
+            divergence: None,
+            detail: "synthetic".to_string(),
+        },
+        is_falsified: true,
+        dag_node: None,
+    };
+
+    let implicated = overlay.implicate_causal_nodes(&log, &comparison);
+    assert!(implicated.is_empty());
+}
+
+#[test]
+fn test_implicate_multiple_events_same_dag_node() {
+    setup();
+    let far_shared = TraceEventBuilder::new()
+        .layer(Layer::Theory)
+        .kind(EventKind::ParameterRecord {
+            name: "shared_far".to_string(),
+            specified_value: None,
+            actual_value: Value::Known(1.0, "arb".to_string()),
+            units: Some("arb".to_string()),
+            observation_mode: ObservationMode::Observational,
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 0,
+            wall_clock_ns: None,
+            logical_sequence: 1,
+        })
+        .dag_node_ref("shared_node".to_string())
+        .build();
+    let far_shared_id = far_shared.id;
+
+    let near_shared = TraceEventBuilder::new()
+        .layer(Layer::Implementation)
+        .kind(EventKind::ResourceStatus {
+            platform_type: "CPU".to_string(),
+            device_ids: vec![],
+            memory_allocated: None,
+            memory_peak: None,
+            parallelization: None,
+            warnings: vec![],
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 1,
+            wall_clock_ns: None,
+            logical_sequence: 2,
+        })
+        .causal_refs(vec![far_shared_id])
+        .dag_node_ref("shared_node".to_string())
+        .build();
+    let near_shared_id = near_shared.id;
+
+    let comparison_event = TraceEventBuilder::new()
+        .layer(Layer::Implementation)
+        .kind(EventKind::ExecutionStatus {
+            status: ExecutionOutcome::Success,
+            framework_error_id: None,
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 2,
+            wall_clock_ns: None,
+            logical_sequence: 3,
+        })
+        .causal_refs(vec![near_shared_id])
+        .build();
+
+    let log = LayeredEventLogBuilder::new(test_experiment_ref(), test_spec())
+        .add_event(far_shared)
+        .add_event(near_shared)
+        .add_event(comparison_event)
+        .build();
+    let overlay = CausalOverlay::from_log(&log);
+    let comparison = PredictionComparison {
+        comparison_event_idx: 2,
+        prediction_id: None,
+        variable: "unknown".to_string(),
+        outcome: ComparisonOutcome {
+            agreement: false,
+            divergence: None,
+            detail: "synthetic".to_string(),
+        },
+        is_falsified: true,
+        dag_node: None,
+    };
+
+    let implicated = overlay.implicate_causal_nodes(&log, &comparison);
+    assert_eq!(implicated.len(), 1);
+    assert_eq!(implicated[0].dag_node, "shared_node");
+    assert_eq!(implicated[0].layer, Layer::Implementation);
+    assert_eq!(implicated[0].causal_distance, 1);
+    assert_eq!(implicated[0].ancestor_event_indices.len(), 2);
+    assert!(implicated[0].ancestor_event_indices.contains(&0));
+    assert!(implicated[0].ancestor_event_indices.contains(&1));
 }
 
 #[test]

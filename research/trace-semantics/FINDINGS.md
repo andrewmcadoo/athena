@@ -17,7 +17,7 @@ What intermediate representation (IR) can translate raw DSL trace logs from stru
 
 ## Status
 
-IN PROGRESS — Steps 1-6 and all synthesis steps (1d, 2c, 3b) complete. Step 5a (candidate IR schemas) complete: Hybrid LEL+DGR recommended (94/100). Step 5b (LEL prototype) complete. Step 5c (open thread resolution) complete: 5/5 threads resolved/narrowed/deferred with evidence. Step 6 (Hybrid LEL+DGR Phase 2 prototype) complete: `by_id` index implemented, `CausalOverlay` + R14 confounder query implemented, crate at 29/29 passing tests, clippy clean.
+IN PROGRESS — Steps 1-7 and all synthesis steps (1d, 2c, 3b) complete. Step 5a (candidate IR schemas) complete: Hybrid LEL+DGR recommended (94/100). Step 5b (LEL prototype) complete. Step 5c (open thread resolution) complete: 5/5 threads resolved/narrowed/deferred with evidence. Step 6 (Hybrid LEL+DGR Phase 2 prototype) complete: `by_id` index implemented, `CausalOverlay` + R14 confounder query implemented. Step 7 (R17+R18 query implementation) complete: `compare_predictions` + `implicate_causal_nodes` implemented with depth-aware BFS helper, crate at 44/44 passing tests, clippy clean.
 
 ## Key Definitions
 
@@ -27,6 +27,35 @@ IN PROGRESS — Steps 1-6 and all synthesis steps (1d, 2c, 3b) complete. Step 5a
 - **Theory-implementation separation**: The API-enforced structural distinction in DSL frameworks between what the user specifies (theory) and how the framework executes it (implementation).
 
 ## Investigation Log
+
+### 2026-02-21: Step 7: R17+R18 Query Implementation
+
+**Scope:** Implement and validate R17 and R18 query methods on `CausalOverlay`: prediction-observation comparison extraction and implicated causal node mapping with layer classification.
+
+**Method:** Direct implementation in `prototypes/lel-ir-prototype/src/overlay.rs` reusing the existing overlay traversal infrastructure. Added a private depth-aware BFS helper (`ancestors_with_depth`) without modifying `transitive_ancestors`, grouped implicated nodes with `BTreeMap`, and resolved `ComparisonResult.prediction_id: String` to `SpecElementId` at query time via parse-at-query-time conversion.
+
+**Findings:**
+
+1. **R17 `compare_predictions` now executes end-to-end.** The query reads `ComparisonResult` events via `indexes.by_kind`, resolves event positions via `indexes.by_id`, parses `prediction_id` string values into `SpecElementId` where possible, joins against `spec.predictions`, and emits `PredictionComparison` outputs with falsification status and DAG-node propagation.
+
+2. **R18 `implicate_causal_nodes` now executes end-to-end with three-way layer classification.** Starting from a comparison event index, the query traverses causal ancestors with BFS depth tracking, groups by DAG node, selects minimum causal distance per node, and returns sorted implicated nodes in Theory→Methodology→Implementation order.
+
+3. **The String→`SpecElementId` mismatch is viable at query time in prototype scope.** Parse-at-query-time conversion handles resolvable IDs while preserving graceful fallback (`prediction_id: None`, variable `"unknown"`) for malformed or unresolvable IDs.
+
+4. **Test coverage for Stage 3 query behavior is now explicit and passing.** Added 15 tests (7 for R17, 8 for R18) covering empty/no-event guards, matched/falsified comparisons, malformed IDs, DAG-node forwarding, layer-specific implication, mixed-layer ordering, depth correctness, ancestor node filtering, and same-node grouping.
+
+5. **Quality gates remain clean after the expansion.** Prototype now passes 44/44 tests with strict clippy (`--all-targets --all-features -- -D warnings`) at zero warnings.
+
+**Implications:**
+- Full Stage 2-3 query surface is now validated in the prototype with implemented R14 + R17 + R18 methods.
+- The Hybrid overlay design supports both confounder detection and falsification-to-causal-implication workflows without architectural changes.
+- Query-time ID parsing is sufficient for prototype iteration speed while preserving deterministic behavior.
+
+**Open Threads:**
+- GROMACS adapter work remains required for cross-framework generalization of the Stage 2-3 query path.
+- `prediction_id` type harmonization (`String` vs `SpecElementId`) remains deferred to a production ADR.
+
+---
 
 ### 2026-02-21: Hybrid LEL+DGR Phase 2 Prototype — CausalOverlay + R14 Query (Step 6)
 
@@ -845,6 +874,12 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 
 50. **R14 confounder detection now executes end-to-end on the overlay prototype.** `detect_confounders` performs ancestor-intersection + controlled/intervention filtering with grouped `ConfounderCandidate` outputs; 7 targeted tests validate controlled-variable exclusion, intervention exclusion, multi-confounder grouping, transitive ancestry, and unknown-variable guards. [Step 6 log 2026-02-21; `lel-ir-prototype/src/overlay.rs`, tests]
 
+51. **R17 comparison query now executes end-to-end on the overlay prototype.** `compare_predictions` resolves `ComparisonResult` events via `by_kind`/`by_id`, parses `prediction_id` strings to `SpecElementId` at query time, joins to `spec.predictions`, and emits falsification-ready `PredictionComparison` records with DAG-node forwarding and malformed-ID fallback behavior. [Step 7 log 2026-02-21; `lel-ir-prototype/src/overlay.rs`, tests]
+
+52. **R18 causal implication query now demonstrates three-way layer classification.** `implicate_causal_nodes` traverses ancestor paths with depth tracking, groups by DAG node, and returns stable Theory→Methodology→Implementation ordering with minimum-distance selection per node. [Step 7 log 2026-02-21; `lel-ir-prototype/src/overlay.rs`, tests]
+
+53. **Prototype Stage 2-3 query surface is now validated end-to-end (`R14 + R17 + R18`).** The crate passes 44/44 tests with zero clippy warnings after adding comparison and implication query coverage. [Step 7 log 2026-02-21; `lel-ir-prototype/src/tests/mod.rs`]
+
 ### What We Suspect
 
 **DSL Trace Architecture**
@@ -991,13 +1026,15 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 
 38. **Whether arena allocation provides measurable benefit for CausalOverlay construction.** NARROWED: Vec-first allocation is now validated on the real overlay path at 10^6 scale (`CausalOverlay::from_log` = 251.82ms). Arena remains deferred and should only be introduced if future profiling shows measurable allocation overhead in broader workloads. [Step 6 log 2026-02-21; `lel-ir-prototype/src/bench.rs`]
 
+39. **Whether `EventKind::ComparisonResult.prediction_id: String` should be harmonized with `PredictionRecord.id: SpecElementId` in production.** Prototype resolves the mismatch at query time via parse-at-query-time conversion, but production semantics and type-level guarantees remain ADR-scoped work. [Step 7 log 2026-02-21; `lel-ir-prototype/src/overlay.rs`]
+
 ## Prototype Index
 
 | Filename | Purpose | Status | Demonstrated |
 | :--- | :--- | :--- | :--- |
 | `codex-prompt-5b-lel-prototype.md` | Codex prompt to produce the LEL IR Rust crate prototype (Step 5b) | Complete | Specifies LEL core types (§1/§2), OpenMM mock adapter, builder helpers, 11 unit tests; validates event typing, layer tagging, spec separation, Hybrid upgrade path fields |
-| `lel-ir-prototype/` | LEL + Hybrid CausalOverlay Rust prototype crate | Complete | Compiles clean, 29/29 tests pass, clippy zero warnings. Validates: event typing (12 EventKind variants), layer tagging, spec separation (AP1 avoidance), serde roundtrip, `by_id` indexing, CausalOverlay construction/traversal, and R14 confounder query behavior. |
-| `lel-ir-prototype/src/overlay.rs` | CausalOverlay implementation (Step 6) | Complete | Implements index-only overlay entities, `from_log` O(n) construction, `transitive_ancestors` BFS traversal, and `detect_confounders` (R14) with controlled/intervention filtering and dag-node grouping. |
+| `lel-ir-prototype/` | LEL + Hybrid CausalOverlay Rust prototype crate | Complete | Compiles clean, 44/44 tests pass, clippy zero warnings. Validates: event typing (12 EventKind variants), layer tagging, spec separation (AP1 avoidance), serde roundtrip, `by_id` indexing, CausalOverlay construction/traversal, and Stage 2-3 query behavior (`R14 + R17 + R18`). |
+| `lel-ir-prototype/src/overlay.rs` | CausalOverlay implementation (Steps 6-7) | Complete | Implements index-only overlay entities, `from_log` O(n) construction, `transitive_ancestors` BFS traversal, private `ancestors_with_depth`, `detect_confounders` (R14), `compare_predictions` (R17), and `implicate_causal_nodes` (R18). |
 | `lel-ir-prototype/src/bench.rs` | CausalOverlay construction benchmark | Complete | Benchmarks real `CausalOverlay::from_log` at 4 scales (10^3-10^6). Latest result: 251.82ms overlay construction at 10^6 events (22.62ms at 10^5), confirming practical O(n) behavior. |
 
 ## Next Steps
@@ -1012,7 +1049,7 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 
 5. **Draft candidate IR schemas and prototype** — **Steps 5a, 5b, 5c COMPLETE.** Three candidates (LEL, DGR, Hybrid LEL+DGR) evaluated against R1-R29, 9 anti-patterns, streaming constraints, and 7-criterion weighted framework. Recommendation: Hybrid (94/100). Step 5 outputs remain valid and are now extended by Step 6 implementation details below. See `dsl-evaluation/candidate-ir-schemas.md`, `prototypes/codex-prompt-5b-lel-prototype.md`, and investigation logs above. (Beads: athena-axc, athena-9uv)
 
-6. **Hybrid LEL+DGR Phase 2 prototype (CausalOverlay + R14 query)** — **COMPLETE.** `by_id` index added; `src/overlay.rs` implemented with O(n) construction and BFS traversal; R14 confounder detection query implemented and tested. Crate now at 29/29 passing tests with strict clippy clean; benchmark uses real overlay path and reports 251.82ms at 10^6 events. (Tracking updates: #37 closed, #38 narrowed/validated)
+6. **Hybrid LEL+DGR Phase 2 prototype (CausalOverlay + R14 query)** — **COMPLETE.** `by_id` index added; `src/overlay.rs` implemented with O(n) construction and BFS traversal; R14 confounder detection query implemented and tested. Baseline Step 6 crate state was 29/29 tests passing with strict clippy clean; subsequent Step 7 query expansion now validates 44/44 tests with strict clippy clean. Benchmark uses real overlay path and reports 251.82ms at 10^6 events. (Tracking updates: #37 closed, #38 narrowed/validated)
 
 **Synthesis steps needed before Step 5:**
 
