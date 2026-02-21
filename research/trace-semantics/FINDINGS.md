@@ -917,7 +917,7 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 
 | Filename | Purpose | Status | Demonstrated |
 | :--- | :--- | :--- | :--- |
-| *None yet* | | | |
+| `codex-prompt-5b-lel-prototype.md` | Codex prompt to produce the LEL IR Rust crate prototype (Step 5b) | Active | Specifies LEL core types (§1/§2), OpenMM mock adapter, builder helpers, 11 unit tests; validates event typing, layer tagging, spec separation, Hybrid upgrade path fields |
 
 ## Next Steps
 

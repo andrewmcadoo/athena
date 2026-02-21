@@ -1,5 +1,5 @@
 # Agent Instructions
-
+**READ CLAUDE.md**
 This project uses **bd** (beads) for issue tracking. Run `bd onboard` to get started.
 
 ## Quick Reference
