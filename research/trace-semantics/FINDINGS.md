@@ -28,6 +28,44 @@ IN PROGRESS — Steps 1-4 substantially complete (7 parallel investigations merg
 
 ## Investigation Log
 
+### 2026-02-20: Requirements Coverage Matrix and Gap Analysis (Step 3b)
+
+**Scope:** Cross-reference R1-R29 requirements against the trace capability matrix from Step 1d (cross-framework-synthesis.md). For each requirement × framework cell, classify data availability using six codes (DA/DI/ER/FU/NT/DE). Perform gap analysis for all non-DA cells. Assess per-stage feasibility. Evaluate Decision Gate 4.
+
+**Method:** Systematic assessment of each R1-R29 requirement against OpenMM, GROMACS, and VASP trace capabilities. Evidence drawn from cross-framework-synthesis.md (trace capability matrix §1, boundary assessment §2, failure modes §3, completeness §4, adapter contract §5.3, coverage implications §7.1), ir-pattern-catalog.md (pattern coverage annotations, candidate designs §6), and evaluation/hidden-confounder/README.md (R27-R29 context). Requirements assessed in order: Stage 1 (R1-R7), Cross-cutting (R19-R29), Stage 2 (R8-R14), Stage 3 (R15-R18). Each cell classified with code + evidence note + confidence + source reference.
+
+**Findings:**
+
+1. **Stage 1 (R1-R7) is fully satisfiable for all three frameworks.** OpenMM requires the most custom instrumentation (4 DI cells vs. 0 for GROMACS/VASP) because it lacks built-in parameter echo and requires API queries for specification/resource data. GROMACS has the best default Stage 1 coverage (5 DA cells). VASP has good structured output but exit code unreliability for SCF non-convergence (R1 caveat). [requirements-coverage-matrix.md §1]
+
+2. **31% of requirements (9 of 29) are NT — external to the Trace Semantics Engine.** R9, R10, R11, R15, R18, R22, R23, R28 come from experiment specification, hypothesis, or DAG. R29 (cycle_id) comes from the workflow controller. This confirms the IR is a composite multi-source structure, not a pure trace-log derivative. [requirements-coverage-matrix.md §5.1 Strategy C]
+
+3. **R19 (layer tag) has the widest framework variance: OpenMM=DA, GROMACS=DI+ER, VASP=ER.** OpenMM's API-enforced boundary yields clean layer tags. GROMACS needs a moderate classification table (~10 boundary params). VASP needs an extensive table (~200-300 INCAR tags) with context-dependent ambiguity for ~5-10 tags. This is the only cross-cutting requirement with framework-dependent difficulty. [requirements-coverage-matrix.md §2]
+
+4. **Stage 2 (R8-R14) is the weakest stage, limited by external context rather than trace data.** The IR contributes only R8 (observable values) and R12 (sampling metadata) to Stage 2. The remaining 5 requirements are NT (from experiment spec/hypothesis/DAG) or DE (computed from other elements + DAG). This is consistent with the accumulated finding that methodology failures are invisible to all frameworks. [requirements-coverage-matrix.md §3]
+
+5. **Stage 3 (R15-R18) is feasible but blocked on one research element.** R17 (prediction-observation comparison) is DE (computable) but the quantitative comparison method — effect size measures, divergence metrics, tolerance thresholds for scientific predictions — is novel research not yet formalized. All other Stage 3 requirements are satisfiable. [requirements-coverage-matrix.md §4]
+
+6. **FU cells are narrowly scoped and below the 10% threshold.** No full requirement is FU for any framework. Partial FU exists only for R6 (sub-component numerical internals) in all three frameworks: OpenMM ~5% (GPU precision), GROMACS ~5% (constraint solver internals), VASP ~5-10% (FFT/PAW internals). The surface-level metrics are available (DA/DI). [requirements-coverage-matrix.md §5.1 Strategy E]
+
+7. **Decision Gate 4: PASS.** No LFI stage has FU requirements blocking >10% of expected failure classifications. Four conditions: (a) OpenMM custom reporter required, (b) VASP INCAR classification table required, (c) VASP 20-30% degraded confidence for ambiguous params accepted per DG1, (d) R17 comparison method requires formalization. [requirements-coverage-matrix.md §7]
+
+8. **DGR (Dual-Graph IR) is the recommended primary candidate for Step 5a.** The coverage matrix reveals the IR is fundamentally a three-input composite (trace data + external context + domain rules). DGR's graph structure naturally represents entities from all three sources with qualified relationships. LEL is strongest for Stage 1 (high DA density). TAL works better as a query interface layer than as a standalone IR. [requirements-coverage-matrix.md §8]
+
+**Implications:**
+- Step 5a (candidate IR schemas) is now unblocked. The coverage matrix provides: (a) concrete data availability per requirement per framework, (b) gap fill strategies with complexity estimates, (c) the three-input data flow architecture as an organizing principle, (d) candidate-specific coverage pattern analysis.
+- The IR's three-input architecture (trace + external + domain rules) should be the organizing principle for candidate evaluation, not just trace parsing capability.
+- OpenMM adapter requires the most engineering (10 DI cells) but has the cleanest structural foundation (R19=DA). VASP adapter requires the most domain knowledge (R19=ER, ~200-300 tag table) but has good default trace output.
+- The prediction-observation comparison formalization (R17) is a discrete, well-scoped research problem that should be elevated as a prerequisite for Stage 3 capability.
+
+**Open Threads:**
+- Per-force-group energy decomposition overhead in OpenMM (R6 DI) — untested, affects custom reporter design decisions. [What We Don't Know #2]
+- Quantitative prediction-observation comparison method — the single unresolved research element blocking Stage 3. Related to DRAT propositional-to-statistical adaptation. [ir-pattern-catalog.md §7 Open Thread]
+- Whether the LEL→DGR incremental path is viable — start with LEL for Stage 1 prototype, evolve toward DGR. Depends on whether adding graph structure is incremental or requires redesign. [ir-pattern-catalog.md §7 Question 5]
+- VASP INCAR classification table completeness and validation — needed before VASP adapter design. [cross-framework §6.4]
+
+---
+
 ### 2026-02-20: Comparative IR Synthesis (Step 2c)
 
 **Scope:** Synthesis of RCA/formal verification IR survey and provenance/workflow IR survey into a unified pattern catalog. Resolution of the MLIR-dialects vs. PROV-DM-hybrid tension. Decision Gate 2 assessment.
@@ -657,6 +695,16 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 
 36. **Three candidate IR designs have distinct pattern-source profiles.** LEL (Layered Event Log): simplest, Stage 1 strongest, log-based. DGR (Dual-Graph IR): natural synthesis of both surveys, Stages 2-3 strongest, graph-based. TAL (Typed Assertion Log): most ATHENA-specific, highest novelty risk, assertion-based. [IR synthesis log 2026-02-20; ir-pattern-catalog.md §6]
 
+**Requirements Coverage**
+
+24. **Stage 1 requirements (R1-R7) are fully satisfiable for all three frameworks.** OpenMM has 4 DI cells (highest instrumentation burden: no parameter echo, API-only access). GROMACS has 5 DA cells (best default coverage). VASP has 4 DA cells but exit code unreliability for SCF non-convergence. Coverage matrix confirms Stage 1 is the most tractable stage. [Coverage matrix log 2026-02-20; requirements-coverage-matrix.md §1]
+
+25. **31% of R1-R29 requirements (9 of 29) are NT — data sources external to the Trace Semantics Engine.** R9, R10, R11, R15, R18, R22, R23, R28, R29(cycle_id) come from experiment specification, hypothesis, DAG, or workflow controller. This quantifies the IR's composite nature first identified in item 20. [Coverage matrix log 2026-02-20; requirements-coverage-matrix.md §5.1]
+
+26. **R19 (layer tag) availability varies: OpenMM=DA (clean API), GROMACS=DI+ER (~10 boundary params), VASP=ER (~200-300 INCAR tags).** This is the only cross-cutting requirement with framework-dependent classification difficulty. OpenMM's clean boundary confirms the DSL constraint's value. VASP's ER burden is bounded (finite, static tag set) and accepted per Decision Gate 1. [Coverage matrix log 2026-02-20; requirements-coverage-matrix.md §2]
+
+27. **Decision Gate 4: PASS — no LFI stage blocked by FU requirements.** FU cells exist only as partial R6 (sub-component numerical internals) at ~5-10% per framework, well below the 10% threshold. Four conditions attached: OpenMM custom reporter, VASP classification table, VASP degraded confidence for ambiguous params, R17 comparison method formalization. [Coverage matrix log 2026-02-20; requirements-coverage-matrix.md §7]
+
 **Baseline Characterization**
 
 37. **The 21% Top@1 figure in VISION.md is uncited.** It carries no reference number, unlike most other claims in the document. The anchoring number for ATHENA's value proposition is unsourced. [Baseline log 2026-02-20]
@@ -701,7 +749,7 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 
 **Requirements and Baseline**
 
-14. **Stage 1 requirements (R1, R2, R6, R7) are the most tractable** because DSL frameworks structurally emit execution status, exceptions, numerical health, and resource state. Partially confirmed by DSL trace surveys. [LFI requirements log 2026-02-20; DSL surveys 2026-02-20]
+14. ~~**Stage 1 requirements (R1, R2, R6, R7) are the most tractable.**~~ PROMOTED to What We Know #24. Coverage matrix confirms: Stage 1 is fully satisfiable for all three frameworks, with OpenMM needing the most instrumentation (4 DI cells) and GROMACS having the best default coverage (5 DA cells). [Coverage matrix log 2026-02-20]
 
 15. **R28 (interventional vs. observational distinction) may be a gap in ARCHITECTURE.md §5.3.** The audit description does not explicitly require it, but the hidden confounder litmus test cannot be passed without it. [LFI requirements log 2026-02-20]
 
@@ -715,7 +763,7 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 
 **Cross-Framework and IR Synthesis**
 
-20. **DGR (Dual-Graph IR) is likely the strongest candidate for Step 5a** because it naturally synthesizes both surveys' recommendations (MLIR dialects for structure + PROV-DM for causal reasoning) and covers Stages 2-3 better than LEL. LEL is the simpler fallback; TAL is the highest-risk alternative. [IR synthesis log 2026-02-20; ir-pattern-catalog.md §6]
+20. **DGR (Dual-Graph IR) is likely the strongest candidate for Step 5a.** Supported by both surveys' pattern synthesis AND the coverage matrix: the IR's three-input composite nature (31% NT, high cross-referencing DE requirements) favors graph structure for representing entities from multiple sources with qualified relationships. LEL remains strongest for Stage 1 (high DA density). TAL works better as a query interface layer than standalone IR. [IR synthesis log 2026-02-20; ir-pattern-catalog.md §6; Coverage matrix log 2026-02-20; requirements-coverage-matrix.md §8]
 
 21. **The unified architecture (MLIR-dialects + PROV-DM + Boogie-contracts) can likely be incrementally implemented** — start with LEL for a Stage 1 prototype, add graph structure for Stages 2-3, evolve toward DGR. This reduces risk by validating incrementally. [IR synthesis log 2026-02-20; ir-pattern-catalog.md §7]
 
@@ -787,6 +835,14 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 
 27. **What the streaming/buffering trade-off is for Stage 3.** LEL is fully streaming; DGR may require partial graph buffering; TAL may require assertion reordering. Depends on how often Stage 3 needs full-trace access vs. phase-level summaries. [IR synthesis log 2026-02-20; ir-pattern-catalog.md §7]
 
+**Coverage Matrix**
+
+28. **How to formalize the quantitative prediction-observation comparison method (R17).** This is the single unresolved research element blocking Stage 3 feasibility. Must define effect size measures, divergence metrics, and tolerance thresholds for scientific predictions. Related to the DRAT propositional-to-statistical adaptation gap. [Coverage matrix log 2026-02-20; requirements-coverage-matrix.md §4, §6.3]
+
+29. **Whether the LEL→DGR incremental implementation path is viable.** The coverage matrix shows LEL is best for Stage 1 (high DA density) and DGR for Stages 2-3 (graph structure for NT/DE cross-referencing). Can LEL be extended incrementally with graph structure, or does DGR require up-front design? [Coverage matrix log 2026-02-20; requirements-coverage-matrix.md §8; ir-pattern-catalog.md §7 Q5]
+
+30. **The per-force-group energy decomposition overhead in OpenMM (R6 DI).** This is the largest unknown affecting OpenMM adapter feasibility. If overhead is prohibitive, alternative R6 strategies are needed (e.g., statistical anomaly detection on total energy only). [Coverage matrix log 2026-02-20; What We Don't Know #2]
+
 ## Prototype Index
 
 | Filename | Purpose | Status | Demonstrated |
@@ -811,4 +867,4 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 
 - ~~**Step 2c: Comparative IR synthesis.**~~ — **COMPLETE.** Seven-category pattern catalog, nine anti-patterns, MLIR/PROV-DM tension resolved (complementary: routing + provenance), Decision Gate 2 resolved (hybrid adaptation, MEDIUM risk). See `dsl-evaluation/ir-pattern-catalog.md` and investigation log above. (Bead: athena-tyt, CLOSED)
 
-- **Step 3b: Requirements refinement with coverage matrix.** Cross-reference R1-R29 against the trace capability matrix from Step 1d. For each requirement, determine: which frameworks provide the data natively, which require custom instrumentation, which require external domain rules. Produce a coverage matrix showing requirement satisfaction by framework. (Bead: athena-rf6, READY — unblocked by athena-ywn completion)
+- ~~**Step 3b: Requirements refinement with coverage matrix.**~~ — **COMPLETE.** R1-R29 cross-referenced against trace capability matrix. Coverage matrix with six classification codes (DA/DI/ER/FU/NT/DE), gap analysis, per-stage feasibility assessment, and Decision Gate 4 (PASS) produced. See `dsl-evaluation/requirements-coverage-matrix.md` and investigation log above. (Bead: athena-rf6, CLOSED)
