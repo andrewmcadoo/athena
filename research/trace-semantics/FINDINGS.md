@@ -28,6 +28,66 @@ IN PROGRESS — Steps 1-4 substantially complete (7 parallel investigations merg
 
 ## Investigation Log
 
+### 2026-02-20: Comparative IR Synthesis (Step 2c)
+
+**Scope:** Synthesis of RCA/formal verification IR survey and provenance/workflow IR survey into a unified pattern catalog. Resolution of the MLIR-dialects vs. PROV-DM-hybrid tension. Decision Gate 2 assessment.
+
+**Method:** Systematic comparison of 20 patterns across both surveys, distilled into 7 pattern categories. Each pattern evaluated against LFI audit stage requirements, R1-R29 coverage, and Rust/streaming compatibility. Anti-patterns cataloged from both surveys with severity ratings. Tension resolution through compositional analysis (MLIR for routing, PROV-DM for provenance).
+
+**Findings:**
+
+1. **Seven transferable pattern categories identified with stage mappings.** Counter-example traces (MEDIUM), Entity-Activity-Agent (HIGH data model / LOW tech stack), typed event chains (HIGH), SSA data flow (MEDIUM-HIGH), multi-level dialects (HIGH), spec-implementation contracts (HIGH), causal dependency/conformance (MEDIUM). Patterns 5 (dialects) and 6 (contracts) are the highest-transferability patterns. [ir-pattern-catalog.md §1]
+2. **Stage 2 (methodology audit) is the weakest stage across all patterns.** No surveyed system provides native methodology adequacy checking. Patterns provide structural scaffolding for encoding methodology metadata, but domain-specific adequacy rules are external to IR design. This is consistent with the DSL trace finding that methodology failures are invisible to all frameworks. [ir-pattern-catalog.md §2]
+3. **MLIR dialects and PROV-DM are complementary, not contradictory.** Dialects answer "WHERE does an element belong?" (classification/routing). PROV-DM answers "HOW are elements causally related?" (causal structure). The unified architecture uses dialect structure as primary organization with PROV-DM-like causal graphs within each layer. [ir-pattern-catalog.md §4]
+4. **Decision Gate 2: Hybrid adaptation, MEDIUM risk.** ~65-70% transfers from existing systems (12 specific patterns). ~30-35% requires novel design: three-way layer typing vocabulary, fault classification ontology, quantitative prediction-observation comparison formalization, methodology detection rules. [ir-pattern-catalog.md §5]
+5. **Nine anti-patterns cataloged with avoidance guidance.** CRITICAL: specification-implementation conflation. HIGH: post-mortem-only design, full-granularity recording, binary pass/fail, lossy compression without principled selection. [ir-pattern-catalog.md §3]
+6. **Three candidate IR designs mapped to pattern sources.** LEL (Layered Event Log) is simplest, strongest for Stage 1. DGR (Dual-Graph IR) is the natural synthesis of both surveys, strongest for Stages 2-3. TAL (Typed Assertion Log) is most ATHENA-specific and highest-novelty-risk. [ir-pattern-catalog.md §6]
+
+**Implications:**
+- The IR structural foundation is now defined: MLIR-style dialect tags for layer routing + PROV-DM-inspired causal graphs within layers + Boogie-style contracts for specification.
+- The technology stack is resolved: Rust-native implementation, no RDF/SPARQL, per ADR 001.
+- Four novel elements flagged as requiring original research (not available from surveyed systems).
+- Step 5a (candidate IR schemas) can now proceed with clear structural foundation and pattern-to-candidate mapping.
+
+**Open Threads:**
+- Quantitative prediction-observation comparison formalization — DRAT is propositional, scientific refutation is quantitative. Bridging mechanism undefined.
+- How to handle events spanning multiple dialects simultaneously (e.g., VASP's PREC parameter).
+- Which causal reasoning substrate (log search, graph traversal, assertion chains) best matches LFI's actual query patterns — requires enumeration of specific queries derived from R1-R29.
+- Whether the unified architecture can be incrementally implemented (start with LEL, evolve toward DGR).
+
+---
+
+### 2026-02-20: Cross-Framework Trace Synthesis (Step 1d)
+
+**Scope:** Comparative analysis of OpenMM, GROMACS, and VASP trace output systems. Production of trace capability matrix, failure mode taxonomy, trace completeness assessment, and Decision Gate 1 assessment.
+
+**Method:** Systematic cross-referencing of the three DSL trace analysis documents. Seven trace element categories compared across frameworks with format, access method, and layer classification. Failure modes harmonized into a cross-framework taxonomy. Theory-implementation boundary assessed per-framework with boundary parameter catalog.
+
+**Findings:**
+
+1. **Trace capability matrix completed across 7 categories.** State snapshots, energy series, convergence metrics, error/warning messages, parameter echo, execution metadata, and trajectory data compared across all three frameworks with specific file formats, access methods, and layer tags. [cross-framework-synthesis.md §1]
+2. **Theory-implementation boundary: OpenMM CLEAN, GROMACS SEMI-CLEAN, VASP DIRTY.** OpenMM has API-enforced separation at `ForceField.createSystem()`. GROMACS has .mdp separation with ~10 boundary parameters (dt, nsteps, rlist, etc.) requiring dual-annotation. VASP has flat INCAR namespace requiring external classification of ~200-300 tags. Twenty boundary parameters cataloged across all three frameworks. [cross-framework-synthesis.md §2]
+3. **49 failure modes taxonomized across three frameworks.** OpenMM: 17 modes (5 impl, 5 methodology, 4 theory, 3 ambiguous). GROMACS: 16 modes. VASP: 16 modes. 8 common cross-framework patterns identified (numerical overflow, constraint/convergence failure, memory exhaustion, etc.) plus 7 DSL-specific modes. [cross-framework-synthesis.md §3]
+4. **Trace completeness varies: OpenMM 30-40% default / 70-80% max, GROMACS 60-70% / 75-85%, VASP 50-60% / 50-60% ceiling.** VASP hits a hard ceiling due to closed-source constraints. All frameworks require custom instrumentation for three-way fault classification. [cross-framework-synthesis.md §4]
+5. **Seven common IR core elements generalize across all frameworks:** timestamped events, energy time series, parameter records, error events, state snapshots, convergence trajectories, data absence records. Framework-specific elements require DSL-specific adapters. [cross-framework-synthesis.md §5]
+6. **Decision Gate 1: VASP FAILS the clean-boundary test but should be accepted.** External classification table is finite, static, and domain-knowledge-based (not novel research). Dropping VASP loses the DFT domain. 70-80% of standard VASP calculations classifiable with full confidence; 20-30% have degraded confidence from ambiguous parameters. Five items flagged for adversarial review. [cross-framework-synthesis.md §6]
+7. **Adapter contract defined: 7 mandatory + 7 optional methods.** The adapter interface establishes the boundary between DSL-specific parsing and common IR construction. [cross-framework-synthesis.md §5.3]
+
+**Implications:**
+- The IR cannot be a universal schema — it must be common core + adapter extensions.
+- The temporal axis must be generic (step intervals for MD, SCF/ionic iterations for DFT).
+- Error classification requires IR-imposed taxonomy through pattern matching (no framework provides structured error codes).
+- Crash-state is unreliable across all frameworks — IR must work with "last known state" semantics.
+- Step 3b (requirements refinement) can now cross-reference R1-R29 against the trace capability matrix.
+
+**Open Threads:**
+- INCAR classification table needs domain expert review before VASP adapter design is finalized.
+- The "ambiguous for pathological systems" threshold for VASP parameters (ALGO, PREC) needs empirical validation.
+- Whether classification tables can be partially automated (LLM-assisted documentation analysis) or are inherently manual — affects ATHENA's generalizability claim.
+- Closed-source ceiling practical impact needs stress-testing with real VASP failure cases.
+
+---
+
 ### 2026-02-20: 21% RCA Baseline Characterization
 
 **Scope:** Source tracing of the 21% Top@1 figure cited in VISION.md Open Question #1; analysis of structural properties that improve RCA accuracy; assessment of transferability to DSL-constrained environments.
@@ -575,15 +635,37 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 
 23. **Stage 2 requirements (R8-R14) are bounded by DAG accuracy.** Every confounder judgment must be traceable to specific DAG edges consulted, enabling reclassification when the DAG changes. [LFI requirements log 2026-02-20; ARCHITECTURE.md §5.3, §8.5]
 
+**Cross-Framework Synthesis**
+
+28. **Trace completeness varies substantially: OpenMM 30-40% default / 70-80% max, GROMACS 60-70% / 75-85%, VASP 50-60% / 50-60% ceiling.** VASP hits a hard closed-source ceiling that cannot be overcome with custom instrumentation. OpenMM has the widest gap between default and instrumented coverage, meaning custom reporters provide the most marginal value. [Cross-framework synthesis log 2026-02-20; cross-framework-synthesis.md §4]
+
+29. **49 failure modes taxonomized: 8 harmonized cross-framework patterns, 7 DSL-specific modes.** Common patterns include: numerical overflow, constraint/convergence failure, memory exhaustion, parameter misspecification, silent methodology inadequacy. DSL-specific modes include VASP SCF non-convergence, GROMACS domain decomposition failure, OpenMM platform-dependent precision divergence. [Cross-framework synthesis log 2026-02-20; cross-framework-synthesis.md §3]
+
+30. **Decision Gate 1 resolved: VASP accepted with external classification table.** 70-80% of standard VASP calculations classifiable with full confidence; 20-30% have degraded confidence from ambiguous parameters (PREC, ALGO, LREAL). Five items flagged for adversarial review. [Cross-framework synthesis log 2026-02-20; cross-framework-synthesis.md §6]
+
+31. **Seven common IR core elements identified.** Timestamped events, energy time series, parameter records, error events, state snapshots, convergence trajectories, and data absence records generalize across all three frameworks and form the universal IR schema core. [Cross-framework synthesis log 2026-02-20; cross-framework-synthesis.md §5]
+
+32. **Adapter contract defined: 7 mandatory + 7 optional methods.** Mandatory: extract_parameters, extract_energy_series, extract_state_snapshots, extract_errors, extract_convergence_metrics, extract_execution_metadata, declare_data_completeness. Optional: validate_preprocessing, extract_runtime_adjustments, extract_scf_convergence, extract_electronic_structure, validate_silent_failures, extract_force_field_compilation, compare_platforms. [Cross-framework synthesis log 2026-02-20; cross-framework-synthesis.md §5.3]
+
+**Comparative IR Synthesis**
+
+33. **MLIR dialects and PROV-DM serve complementary roles in the IR architecture.** Dialects provide classification/routing (which LFI stage handles an element); PROV-DM provides causal structure (how elements relate within each stage). The unified architecture uses dialect structure as primary organization with PROV-DM-like causal graphs within each layer. [IR synthesis log 2026-02-20; ir-pattern-catalog.md §4]
+
+34. **Decision Gate 2 resolved: hybrid adaptation, MEDIUM risk.** ~65-70% transfers from existing systems. ~30-35% requires novel design: three-way layer typing vocabulary, fault classification ontology, quantitative prediction-observation comparison formalization, methodology detection rules. [IR synthesis log 2026-02-20; ir-pattern-catalog.md §5]
+
+35. **Nine anti-patterns cataloged with severity ratings and avoidance guidance.** CRITICAL: specification-implementation conflation (directly disables three-stage audit). HIGH: post-mortem-only design (blocks streaming per ADR 001), full-granularity recording (10^8+ nodes), binary pass/fail (collapses three-way), lossy compression without principled selection. [IR synthesis log 2026-02-20; ir-pattern-catalog.md §3]
+
+36. **Three candidate IR designs have distinct pattern-source profiles.** LEL (Layered Event Log): simplest, Stage 1 strongest, log-based. DGR (Dual-Graph IR): natural synthesis of both surveys, Stages 2-3 strongest, graph-based. TAL (Typed Assertion Log): most ATHENA-specific, highest novelty risk, assertion-based. [IR synthesis log 2026-02-20; ir-pattern-catalog.md §6]
+
 **Baseline Characterization**
 
-24. **The 21% Top@1 figure in VISION.md is uncited.** It carries no reference number, unlike most other claims in the document. The anchoring number for ATHENA's value proposition is unsourced. [Baseline log 2026-02-20]
+37. **The 21% Top@1 figure in VISION.md is uncited.** It carries no reference number, unlike most other claims in the document. The anchoring number for ATHENA's value proposition is unsourced. [Baseline log 2026-02-20]
 
-25. **The 21% figure almost certainly originates from cloud/AIOps RCA benchmarks, not scientific computing.** The domain is structurally harder than ATHENA's target on every relevant dimension: trace structure, candidate set size, causal complexity, and observability. The figure is a conservative contrast, not a direct baseline. [Baseline log 2026-02-20; evidence quality B]
+38. **The 21% figure almost certainly originates from cloud/AIOps RCA benchmarks, not scientific computing.** The domain is structurally harder than ATHENA's target on every relevant dimension: trace structure, candidate set size, causal complexity, and observability. The figure is a conservative contrast, not a direct baseline. [Baseline log 2026-02-20; evidence quality B]
 
-26. **ATHENA's three-way classification (implementation/methodology/theory) has a candidate set of 3 with random baseline 33%. Cloud RCA Top@1 operates over 50-500+ candidates with random baseline 0.2-2%.** These are fundamentally different metrics and should not be directly compared. [Baseline log 2026-02-20]
+39. **ATHENA's three-way classification (implementation/methodology/theory) has a candidate set of 3 with random baseline 33%. Cloud RCA Top@1 operates over 50-500+ candidates with random baseline 0.2-2%.** These are fundamentally different metrics and should not be directly compared. [Baseline log 2026-02-20]
 
-27. **Six specific structural properties of traces improve RCA accuracy** (with estimated improvements): temporal/causal ordering (+15-25%), event type taxonomies (+10-20%), schema conformance (+10-20%), causal annotations/dependency graphs (+20-35%), severity levels (+5-10%), layer/component separation (+10-15%). Improvements interact positively. [Baseline log 2026-02-20; evidence quality B]
+40. **Six specific structural properties of traces improve RCA accuracy** (with estimated improvements): temporal/causal ordering (+15-25%), event type taxonomies (+10-20%), schema conformance (+10-20%), causal annotations/dependency graphs (+20-35%), severity levels (+5-10%), layer/component separation (+10-15%). Improvements interact positively. [Baseline log 2026-02-20; evidence quality B]
 
 ### What We Suspect
 
@@ -630,6 +712,16 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 18. **DSL-constrained RCA should achieve 55-75% Top@1 accuracy** on the same failure types that score 21% on unstructured traces. Speculative but grounded in structural analysis. [Baseline log 2026-02-20; evidence quality C]
 
 19. **Residual hard cases (10-25%) cluster into theory-theory interactions, subtle methodology insufficiency, emergent numerical failures, and multi-component interaction failures.** These require the causal DAG and Bayesian Surprise Evaluator, not just the IR. [Baseline log 2026-02-20; evidence quality C]
+
+**Cross-Framework and IR Synthesis**
+
+20. **DGR (Dual-Graph IR) is likely the strongest candidate for Step 5a** because it naturally synthesizes both surveys' recommendations (MLIR dialects for structure + PROV-DM for causal reasoning) and covers Stages 2-3 better than LEL. LEL is the simpler fallback; TAL is the highest-risk alternative. [IR synthesis log 2026-02-20; ir-pattern-catalog.md §6]
+
+21. **The unified architecture (MLIR-dialects + PROV-DM + Boogie-contracts) can likely be incrementally implemented** — start with LEL for a Stage 1 prototype, add graph structure for Stages 2-3, evolve toward DGR. This reduces risk by validating incrementally. [IR synthesis log 2026-02-20; ir-pattern-catalog.md §7]
+
+22. **Classification tables for new DSL frameworks may be partially automatable** via LLM-assisted documentation analysis, reducing the per-DSL engineering cost. Untested. [Cross-framework synthesis log 2026-02-20; cross-framework-synthesis.md §6.4]
+
+23. **The adapter optional methods (validate_silent_failures, extract_scf_convergence, etc.) may evolve into mandatory requirements** as empirical testing reveals which framework-specific data is essential for correct fault classification. [Cross-framework synthesis log 2026-02-20; cross-framework-synthesis.md §5.3]
 
 ### What We Don't Know
 
@@ -683,6 +775,18 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 
 22. **How the success criterion should be reframed** as three-way classification accuracy rather than direct comparison to cloud RCA Top@1. [Baseline log 2026-02-20]
 
+**Cross-Framework and IR Synthesis**
+
+23. **Which causal reasoning substrate (log search, graph traversal, or assertion chains) best matches the LFI's actual query patterns.** Requires enumerating specific queries derived from R1-R29 and benchmarking each candidate. [IR synthesis log 2026-02-20; ir-pattern-catalog.md §7]
+
+24. **How boundary parameters (GROMACS dt, VASP PREC) should be represented in a dialect-based IR.** Options: assign to primary dialect with cross-reference, create a "boundary" sub-dialect, or duplicate with explicit derivation link. [IR synthesis log 2026-02-20; ir-pattern-catalog.md §7]
+
+25. **The practical impact of VASP's closed-source ceiling.** How often does correct fault classification require information not present in vasprun.xml + OUTCAR + stdout? Needs stress-testing with real VASP failure cases. [Cross-framework synthesis log 2026-02-20; cross-framework-synthesis.md §6.4]
+
+26. **Whether the INCAR classification table is correct and complete.** The tag-level classification (theory/implementation/ambiguous) for ~200-300 INCAR parameters needs domain expert validation, particularly for context-dependent tags. [Cross-framework synthesis log 2026-02-20; cross-framework-synthesis.md §6.4]
+
+27. **What the streaming/buffering trade-off is for Stage 3.** LEL is fully streaming; DGR may require partial graph buffering; TAL may require assertion reordering. Depends on how often Stage 3 needs full-trace access vs. phase-level summaries. [IR synthesis log 2026-02-20; ir-pattern-catalog.md §7]
+
 ## Prototype Index
 
 | Filename | Purpose | Status | Demonstrated |
@@ -703,8 +807,8 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 
 **Synthesis steps needed before Step 5:**
 
-- **Step 1d: Cross-framework trace synthesis.** Synthesize the three DSL surveys into a common trace capability matrix: what each framework provides, what gaps exist, what custom instrumentation is needed. Identify IR elements that generalize vs. those requiring DSL-specific adapters. (Bead: athena-ywn, READY)
+- ~~**Step 1d: Cross-framework trace synthesis.**~~ — **COMPLETE.** Trace capability matrix, failure mode taxonomy (49 modes), trace completeness assessment, and Decision Gate 1 resolved (VASP accepted with external classification table). See `dsl-evaluation/cross-framework-synthesis.md` and investigation log above. (Bead: athena-ywn, CLOSED)
 
-- **Step 2c: Comparative IR synthesis.** Synthesize the RCA/FV survey and provenance/workflow survey into a unified design pattern recommendation. Resolve tensions between the MLIR dialect approach and the PROV-DM hybrid approach. Produce a recommended structural foundation for the IR. (Bead: athena-tyt, READY)
+- ~~**Step 2c: Comparative IR synthesis.**~~ — **COMPLETE.** Seven-category pattern catalog, nine anti-patterns, MLIR/PROV-DM tension resolved (complementary: routing + provenance), Decision Gate 2 resolved (hybrid adaptation, MEDIUM risk). See `dsl-evaluation/ir-pattern-catalog.md` and investigation log above. (Bead: athena-tyt, CLOSED)
 
-- **Step 3b: Requirements refinement with coverage matrix.** Cross-reference R1-R29 against the trace capability matrix from Step 1d. For each requirement, determine: which frameworks provide the data natively, which require custom instrumentation, which require external domain rules. Produce a coverage matrix showing requirement satisfaction by framework. (Bead: athena-rf6, blocked by athena-ywn)
+- **Step 3b: Requirements refinement with coverage matrix.** Cross-reference R1-R29 against the trace capability matrix from Step 1d. For each requirement, determine: which frameworks provide the data natively, which require custom instrumentation, which require external domain rules. Produce a coverage matrix showing requirement satisfaction by framework. (Bead: athena-rf6, READY — unblocked by athena-ywn completion)
