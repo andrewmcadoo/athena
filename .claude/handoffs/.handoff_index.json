@@ -1,0 +1,67 @@
+{
+  "handoffs": [
+    {
+      "sequence": 1,
+      "filename": "handoff_001_2026-02-20_merge-7-trace-semantics-branches.md",
+      "created": "2026-02-20T22:03:49.661299",
+      "slug": "merge-7-trace-semantics-branches",
+      "directive": "Merge 7 completed research worktree branches into master, then assess findings and determine next steps for P1 Trace Semantics IR investigation"
+    },
+    {
+      "sequence": 2,
+      "filename": "handoff_002_2026-02-20_synthesis-phase-trace-semantics.md",
+      "created": "2026-02-20T22:35:28.941435",
+      "slug": "synthesis-phase-trace-semantics",
+      "directive": "Execute the two unblocked synthesis beads (athena-ywn: cross-framework trace synthesis, athena-tyt: comparative IR synthesis) to advance toward Step 5 (draft candidate IR schemas)"
+    },
+    {
+      "sequence": 3,
+      "filename": "handoff_003_2026-02-20_step-3b-requirements-refinement.md",
+      "created": "2026-02-20T23:05:46.700069",
+      "slug": "step-3b-requirements-refinement",
+      "directive": "Continue the P1 Trace Semantics IR investigation: plan and implement Step 3b (requirements refinement with coverage matrix)"
+    },
+    {
+      "sequence": 4,
+      "filename": "handoff_004_2026-02-20_plan-implement-5a-candidate-ir-schemas.md",
+      "created": "2026-02-20T23:39:12.306538",
+      "slug": "plan-implement-5a-candidate-ir-schemas",
+      "directive": "Plan and implement Step 5a: Draft candidate IR schemas for ATHENA Trace Semantics Engine"
+    },
+    {
+      "sequence": 5,
+      "filename": "handoff_005_2026-02-21_codex-prompt-5b-lel-prototype.md",
+      "created": "2026-02-21T00:12:56.811348",
+      "slug": "codex-prompt-5b-lel-prototype",
+      "directive": "Design a prompt for Codex to implement Step 5b: LEL IR prototype on OpenMM traces"
+    },
+    {
+      "sequence": 6,
+      "filename": "handoff_006_2026-02-21_close-step-5a-open-threads.md",
+      "created": "2026-02-21T01:01:22.199032",
+      "slug": "close-step-5a-open-threads",
+      "directive": "Close the 5 open threads from Step 5a using the validated LEL prototype as empirical evidence"
+    },
+    {
+      "sequence": 7,
+      "filename": "handoff_007_2026-02-21_phase2-hybrid-prototyping.md",
+      "created": "2026-02-21T11:24:14.480909",
+      "slug": "phase2-hybrid-prototyping",
+      "directive": "Push trace semantics into Phase 2 prototyping: add by_id index, implement CausalOverlay, implement R14 confounder query"
+    },
+    {
+      "sequence": 8,
+      "filename": "handoff_008_2026-02-21_gromacs-adapter-cross-framework.md",
+      "created": "2026-02-21T13:22:02.016487",
+      "slug": "gromacs-adapter-cross-framework",
+      "directive": "Step 9 \u2014 a GROMACS adapter for cross-framework generalization"
+    },
+    {
+      "sequence": 9,
+      "filename": "handoff_009_2026-02-21_vasp-adapter-litmus-test.md",
+      "created": "2026-02-21T15:26:05.924715",
+      "slug": "vasp-adapter-litmus-test",
+      "directive": "VASP adapter first, then hidden confounder litmus test"
+    }
+  ]
+}

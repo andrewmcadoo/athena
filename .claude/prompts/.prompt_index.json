@@ -1,0 +1,44 @@
+{
+  "prompts": [
+    {
+      "sequence": 1,
+      "filename": "prompt_001_2026-02-20_athena-architecture-build-guide.md",
+      "created": "2026-02-20T21:01:39.475216",
+      "slug": "athena-architecture-build-guide",
+      "goal": "Create a concise GUIDE.md that serves as a personal architecture build guide for ATHENA \u2014 summarizing what's been completed, the current project state, and what remains to plan and build, ordered by dependency and priority.",
+      "framework": "TIDD-EC"
+    },
+    {
+      "sequence": 2,
+      "filename": "prompt_002_2026-02-21_lel-overlay-r14.md",
+      "created": "2026-02-21T11:56:23.595865",
+      "slug": "lel-overlay-r14",
+      "goal": "Extend the LEL IR prototype crate with a CausalOverlay struct, by_id index, O(n) overlay construction, and R14 confounder detection query",
+      "framework": "RISEN"
+    },
+    {
+      "sequence": 3,
+      "filename": "prompt_003_2026-02-21_r17-r18-overlay-queries.md",
+      "created": "2026-02-21T12:52:47.017760",
+      "slug": "r17-r18-overlay-queries",
+      "goal": "Implement R17 and R18 query methods on CausalOverlay with 15 tests, clippy compliance, and FINDINGS.md update",
+      "framework": "RISEN"
+    },
+    {
+      "sequence": 4,
+      "filename": "prompt_004_2026-02-21_gromacs-adapter-lel-ir.md",
+      "created": "2026-02-21T14:35:36.428409",
+      "slug": "gromacs-adapter-lel-ir",
+      "goal": "Implement a GROMACS adapter module for the LEL IR prototype, parsing real .mdp and .log files into LayeredEventLog with 22 new tests",
+      "framework": "RISEN"
+    },
+    {
+      "sequence": 5,
+      "filename": "prompt_005_2026-02-21_gromacs-adapter-review-fixes.md",
+      "created": "2026-02-21T15:15:53.203984",
+      "slug": "gromacs-adapter-review-fixes",
+      "goal": "Address 3 warnings and 1 coverage gap from GROMACS adapter code review",
+      "framework": "RTF"
+    }
+  ]
+}

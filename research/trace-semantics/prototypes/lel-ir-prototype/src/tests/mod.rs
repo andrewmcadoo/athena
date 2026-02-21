@@ -3,6 +3,9 @@ use std::sync::Once;
 use crate::adapter::{DslAdapter, MockOpenMmAdapter};
 use crate::common::*;
 use crate::event_kinds::EventKind;
+use crate::gromacs_adapter::{
+    classify_mdp_parameter, parse_log, parse_mdp, GromacsAdapter,
+};
 use crate::lel::*;
 use crate::overlay::{CausalOverlay, PredictionComparison};
 
@@ -2512,4 +2515,536 @@ fn test_serde_roundtrip() {
         assert_eq!(orig.spec_ref, rest.spec_ref);
         assert_eq!(orig.causal_refs, rest.causal_refs);
     }
+}
+
+const GROMACS_MDP_SAMPLE: &str = r#"
+; GROMACS mdp file
+integrator = md
+dt = 0.002 ; ps
+nsteps = 500000
+coulombtype = PME
+rcoulomb = 1.0
+ref_t = 300
+ref_p = 1.0
+tcoupl = V-rescale
+tau_t = 0.1
+pcoupl = Parrinello-Rahman
+nstlog = 1000
+nstxout = 1000
+"#;
+
+const GROMACS_LOG_SAMPLE: &str = r#"
+             :-) GROMACS - gmx mdrun, 2023.3 (-:
+
+Using 1 GPU
+
+   Step           Time
+      0        0.00000
+
+Energies (kJ/mol)
+   Bond          Angle    Proper Dih.          LJ-14     Coulomb-14
+1234.56       2345.67        345.678       456.789       567.890
+   LJ (SR)   Coulomb (SR)   Coul. recip.      Potential    Kinetic En.
+-12345.6      -54321.0        1234.56      -45678.9       12345.6
+   Total Energy   Pressure (bar)
+-33333.3            1.013
+
+Finished mdrun on rank 0
+"#;
+
+const GROMACS_LOG_NAN: &str = r#"
+             :-) GROMACS - gmx mdrun, 2023.3 (-:
+Using 1 GPU
+   Step           Time
+      10        0.02000
+Energies (kJ/mol)
+   Bond          Angle
+100.0          NaN
+   Total Energy
+200.0
+Finished mdrun on rank 0
+"#;
+
+const GROMACS_LOG_TRUNCATED: &str = r#"
+             :-) GROMACS - gmx mdrun, 2023.3 (-:
+Using 1 CPU
+   Step           Time
+      50        0.10000
+Energies (kJ/mol)
+   Bond          Angle
+10.0           20.0
+   Total Energy
+30.0
+"#;
+
+const GROMACS_LOG_FATAL_ERROR: &str = "\
+             :-) GROMACS - gmx mdrun, 2023.3 (-:
+
+Using 1 GPU
+
+   Step           Time
+      0        0.00000
+
+Energies (kJ/mol)
+   Kinetic En.   Total Energy
+      1234.56       -5678.90
+
+Fatal error: Step 100: The total potential energy is -1e+14
+";
+
+#[test]
+fn test_classify_theory_params() {
+    setup();
+    let (layer, boundary, units) = classify_mdp_parameter("coulombtype", "PME");
+    assert_eq!(layer, Layer::Theory);
+    assert_eq!(boundary, BoundaryClassification::PrimaryLayer);
+    assert_eq!(units, None);
+
+    let (layer, boundary, units) = classify_mdp_parameter("rcoulomb", "1.0");
+    assert_eq!(layer, Layer::Theory);
+    match boundary {
+        BoundaryClassification::DualAnnotated { secondary_layer, .. } => {
+            assert_eq!(secondary_layer, Layer::Methodology);
+        }
+        other => panic!("Expected DualAnnotated, got {:?}", other),
+    }
+    assert_eq!(units, Some("nm"));
+}
+
+#[test]
+fn test_classify_methodology_params() {
+    setup();
+    let (layer, boundary, units) = classify_mdp_parameter("integrator", "md");
+    assert_eq!(layer, Layer::Methodology);
+    assert_eq!(boundary, BoundaryClassification::PrimaryLayer);
+    assert_eq!(units, None);
+
+    let (layer, _, units) = classify_mdp_parameter("dt", "0.002");
+    assert_eq!(layer, Layer::Methodology);
+    assert_eq!(units, Some("ps"));
+
+    let (layer, boundary, units) = classify_mdp_parameter("tcoupl", "V-rescale");
+    assert_eq!(layer, Layer::Methodology);
+    assert_eq!(boundary, BoundaryClassification::PrimaryLayer);
+    assert_eq!(units, None);
+}
+
+#[test]
+fn test_classify_implementation_params() {
+    setup();
+    let (layer, boundary, units) = classify_mdp_parameter("nstlog", "1000");
+    assert_eq!(layer, Layer::Implementation);
+    assert_eq!(boundary, BoundaryClassification::PrimaryLayer);
+    assert_eq!(units, None);
+
+    let (layer, boundary, units) = classify_mdp_parameter("nstxout", "1000");
+    assert_eq!(layer, Layer::Implementation);
+    assert_eq!(boundary, BoundaryClassification::PrimaryLayer);
+    assert_eq!(units, None);
+}
+
+#[test]
+fn test_classify_dual_annotated() {
+    setup();
+    let (_, boundary, _) = classify_mdp_parameter("dt", "0.002");
+    match boundary {
+        BoundaryClassification::DualAnnotated {
+            secondary_layer,
+            rationale,
+        } => {
+            assert_eq!(secondary_layer, Layer::Implementation);
+            assert!(rationale.contains("Timestep affects both sampling methodology"));
+        }
+        other => panic!("Expected DualAnnotated for dt, got {:?}", other),
+    }
+
+    let (_, boundary, _) = classify_mdp_parameter("rcoulomb", "1.0");
+    match boundary {
+        BoundaryClassification::DualAnnotated {
+            secondary_layer,
+            rationale,
+        } => {
+            assert_eq!(secondary_layer, Layer::Methodology);
+            assert!(rationale.contains("Cutoff radius affects both force field accuracy"));
+        }
+        other => panic!("Expected DualAnnotated for rcoulomb, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_classify_unknown_param() {
+    setup();
+    let (layer, boundary, units) = classify_mdp_parameter("mystery_param", "42");
+    assert_eq!(layer, Layer::Implementation);
+    assert_eq!(units, None);
+    match boundary {
+        BoundaryClassification::ContextDependent {
+            default_layer,
+            context_note,
+        } => {
+            assert_eq!(default_layer, Layer::Implementation);
+            assert!(context_note.contains("classification table"));
+        }
+        other => panic!("Expected ContextDependent, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_parse_mdp_basic() {
+    setup();
+    let mdp = r#"
+integrator = md
+dt = 0.002
+nsteps = 500000
+coulombtype = PME
+ref_t = 300
+"#;
+    let events = parse_mdp(mdp).unwrap();
+    assert_eq!(events.len(), 5);
+
+    let names: Vec<String> = events
+        .iter()
+        .map(|event| match &event.kind {
+            EventKind::ParameterRecord { name, .. } => name.clone(),
+            other => panic!("Expected ParameterRecord, got {:?}", other),
+        })
+        .collect();
+    assert_eq!(
+        names,
+        vec!["integrator", "dt", "nsteps", "coulombtype", "ref_t"]
+    );
+
+    match &events[1].kind {
+        EventKind::ParameterRecord { actual_value, .. } => {
+            assert_eq!(actual_value, &Value::Known(0.002, "ps".to_string()));
+        }
+        other => panic!("Expected ParameterRecord for dt, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_parse_mdp_comments_stripped() {
+    setup();
+    let mdp = "dt = 0.002 ; ps\nintegrator = md ; leapfrog\n";
+    let events = parse_mdp(mdp).unwrap();
+    assert_eq!(events.len(), 2);
+
+    match &events[0].kind {
+        EventKind::ParameterRecord { actual_value, .. } => {
+            assert_eq!(actual_value, &Value::Known(0.002, "ps".to_string()));
+        }
+        other => panic!("Expected ParameterRecord for dt, got {:?}", other),
+    }
+
+    match &events[1].kind {
+        EventKind::ParameterRecord { actual_value, .. } => {
+            assert_eq!(actual_value, &Value::KnownCat("md".to_string()));
+        }
+        other => panic!("Expected ParameterRecord for integrator, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_parse_mdp_empty() {
+    setup();
+    let events = parse_mdp("").unwrap();
+    assert!(events.is_empty());
+}
+
+#[test]
+fn test_parse_mdp_layer_distribution() {
+    setup();
+    let events = parse_mdp(GROMACS_MDP_SAMPLE).unwrap();
+    assert!(!events.is_empty());
+
+    let layers: std::collections::HashSet<Layer> =
+        events.iter().map(|event| event.layer).collect();
+    assert!(layers.contains(&Layer::Theory));
+    assert!(layers.contains(&Layer::Methodology));
+    assert!(layers.contains(&Layer::Implementation));
+}
+
+#[test]
+fn test_parse_mdp_provenance_lines() {
+    setup();
+    let mdp = "; comment\nintegrator = md\n\n dt = 0.002 ; ps\n; another comment\nnstlog = 1000\n";
+    let events = parse_mdp(mdp).unwrap();
+    assert_eq!(events.len(), 3);
+
+    let line_starts: Vec<u32> = events
+        .iter()
+        .map(|event| match &event.provenance.source_location {
+            SourceLocation::LineRange { start, end } => {
+                assert_eq!(start, end);
+                *start
+            }
+            other => panic!("Expected LineRange, got {:?}", other),
+        })
+        .collect();
+
+    assert_eq!(line_starts, vec![2, 4, 6]);
+}
+
+#[test]
+fn test_parse_energy_block() {
+    setup();
+    let log = r#"
+   Step           Time
+      0        0.00000
+Energies (kJ/mol)
+   Bond          Angle
+1.0           2.0
+   Total Energy
+3.0
+Finished mdrun on rank 0
+"#;
+    let events = parse_log(log, 0).unwrap();
+    let energy = events
+        .iter()
+        .find_map(|event| match &event.kind {
+            EventKind::EnergyRecord { total, components } => Some((total, components)),
+            _ => None,
+        })
+        .expect("Expected at least one EnergyRecord");
+
+    assert_eq!(energy.0, &Value::Known(3.0, "kJ/mol".to_string()));
+    assert!(energy.1.iter().any(|(name, _)| name == "Bond"));
+    assert!(energy.1.iter().any(|(name, _)| name == "Angle"));
+}
+
+#[test]
+fn test_parse_log_header() {
+    setup();
+    let events = parse_log(GROMACS_LOG_SAMPLE, 0).unwrap();
+    let resource = events
+        .iter()
+        .find_map(|event| match &event.kind {
+            EventKind::ResourceStatus {
+                platform_type,
+                device_ids,
+                ..
+            } => Some((platform_type, device_ids)),
+            _ => None,
+        })
+        .expect("Expected ResourceStatus event");
+
+    assert_eq!(resource.0, "GPU");
+    assert!(resource.1.iter().any(|entry| entry.contains("GROMACS")));
+}
+
+#[test]
+fn test_parse_log_energy_record() {
+    setup();
+    let events = parse_log(GROMACS_LOG_SAMPLE, 0).unwrap();
+    let energy = events
+        .iter()
+        .find_map(|event| match &event.kind {
+            EventKind::EnergyRecord { total, components } => Some((total, components)),
+            _ => None,
+        })
+        .expect("Expected EnergyRecord event");
+
+    match energy.0 {
+        Value::Known(total, unit) => {
+            assert!((*total + 33333.3).abs() < 1e-6);
+            assert_eq!(unit, "kJ/mol");
+        }
+        other => panic!("Expected scalar energy total, got {:?}", other),
+    }
+    assert!(energy.1.iter().any(|(name, _)| name == "Bond"));
+    assert!(energy.1.iter().any(|(name, _)| name == "Kinetic_En."));
+}
+
+#[test]
+fn test_parse_log_nan_detection() {
+    setup();
+    let events = parse_log(GROMACS_LOG_NAN, 0).unwrap();
+    assert!(events.iter().any(|event| matches!(
+        event.kind,
+        EventKind::EnergyRecord { .. }
+    )));
+    assert!(events.iter().any(|event| matches!(
+        event.kind,
+        EventKind::NumericalStatus {
+            event_type: NumericalEventType::NaNDetected,
+            ..
+        }
+    )));
+}
+
+#[test]
+fn test_parse_log_success() {
+    setup();
+    let events = parse_log(GROMACS_LOG_SAMPLE, 0).unwrap();
+    assert!(events.iter().any(|event| matches!(
+        event.kind,
+        EventKind::ExecutionStatus {
+            status: ExecutionOutcome::Success,
+            ..
+        }
+    )));
+}
+
+#[test]
+fn test_parse_log_fatal_error() {
+    setup();
+    let events = crate::gromacs_adapter::parse_log(GROMACS_LOG_FATAL_ERROR, 0).unwrap();
+    let last = events.last().expect("Expected at least one event");
+    match &last.kind {
+        EventKind::ExecutionStatus {
+            status: ExecutionOutcome::CrashDivergent,
+            ..
+        } => {}
+        other => panic!("Expected CrashDivergent, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_parse_log_truncated() {
+    setup();
+    let events = parse_log(GROMACS_LOG_TRUNCATED, 0).unwrap();
+    let timeout_event = events
+        .iter()
+        .find(|event| {
+            matches!(
+                event.kind,
+                EventKind::ExecutionStatus {
+                    status: ExecutionOutcome::Timeout,
+                    ..
+                }
+            )
+        })
+        .expect("Expected timeout completion event");
+
+    match &timeout_event.confidence.completeness {
+        Completeness::PartiallyInferred { inference_method } => {
+            assert_eq!(inference_method, "no completion marker in log");
+        }
+        other => panic!("Expected PartiallyInferred completeness, got {:?}", other),
+    }
+    assert!((timeout_event.confidence.field_coverage - 0.5).abs() < f32::EPSILON);
+}
+
+#[test]
+fn test_gromacs_adapter_combined() {
+    setup();
+    let adapter = GromacsAdapter;
+    let raw = format!(
+        "--- MDP ---\n{}\n--- LOG ---\n{}",
+        GROMACS_MDP_SAMPLE, GROMACS_LOG_SAMPLE
+    );
+
+    let log = adapter.parse_trace(&raw).unwrap();
+    assert!(!log.events.is_empty());
+    assert!(
+        log.events
+            .iter()
+            .any(|event| matches!(event.kind, EventKind::ParameterRecord { .. }))
+    );
+    assert!(
+        log.events
+            .iter()
+            .any(|event| matches!(event.kind, EventKind::EnergyRecord { .. }))
+    );
+}
+
+#[test]
+fn test_gromacs_adapter_mdp_only() {
+    setup();
+    let adapter = GromacsAdapter;
+    let raw = format!("--- MDP ---\n{}", GROMACS_MDP_SAMPLE);
+    let log = adapter.parse_trace(&raw).unwrap();
+
+    assert!(!log.events.is_empty());
+    assert!(
+        log.events
+            .iter()
+            .all(|event| matches!(event.kind, EventKind::ParameterRecord { .. }))
+    );
+}
+
+#[test]
+fn test_gromacs_adapter_controlled_vars() {
+    setup();
+    let adapter = GromacsAdapter;
+    let raw = format!("--- MDP ---\n{}", GROMACS_MDP_SAMPLE);
+    let log = adapter.parse_trace(&raw).unwrap();
+
+    assert_eq!(log.spec.controlled_variables.len(), 2);
+    let mut parameters: Vec<String> = log
+        .spec
+        .controlled_variables
+        .iter()
+        .map(|var| var.parameter.clone())
+        .collect();
+    parameters.sort();
+    assert_eq!(parameters, vec!["pressure".to_string(), "temperature".to_string()]);
+}
+
+#[test]
+fn test_gromacs_overlay_construction() {
+    setup();
+    let adapter = GromacsAdapter;
+    let raw = format!(
+        "--- MDP ---\n{}\n--- LOG ---\n{}",
+        GROMACS_MDP_SAMPLE, GROMACS_LOG_SAMPLE
+    );
+    let log = adapter.parse_trace(&raw).unwrap();
+    let overlay = CausalOverlay::from_log(&log);
+
+    assert_eq!(overlay.len(), log.events.len());
+}
+
+#[test]
+fn test_gromacs_overlay_layer_span() {
+    setup();
+    let adapter = GromacsAdapter;
+    let raw = format!(
+        "--- MDP ---\n{}\n--- LOG ---\n{}",
+        GROMACS_MDP_SAMPLE, GROMACS_LOG_SAMPLE
+    );
+    let log = adapter.parse_trace(&raw).unwrap();
+
+    assert!(log.indexes.by_layer.contains_key(&Layer::Theory));
+    assert!(log.indexes.by_layer.contains_key(&Layer::Methodology));
+    assert!(log.indexes.by_layer.contains_key(&Layer::Implementation));
+}
+
+#[test]
+fn test_gromacs_e2e_confounder_detection() {
+    setup();
+    let adapter = GromacsAdapter;
+    let raw = format!(
+        "--- MDP ---\n{}\n--- LOG ---\n{}",
+        GROMACS_MDP_SAMPLE, GROMACS_LOG_SAMPLE
+    );
+    let mut log = adapter.parse_trace(&raw).unwrap();
+
+    let mut tau_t_id: Option<EventId> = None;
+    let mut dt_idx: Option<usize> = None;
+    let mut ref_t_idx: Option<usize> = None;
+
+    for (idx, event) in log.events.iter().enumerate() {
+        if let EventKind::ParameterRecord { name, .. } = &event.kind {
+            if name == "tau_t" {
+                tau_t_id = Some(event.id);
+            } else if name == "dt" {
+                dt_idx = Some(idx);
+            } else if name == "ref_t" {
+                ref_t_idx = Some(idx);
+            }
+        }
+    }
+
+    let tau_t_id = tau_t_id.expect("tau_t parameter event must exist");
+    let dt_idx = dt_idx.expect("dt parameter event must exist");
+    let ref_t_idx = ref_t_idx.expect("ref_t parameter event must exist");
+
+    log.events[dt_idx].causal_refs = vec![tau_t_id];
+    log.events[ref_t_idx].causal_refs = vec![tau_t_id];
+
+    let overlay = CausalOverlay::from_log(&log);
+    let candidates = overlay.detect_confounders(&log, "ref_t", "dt");
+    assert!(!candidates.is_empty());
+    assert!(candidates.iter().any(|candidate| candidate.dag_node == "tau_t"));
 }

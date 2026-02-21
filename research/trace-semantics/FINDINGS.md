@@ -17,7 +17,7 @@ What intermediate representation (IR) can translate raw DSL trace logs from stru
 
 ## Status
 
-IN PROGRESS — Steps 1-7 and all synthesis steps (1d, 2c, 3b) complete. Step 5a (candidate IR schemas) complete: Hybrid LEL+DGR recommended (94/100). Step 5b (LEL prototype) complete. Step 5c (open thread resolution) complete: 5/5 threads resolved/narrowed/deferred with evidence. Step 6 (Hybrid LEL+DGR Phase 2 prototype) complete: `by_id` index implemented, `CausalOverlay` + R14 confounder query implemented. Step 7 (R17+R18 query implementation) complete: `compare_predictions` + `implicate_causal_nodes` implemented with depth-aware BFS helper, crate at 44/44 passing tests, clippy clean.
+IN PROGRESS — Steps 1-7 and all synthesis steps (1d, 2c, 3b) complete. Step 5a (candidate IR schemas) complete: Hybrid LEL+DGR recommended (94/100). Step 5b (LEL prototype) complete. Step 5c (open thread resolution) complete: 5/5 threads resolved/narrowed/deferred with evidence. Step 6 (Hybrid LEL+DGR Phase 2 prototype) complete: `by_id` index implemented, `CausalOverlay` + R14 confounder query implemented. Step 7 (R17+R18 query implementation) complete: `compare_predictions` + `implicate_causal_nodes` implemented with depth-aware BFS helper. Step 9 complete: GROMACS adapter implemented on existing LEL types (`src/gromacs_adapter.rs`), causal overlay path validated cross-framework, crate now at 66/66 passing tests with strict clippy clean.
 
 ## Key Definitions
 
@@ -27,6 +27,32 @@ IN PROGRESS — Steps 1-7 and all synthesis steps (1d, 2c, 3b) complete. Step 5a
 - **Theory-implementation separation**: The API-enforced structural distinction in DSL frameworks between what the user specifies (theory) and how the framework executes it (implementation).
 
 ## Investigation Log
+
+### 2026-02-21: Step 9: GROMACS Adapter for Cross-Framework Validation
+
+**Scope:** Implement a hand-written GROMACS `.mdp`/`.log` adapter in the Rust prototype, map all parsed outputs onto existing LEL `EventKind` variants, and validate end-to-end compatibility with `CausalOverlay` and R14 confounder detection.
+
+**Method:** Added `src/gromacs_adapter.rs` with deterministic MDP parameter classification (Theory/Methodology/Implementation + boundary annotations), provenance-preserving parsers (`parse_mdp`, `parse_log`), and `DslAdapter` integration that assembles `LayeredEventLog`, wires causal references post-parse, and derives `ExperimentSpec.controlled_variables` from `ref_t`/`ref_p`. Appended 22 tests to `src/tests/mod.rs` covering classifier behavior, parser correctness, adapter integration, overlay construction, and confounder detection over GROMACS-derived events.
+
+**Findings:**
+
+1. **Existing `EventKind` variants were sufficient for GROMACS trace semantics.** The adapter exercised `ParameterRecord`, `ResourceStatus`, `EnergyRecord`, `NumericalStatus`, and `ExecutionStatus` without adding or modifying IR type definitions.
+
+2. **No blocking type gaps were discovered for Step 9 scope.** GROMACS `.mdp`/`.log` content mapped into the current LEL schema using existing `Value`, `BoundaryClassification`, temporal/provenance, and confidence metadata fields.
+
+3. **Layer classification is tractable and deterministic for real `.mdp` parameters.** Implemented explicit lookup rules (including DualAnnotated rationale strings for `dt`/`tau_t`/`tau_p`, `constraints`, `rcoulomb`/`rvdw`) and a deterministic ContextDependent fallback for unknown parameters.
+
+4. **Validation expanded from 44 to 66 passing tests with quality gates clean.** The crate now passes 66/66 tests (`44` existing + `22` Step 9 additions), and `cargo clippy --all-targets --all-features -- -D warnings` passes at zero warnings.
+
+**Implications:**
+- The Hybrid LEL+DGR prototype now demonstrates cross-framework IR generalization beyond OpenMM: the same event/type system supports GROMACS parsing, overlay construction, and causal query execution.
+- Adapter-level parsing differences do not require IR schema branching, supporting the architecture claim that DSL-specific adapters can feed a common core representation.
+
+**Open Threads:**
+- Broader cross-framework validation still requires a VASP adapter path for Stage 2-3 queries.
+- GROMACS energy-table parsing currently uses prototype-scoped heuristics for multi-word headers; production hardening remains future work.
+
+---
 
 ### 2026-02-21: Step 7: R17+R18 Query Implementation
 
@@ -880,6 +906,8 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 
 53. **Prototype Stage 2-3 query surface is now validated end-to-end (`R14 + R17 + R18`).** The crate passes 44/44 tests with zero clippy warnings after adding comparison and implication query coverage. [Step 7 log 2026-02-21; `lel-ir-prototype/src/tests/mod.rs`]
 
+54. **Cross-framework IR generalization is now demonstrated with a GROMACS adapter using existing LEL types.** `src/gromacs_adapter.rs` maps `.mdp`/`.log` content into existing `EventKind` variants, preserves line-level provenance, and supports `CausalOverlay::from_log` + R14 confounder detection without IR schema changes. Crate quality gates now pass at 66/66 tests and strict clippy clean. [Step 9 log 2026-02-21; `lel-ir-prototype/src/gromacs_adapter.rs`, `lel-ir-prototype/src/tests/mod.rs`]
+
 ### What We Suspect
 
 **DSL Trace Architecture**
@@ -1033,8 +1061,9 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 | Filename | Purpose | Status | Demonstrated |
 | :--- | :--- | :--- | :--- |
 | `codex-prompt-5b-lel-prototype.md` | Codex prompt to produce the LEL IR Rust crate prototype (Step 5b) | Complete | Specifies LEL core types (§1/§2), OpenMM mock adapter, builder helpers, 11 unit tests; validates event typing, layer tagging, spec separation, Hybrid upgrade path fields |
-| `lel-ir-prototype/` | LEL + Hybrid CausalOverlay Rust prototype crate | Complete | Compiles clean, 44/44 tests pass, clippy zero warnings. Validates: event typing (12 EventKind variants), layer tagging, spec separation (AP1 avoidance), serde roundtrip, `by_id` indexing, CausalOverlay construction/traversal, and Stage 2-3 query behavior (`R14 + R17 + R18`). |
+| `lel-ir-prototype/` | LEL + Hybrid CausalOverlay Rust prototype crate | Complete | Compiles clean, 66/66 tests pass, clippy zero warnings. Validates: event typing (12 EventKind variants), layer tagging, spec separation (AP1 avoidance), serde roundtrip, `by_id` indexing, CausalOverlay construction/traversal, and Stage 2-3 query behavior (`R14 + R17 + R18`) across OpenMM and GROMACS adapters. |
 | `lel-ir-prototype/src/overlay.rs` | CausalOverlay implementation (Steps 6-7) | Complete | Implements index-only overlay entities, `from_log` O(n) construction, `transitive_ancestors` BFS traversal, private `ancestors_with_depth`, `detect_confounders` (R14), `compare_predictions` (R17), and `implicate_causal_nodes` (R18). |
+| `lel-ir-prototype/src/gromacs_adapter.rs` | GROMACS `.mdp`/`.log` parser, DslAdapter impl | Complete | Cross-framework IR generalization: maps GROMACS traces to existing LEL `EventKind`s, preserves provenance, wires causal refs, and validates overlay + confounder queries with new integration tests. |
 | `lel-ir-prototype/src/bench.rs` | CausalOverlay construction benchmark | Complete | Benchmarks real `CausalOverlay::from_log` at 4 scales (10^3-10^6). Latest result: 251.82ms overlay construction at 10^6 events (22.62ms at 10^5), confirming practical O(n) behavior. |
 
 ## Next Steps

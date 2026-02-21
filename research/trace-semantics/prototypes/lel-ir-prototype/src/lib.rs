@@ -3,6 +3,7 @@ pub mod lel;
 pub mod event_kinds;
 pub mod adapter;
 pub mod overlay;
+pub mod gromacs_adapter;
 
 #[cfg(test)]
 mod tests;
