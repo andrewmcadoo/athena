@@ -1,4 +1,4 @@
-# ATHENA
+# ATHENA -(Adversarial Testing of Hypotheses through Evolutionary and Normative Analysis)
 
 Falsification-driven AI co-scientist. Structured failure analysis over generation volume.
 

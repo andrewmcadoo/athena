@@ -1,4 +1,4 @@
-# **VISION.md: ATHENA**
+# **VISION.md: ATHENA - (Adversarial Testing of Hypotheses through Evolutionary and Normative Analysis)**
 
 ## **1\. THE PROBLEM**
 

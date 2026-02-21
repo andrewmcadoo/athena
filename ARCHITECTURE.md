@@ -1,4 +1,4 @@
-# ARCHITECTURE.md: ATHENA
+# ARCHITECTURE.md: ATHENA - (Adversarial Testing of Hypotheses through Evolutionary and Normative Analysis)
 
 ## 1. Abstract
 
