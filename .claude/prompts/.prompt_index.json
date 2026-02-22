@@ -103,6 +103,14 @@
       "slug": "hybrid-robustness-perturbation",
       "goal": "Implement a perturbation robustness test for the hybrid aggregation candidate that systematically varies fixture parameters across all 7 scenarios, producing a robustness map with pass/fail regions, margins, and tipping points",
       "framework": "RISEN"
+    },
+    {
+      "sequence": 14,
+      "filename": "prompt_014_2026-02-22_s5-ceiling-analysis.md",
+      "created": "2026-02-22T12:52:50.214433",
+      "slug": "s5-ceiling-analysis",
+      "goal": "Implement ceiling analysis for ATHENA hybrid aggregation BF normalization saturation, testing alternative normalizations with full 7-scenario evaluation",
+      "framework": "RISEN"
     }
   ]
 }

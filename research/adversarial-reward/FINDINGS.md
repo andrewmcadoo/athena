@@ -30,6 +30,51 @@ IN PROGRESS
 
 ## Investigation Log
 
+### 2026-02-22 -- WDK#41 Session 4.1: BF Ceiling Analysis for Hybrid S5 Saturation
+
+**Scope**
+
+- Isolate and quantify the BayesFactor normalization ceiling that drives the S5 failure transition above BF~110 in Session 4 perturbations.
+- Test calibrated alternative BF normalization families while preserving all non-BF normalization behavior and full hybrid aggregation mechanics.
+- Determine whether S6 failing compression cells are fundamentally decomposition-share failures (vs reconstruction failures) and whether BF normalization changes can provide side-benefits.
+
+**Method**
+
+- Added `research/adversarial-reward/prototypes/aggregation-candidates/ceiling_analysis.py` as a four-phase deterministic analysis harness.
+- Reused existing module APIs (`candidates.py`, `evaluate.py`, `scenarios.py`, `perturbation_test.py`, `normalization.py`, `models.py`) and duplicated BF-only post-processing logic in one local hook (`normalize_component_with_alt_bf`) because `normalize_component(...)` does not expose a raw-BF substitution seam.
+- Executed `python ceiling_analysis.py` in `research/adversarial-reward/prototypes/aggregation-candidates/`, generating:
+  - `ceiling_analysis.json` (machine-readable phase outputs, curves, suite results)
+  - `ceiling_analysis.md` (decision-oriented summary with tables and recommendation)
+- Enforced sanity gate first: patched hybrid using current BF norm (`1 - 1/(1+BF)`) had to match baseline `aggregate_hybrid(...)` raw scenario scores within `1e-12` across all seven scenarios.
+
+**Findings**
+
+- Sanity gate passed exactly (`max_abs_diff = 0.0` over all 7 scenarios), validating patched-hybrid equivalence under current BF normalization.
+- S6 decomposition check on the five known failing cells confirmed all failures are dominant-share failures, not reconstruction failures:
+  - `failure_is_dominant_share = True` for all 5
+  - `failure_is_recon_error = False` for all 5
+- Current BF normalization ceiling was measured at `BF=110` for the strict criterion `score < 0.991` (consistent with the observed BF~111 transition boundary).
+- Alternative normalization sweep (15 calibrated candidates):
+  - Pre-filter (`score@100 >= 0.3`) passed: `13/15`
+  - Full baseline suite on pre-filtered set: `13/13` achieved `7/7`
+- Best candidate by ceiling extension while retaining `7/7`: `log_scaled_bfmax_10000`
+  - `bf_ceiling = 9999`
+  - S5 BF sweep pass at all tested points (`80, 100, 120, 200, 500, 1000`)
+  - Positive S5 margins maintained through BF=1000
+- S6 side-benefit was positive for multiple candidates; highest-ceiling candidates (`log_scaled_bfmax_10000`, `power_law_bfmax_10000`) recovered all five previously failing S6 compression cells (`dominant_share >= 0.35`).
+
+**Implications**
+
+- The S5 BF ceiling is a normalization artifact, not a hybrid gating/Fisher-combination artifact.
+- Replacing only the BF raw normalization mapping can remove the S5 operating-range ceiling while preserving the full 7-scenario baseline behavior.
+- Recommendation for athena-e2a decision: adopt a calibrated log-scaled BF normalization with `bf_max_target=10000` (per `ceiling_analysis.md`), which maximizes operating headroom and preserves baseline criteria.
+
+**Open Threads**
+
+- Validate behavior for BF ranges beyond 1000 in additional stress fixtures to ensure ranking stability and avoid over-compression at very large BF.
+- Decide whether to lock the target at `10000` (max headroom) or choose a lower calibrated target (e.g., `5000`) for a more conservative transition curve.
+- If promoted beyond prototype, refactor normalization to expose a first-class BF raw-score hook and remove the local BF-branch duplication used in this research artifact.
+
 ### 2026-02-22 -- WDK#41 Session 4: Hybrid Robustness Under Targeted Fixture Perturbation
 
 **Scope**
