@@ -63,6 +63,14 @@
       "slug": "wdk13-convergence-representation",
       "goal": "Investigate how convergence trajectories should be represented in ATHENA's IR (raw time series, classified patterns, derived features, or a hybrid), by cataloging current adapter usage, steel-manning each option, tracing downstream consumers (LFI/BSE/ComparisonProfileV1), and documenting the recommendation as a Step 13 entry in trace-semantics FINDINGS.md.",
       "framework": "RISEN"
+    },
+    {
+      "sequence": 9,
+      "filename": "prompt_009_2026-02-21_wdk40-uncertainty-schema.md",
+      "created": "2026-02-21T19:40:50.305084",
+      "slug": "wdk40-uncertainty-schema",
+      "goal": "Investigate WDK#40 by surveying external UQ/V&V frameworks, tracing 6 consumers against 3 candidate schemas, assessing cross-adapter feasibility, steel-manning/stress-testing candidates, specifying the recommended UncertaintySummary schema, and writing the Step 14 FINDINGS.md entry",
+      "framework": "RISEN"
     }
   ]
 }

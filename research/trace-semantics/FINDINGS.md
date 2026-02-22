@@ -17,7 +17,7 @@ What intermediate representation (IR) can translate raw DSL trace logs from stru
 
 ## Status
 
-IN PROGRESS — Steps 1-7 and all synthesis steps (1d, 2c, 3b) complete. Step 5a (candidate IR schemas) complete: Hybrid LEL+DGR recommended (94/100). Step 5b (LEL prototype) complete. Step 5c (open thread resolution) complete: 5/5 threads resolved/narrowed/deferred with evidence. Step 6 (Hybrid LEL+DGR Phase 2 prototype) complete: `by_id` index implemented, `CausalOverlay` + R14 confounder query implemented. Step 7 (R17+R18 query implementation) complete: `compare_predictions` + `implicate_causal_nodes` implemented with depth-aware BFS helper. Step 9 complete: GROMACS adapter implemented on existing LEL types (`src/gromacs_adapter.rs`). Step 10 complete: VASP adapter implemented on existing LEL types (`src/vasp_adapter.rs`) with first adapter-level use of `ConvergencePoint` and `StateSnapshot`. Step 11 complete: hidden confounder prototype litmus validated end-to-end on VASP-derived traces. Step 12 complete: R17 quantitative comparison formalization narrowed with a trace-semantics-to-adversarial-reward interface contract. Step 13 complete (NARROWED): convergence trajectory representation recommends a hybrid raw-plus-summary design (Option D) with ComparisonProfileV1-compatible outputs and explicit WDK#40 hook. Crate remains at 92/92 tests with strict clippy clean (no prototype code changes in Step 13).
+IN PROGRESS — Steps 1-7 and all synthesis steps (1d, 2c, 3b) complete. Step 5a (candidate IR schemas) complete: Hybrid LEL+DGR recommended (94/100). Step 5b (LEL prototype) complete. Step 5c (open thread resolution) complete: 5/5 threads resolved/narrowed/deferred with evidence. Step 6 (Hybrid LEL+DGR Phase 2 prototype) complete: `by_id` index implemented, `CausalOverlay` + R14 confounder query implemented. Step 7 (R17+R18 query implementation) complete: `compare_predictions` + `implicate_causal_nodes` implemented with depth-aware BFS helper. Step 9 complete: GROMACS adapter implemented on existing LEL types (`src/gromacs_adapter.rs`). Step 10 complete: VASP adapter implemented on existing LEL types (`src/vasp_adapter.rs`) with first adapter-level use of `ConvergencePoint` and `StateSnapshot`. Step 11 complete: hidden confounder prototype litmus validated end-to-end on VASP-derived traces. Step 12 complete: R17 quantitative comparison formalization narrowed with a trace-semantics-to-adversarial-reward interface contract. Step 13 complete (NARROWED): convergence trajectory representation recommends a hybrid raw-plus-summary design (Option D) with ComparisonProfileV1-compatible outputs and explicit WDK#40 hook. Step 14 complete (NARROWED): minimal `UncertaintySummary` schema direction selected (layered point summary + optional tagged distribution payload) with six-consumer trace and cross-adapter feasibility evidence. Crate remains at 92/92 tests with strict clippy clean (no prototype code changes in Step 14).
 
 ## Key Definitions
 
@@ -27,6 +27,131 @@ IN PROGRESS — Steps 1-7 and all synthesis steps (1d, 2c, 3b) complete. Step 5a
 - **Theory-implementation separation**: The API-enforced structural distinction in DSL frameworks between what the user specifies (theory) and how the framework executes it (implementation).
 
 ## Investigation Log
+
+### 2026-02-22: Step 14 — UncertaintySummary Schema for Divergence Metrics (WDK#40)
+
+**Scope:** Resolve/narrow What We Don't Know #40 ("What minimal `UncertaintySummary` schema should accompany each divergence metric so one comparison profile can support both V&V/effect-size reporting and Bayesian/active-learning reward calibration without adapter-specific branching"), while preserving Step 12 `ComparisonProfileV1` guarantees (G1-G5) and Step 13 convergence-summary compatibility.
+
+**Method:**  
+1. External survey (scoped) of uncertainty representation patterns in ASME V&V/VVUQ pages, ArviZ `summary`, SALib Sobol analysis outputs, and UQpy inference/sampling/distribution docs.  
+2. Six-consumer trace (LFI Stage 3, BSE post-experiment, BSE pre-experiment type-compatibility, Adversarial Experiment Designer calibration, Mode Controller, ConvergenceSummary) against Candidates A/B/C.  
+3. Cross-adapter feasibility pass using current prototype outputs for VASP/GROMACS/OpenMM adapters.  
+4. Steel-man/stress-test on the three schema candidates against priority criteria (Primary: consumer coverage, G5 compliance, cross-adapter feasibility; Secondary: minimality, type safety, extensibility; Tertiary: information preservation).  
+5. Recommended type specification with explicit divergence-kind interaction and `ConvergenceSummary` relationship.
+
+**Findings:**
+
+1. **[PROVEN] The current prototype has no measurement-uncertainty type on divergence outputs; only scalar divergence values are carried through Stage 3 comparison paths.**  
+Mechanism: `ComparisonOutcome` stores `agreement + Option<DivergenceMeasure> + detail`; each `DivergenceMeasure` variant is scalar `f64`; overlay query logic forwards this outcome unchanged into `PredictionComparison`.  
+Conditions: this is sufficient for falsification routing but insufficient for uncertainty-aware calibration (Step 12 gap).  
+Evidence: `prototypes/lel-ir-prototype/src/common.rs:134-150`; `prototypes/lel-ir-prototype/src/overlay.rs:230-277`; Step 12 contract block (`ComparisonProfileV1`) at `FINDINGS.md:200-227`.
+
+2. **[PROVEN] Existing `ConfidenceMeta` is data-completeness metadata, not measurement uncertainty, and cannot substitute for `UncertaintySummary`.**  
+Mechanism: `ConfidenceMeta` encodes completeness/inference provenance (`FullyObserved`, `PartiallyInferred`, etc.) and field coverage; it does not encode standard errors, intervals, distributional shape, or posterior sample summaries.  
+Evidence: `prototypes/lel-ir-prototype/src/common.rs:266-280`.
+
+3. **[PROVEN FROM EXTERNAL SOURCES + CONJECTURE BOUNDARY] Across surveyed ecosystems, the dominant pattern is layered: a point-level summary plus optional richer uncertainty/distributional payload, closest to Candidate C (often with an inner tagged payload resembling B).**  
+Observed pattern mapping:
+
+| External schema | Observed uncertainty shape | Closest candidate |
+| :--- | :--- | :--- |
+| ASME V&V 20 product description + ASME VVUQ 10.2 description | Validation-comparison accuracy quantified using errors/uncertainties in simulation and data; explicit inclusion of model-form/numerical/input uncertainties and validation metrics including uncertainty. | C |
+| ArviZ `az.summary()` | Fixed point/interval/diagnostic columns (`mean/sd/hdi/mcse/ess/r_hat`) in one summary table; optional formatting for diagnostics vs stats. | C |
+| SALib Sobol | Point sensitivity indices plus paired confidence outputs (`S1` with `S1_conf`, `ST` with `ST_conf`, optional `S2` with `S2_conf`). | C (with B-like typed subkeys) |
+| UQpy inference/sampling/distributions | Posterior represented via sampler samples (tensor-shaped arrays) with distribution objects/methods (`pdf/cdf/log_pdf/rvs`) and downstream summarization. | C with tagged distribution payload |
+
+Evidence: ASME V&V 20 page (`https://www.asme.org/codes-standards/find-codes-standards/standard-for-verification-and-validation-in-computational-fluid-dynamics-and-heat-transfer`), ASME V&V 10 page (`https://www.asme.org/codes-standards/find-codes-standards/standard-for-verification-and-validation-in-computational-solid-mechanics`), ASME VVUQ 10.2 page (`https://www.asme.org/codes-standards/find-codes-standards/the-role-of-uncertainty-quantification-in-verification-and-validation-of-computational-solid-mechanics-models`), ASME V&V 20 press-release description (`https://www.asme.org/about-asme/media-inquiries/press-releases/asme-announces-a-new-standard-for-verification-and`), ArviZ docs (`https://python.arviz.org/en/v0.21.0/api/generated/arviz.summary.html`), SALib basics/API (`https://salib.readthedocs.io/en/stable/user_guide/basics.html`, `https://salib.readthedocs.io/en/latest/api.html`), UQpy docs (`https://uqpyproject.readthedocs.io/en/stable/inference/bayes_parameter_estimation.html`, `https://uqpyproject.readthedocs.io/en/latest/sampling/mcmc/index.html`, `https://uqpyproject.readthedocs.io/en/latest/distributions/`).  
+Conjecture boundary: full ASME standards are paywalled; tolerance-band/acceptance-detail claims should be verified directly against purchased standard text before production ADRs.
+
+4. **[PROVEN REASONING] Candidate A (flat optional struct) is minimal in syntax but weak on machine-checkable omission semantics (G5) and high on combinatorial ambiguity.**  
+Steel-man: easiest incremental fit with current prototype optional patterns.  
+Stress-test: consumers cannot distinguish "not provided" from "not applicable" without extra conventions; presence/absence combinations become combinatorial; predicted-vs-actual calibration comparisons require brittle field-presence logic.  
+Evidence: Step 12 G5 requirement (`FINDINGS.md:221-227`) plus current optionality-heavy prototype patterns (`event_kinds.rs:65-83`, `common.rs:266-280`).
+
+5. **[PROVEN REASONING] Candidate B (single tagged union by uncertainty regime) improves type safety and explicit NoUncertainty encoding, but loses information when point and distributional representations coexist in one metric.**  
+Steel-man: strong variant-level validity guarantees; explicit `NoUncertainty` is machine-checkable for G5.  
+Stress-test: single-variant selection forces adapter or derivation layer to choose one regime when both point summary and empirical/parametric payload are available; this creates avoidable information loss for dual consumers (point-only + distributional).  
+Conditions: holds under the Step 4 definition where variants are mutually exclusive.  
+Evidence: Step 12 contract requires support for both point consumers and posterior-aware consumers (`FINDINGS.md:200-227`); external patterns above usually expose both summaries and richer payloads.
+
+6. **[PROVEN] Candidate C (always point summary + optional distribution payload) is the only candidate that satisfies all six consumers without adapter-specific branching and without forcing scalar/distributional trade-off.**  
+Mechanism: point-only consumers read the always-present point layer; distributional consumers read payload when available, otherwise point fallback with explicit omission semantics.  
+Evidence: architecture consumer responsibilities (`ARCHITECTURE.md:111-117`, `:168`, `:206-208`, `:214-243`) and Step 13 convergence compatibility requirement (`FINDINGS.md:92-94`, `:101-114`).
+
+Consumer trace (Need Met / Requires Branching / Information Lost):
+
+| Consumer | Candidate A | Candidate B | Candidate C |
+| :--- | :--- | :--- | :--- |
+| (a) LFI Stage 3 (`std_error` or CI + `sample_size`) | Y / Y / Medium (missingness ambiguous) | Y / Y / Low-Medium (variant mismatch risk) | Y / N / Low |
+| (b) BSE post-experiment (KL calibration metadata) | Y / Y / Medium-High (field ambiguity) | Y / Y / Medium (single-variant tradeoff) | Y / Y (payload-only) / Low |
+| (c) BSE pre-experiment type-compatibility (predicted vs actual) | N / Y / High | Y / Y / Medium | Y / Y (payload-only) / Low |
+| (d) Adversarial Designer predicted-vs-actual gain calibration | Y / Y / Medium | Y / Y / Medium | Y / Y (payload-only) / Low |
+| (e) Mode Controller convergence/confidence trend inputs | Y / Y / Medium | Y / Y / Medium | Y / N / Low |
+| (f) ConvergenceSummary residual uncertainty + pattern confidence hook | Y / Y / Medium | N / Y / High | Y / Y (payload-only) / Low |
+
+7. **[PROVEN] Cross-adapter feasibility favors Candidate C because all adapters can populate the point layer now, while distribution payload remains optional and reporter/trace richness dependent.**  
+VASP: currently emits SCF convergence points (`dE`), energy records, and execution status; supports point uncertainty baselines (residual, iteration count, CI only if derivable).  
+GROMACS: emits repeated energy records and numerical statuses from logs; supports point baselines now and empirical interval/bootstrap-style payloads when sufficient sampling windows are available.  
+OpenMM (current prototype path): only mock reporter events (`ParameterRecord`, `ResourceStatus`, `EnergyRecord`, `ExecutionStatus`); distribution payload is reporter-dependent and cannot be assumed.  
+Evidence: `prototypes/lel-ir-prototype/src/vasp_adapter.rs:175-276`, `:488-618`; `prototypes/lel-ir-prototype/src/gromacs_adapter.rs:258-530`, `:532-655`; `prototypes/lel-ir-prototype/src/adapter.rs:40-197`; Step 13 Findings 1-3.
+
+8. **[PROVEN] Recommended minimal schema is a layered Candidate C with an inner tagged distribution payload.**
+
+Proposed type (conceptual, findings-level):
+
+```text
+UncertaintySummary {
+  point: PointUncertainty                 // always present
+  distribution: Option<DistributionPayload> // optional richer payload
+}
+
+PointUncertainty =
+  | Summary {
+      sample_size: Option<u32>
+      standard_error: Option<f64>
+      interval: Option<IntervalEstimate>   // bounds + confidence/credibility level + sidedness
+      method_ref: String                   // estimator/CI method identifier
+    }
+  | NoUncertainty {
+      reason: UncertaintyUnavailableReason // adapter_cannot_observe | insufficient_samples | not_computed | invalidated
+    }
+
+DistributionPayload =
+  | Parametric { family: String, parameters: Vec<NamedValue>, support: Option<Support> }
+  | Empirical  { quantiles: Vec<QuantilePoint>, sample_count: Option<u32> }
+  | BoundedInterval { lower: f64, upper: f64, coverage: Option<f64>, basis: String }
+```
+
+Field justification:
+- `sample_size`, `standard_error`, `interval`: required by LFI Stage 3 quality checks and effect-size/V&V consumers.  
+- `method_ref`: required for auditability/calibration diagnosis (G4).  
+- `NoUncertainty.reason`: required for G5 explicit omission semantics.  
+- `DistributionPayload` variants: required for BSE/adversarial predicted-vs-actual calibration compatibility without adapter branching.
+
+9. **[PROVEN] Interaction with `DivergenceKind` should be non-redundant: `DivergenceKind` encodes metric semantics; `UncertaintySummary` encodes uncertainty of estimating that metric value.**  
+Implication: do not duplicate Bayes-factor/KL semantic payloads in `UncertaintySummary`; only include estimation uncertainty (e.g., MCSE, interval, empirical quantiles, bounded ranges) around `MetricComponent.value`.  
+Evidence: Step 12 `MetricComponent` contract (`FINDINGS.md:210-218`).
+
+10. **[PROVEN + CONSTRAINED DESIGN INFERENCE] `MetricComponent.uncertainty` and `ConvergenceSummary.uncertainty` should share the same numeric `UncertaintySummary` core, while convergence-pattern confidence remains a separate field until WDK#42 is resolved.**  
+Mechanism: residual/rate uncertainty uses the same numeric schema; categorical pattern-confidence taxonomy is a separate unresolved question (WDK#42-44).  
+Evidence: Step 13 recommended `ConvergenceSummary` fields (`FINDINGS.md:101-114`) and open WDK#42-44 definitions (`FINDINGS.md:1348-1352`).
+
+11. **[PROVEN] No prototype code changes are warranted in Step 14.**  
+Rationale: WDK#40 is narrowed analytically with a concrete schema recommendation; implementing types before WDK#41 aggregation and WDK#42-44 convergence-taxonomy decisions would risk rework.  
+Evidence: Step 12/13 scope boundaries and no-code-change precedent (`FINDINGS.md:20`, `:1379-1381`).
+
+**Implications:**  
+- **WDK#40 is NARROWED to a concrete schema direction:** Candidate C with mandatory point layer + optional tagged distribution payload + explicit `NoUncertainty` reason.  
+- **ComparisonProfileV1 integration is now explicit:** `MetricComponent.uncertainty` can satisfy both V&V/effect-size reporting and Bayesian calibration consumers without adapter-specific branching.  
+- **Adversarial calibration compatibility is preserved:** predicted-vs-actual gain comparisons can use a type-compatible uncertainty container across pre/post experiment paths.  
+- **Prototype impact:** deferred by design; findings-level contract is sufficient at this stage.
+
+**Open Threads:**  
+- WDK#41: scalar aggregation from multi-metric uncertainty-aware profiles remains unresolved (connection only).  
+- WDK#42-44: convergence pattern taxonomy/derivation/timing remain unresolved; only numeric uncertainty core is settled here.  
+- Field-level canonicalization still needed before implementation (e.g., required quantile set, `method_ref` registry, interval-sidedness enum).
+
+---
 
 ### 2026-02-22: Step 13 — Convergence Trajectory Representation (WDK#13)
 
@@ -1193,6 +1318,16 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 
 65. **Convergence summaries can map cleanly to Step 12 Candidate B (`ComparisonProfileV1`) as multi-component metrics.** The required shape is `metrics: Vec<MetricComponent>` with optional uncertainty/provenance hooks, allowing Stage 3 and Bayesian-surprise consumers to avoid scalar collapse. [Step 12 log 2026-02-22; Step 13 log 2026-02-22; `FINDINGS.md` Step 12 contract block]
 
+66. **External UQ ecosystem practice aligns with a layered uncertainty shape (point summary + optional richer distributional payload), not scalar-only uncertainty metadata.** ASME V&V/VVUQ descriptions, ArviZ `summary`, SALib Sobol outputs, and UQpy posterior/distribution APIs all expose point-level summaries while allowing richer uncertainty structure when available. [Step 14 log 2026-02-22; `https://www.asme.org/codes-standards/find-codes-standards/standard-for-verification-and-validation-in-computational-fluid-dynamics-and-heat-transfer`; `https://www.asme.org/codes-standards/find-codes-standards/the-role-of-uncertainty-quantification-in-verification-and-validation-of-computational-solid-mechanics-models`; `https://python.arviz.org/en/v0.21.0/api/generated/arviz.summary.html`; `https://salib.readthedocs.io/en/latest/api.html`; `https://uqpyproject.readthedocs.io/en/stable/inference/bayes_parameter_estimation.html`]
+
+67. **Candidate C (layered point summary + optional tagged distribution payload) is the strongest WDK#40 direction under ATHENA's priority ordering.** It is the only candidate that covers all six consumers while preserving explicit missingness semantics (G5) and avoiding forced point-vs-distribution trade-offs. [Step 14 log 2026-02-22; Step 12 contract block; ARCHITECTURE.md §4.5, §5.4, §6.1-§6.2]
+
+68. **Cross-adapter feasibility for uncertainty metadata is asymmetric but compatible with one shared type when distribution payload is optional.** VASP/GROMACS/OpenMM can all populate the point layer immediately; richer distribution payloads remain adapter/reporter dependent and can be omitted explicitly without branching by adapter identity. [Step 14 log 2026-02-22; `lel-ir-prototype/src/vasp_adapter.rs`; `lel-ir-prototype/src/gromacs_adapter.rs`; `lel-ir-prototype/src/adapter.rs`]
+
+69. **WDK#40 is narrowed to a concrete schema contract at findings level: mandatory point uncertainty, optional tagged distribution payload, explicit `NoUncertainty` reason.** This is sufficient to support both V&V/effect-size reporting and Bayesian/adversarial calibration from one `ComparisonProfileV1` metric interface. [Step 14 log 2026-02-22]
+
+70. **`MetricComponent.uncertainty` and `ConvergenceSummary.uncertainty` should share the same numeric uncertainty core, while convergence-pattern confidence remains separate pending WDK#42-44.** This preserves Step 13 compatibility without prematurely freezing pattern-taxonomy semantics. [Step 14 log 2026-02-22; Step 13 log 2026-02-22; WDK#42-44]
+
 ### What We Suspect
 
 **DSL Trace Architecture**
@@ -1341,7 +1476,7 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 
 39. **Whether `EventKind::ComparisonResult.prediction_id: String` should be harmonized with `PredictionRecord.id: SpecElementId` in production.** Prototype resolves the mismatch at query time via parse-at-query-time conversion, but production semantics and type-level guarantees remain ADR-scoped work. [Step 7 log 2026-02-21; `lel-ir-prototype/src/overlay.rs`]
 
-40. **What minimal `UncertaintySummary` schema should accompany each divergence metric** so one comparison profile can support both V&V/effect-size reporting and Bayesian/active-learning reward calibration without adapter-specific branching. [Step 12 log 2026-02-22]
+40. ~~**What minimal `UncertaintySummary` schema should accompany each divergence metric** so one comparison profile can support both V&V/effect-size reporting and Bayesian/active-learning reward calibration without adapter-specific branching.~~ NARROWED: Step 14 recommends Candidate C (layered point uncertainty + optional tagged distribution payload + explicit `NoUncertainty` reason) as the minimal adapter-agnostic direction. Remaining work is implementation/field canonicalization and downstream aggregation/pattern-taxonomy dependencies (WDK#41-44), not baseline schema shape. [Step 14 log 2026-02-22]
 
 41. **How to standardize profile aggregation into a bounded, monotonic reward scalar** that remains calibratable under ARCHITECTURE.md §5.4 feedback and robust against Noisy-TV style reward hacking. [Step 12 log 2026-02-22; ARCHITECTURE.md §5.4; VISION.md §6.2]
 
@@ -1379,6 +1514,8 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 7. **R17 quantitative comparison formalization and bridge contract (Step 12)** — **COMPLETE (NARROWED).** Literature survey + prototype mapping + candidate scoring completed. Recommendation: Candidate B (Multi-Metric Divergence Profile) with optional posterior hooks. Trace-semantics now defines a contract (`ComparisonProfileV1` assumptions) that adversarial-reward can consume once that track starts. Remaining work moved to What We Don't Know #40 and #41.
 
 8. **Convergence trajectory representation (Step 13)** — **COMPLETE (NARROWED).** Empirical adapter inventory + A/B/C steel-man stress tests + external survey + consumer trace completed. Recommendation: Option D hybrid (raw canonical trajectory + Stage 1->2 summary). Remaining work moved to What We Don't Know #42, #43, and #44, with WDK#40 linkage retained for uncertainty schema coupling.
+
+9. **UncertaintySummary schema for divergence metrics (Step 14)** — **COMPLETE (NARROWED).** External survey + six-consumer trace + cross-adapter feasibility + A/B/C stress-test completed. Recommendation: Candidate C (mandatory point uncertainty + optional tagged distribution payload + explicit missingness reason) with shared numeric core across `MetricComponent` and `ConvergenceSummary` uncertainty fields. Remaining dependencies moved/linked to WDK#41-44.
 
 **Synthesis steps needed before Step 5:**
 
