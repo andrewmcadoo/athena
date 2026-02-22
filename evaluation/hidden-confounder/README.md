@@ -70,9 +70,11 @@ The test is deliberately designed to be passable by either architecture in princ
 
 ## Current Status
 
-**NOT STARTED**
+**PROTOTYPE-LEVEL VALIDATION AVAILABLE (2026-02-22)**
 
-This specification cannot be implemented until the trace-semantics and adversarial-reward research investigations produce actionable findings. The environment design depends on knowing what the IR looks like (to produce compatible trace logs) and how the adversary evaluates experiments (to ensure the confounder is discoverable by design).
+Prototype evidence now exists in the LEL IR test suite: `test_vasp_hidden_confounder_litmus` validates end-to-end confounder detection (`CausalOverlay::detect_confounders`) on VASP-derived trace data, and `test_vasp_hidden_confounder_controlled_excluded` validates controlled-variable exclusion semantics.
+
+The full 50-cycle evaluation environment specified in this document is still pending. It depends on adversarial-reward research to formalize the confounder-discovery objective and to parameterize the generation-first baseline comparison.
 
 ## References
 

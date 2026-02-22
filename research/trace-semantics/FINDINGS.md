@@ -17,7 +17,7 @@ What intermediate representation (IR) can translate raw DSL trace logs from stru
 
 ## Status
 
-IN PROGRESS — Steps 1-7 and all synthesis steps (1d, 2c, 3b) complete. Step 5a (candidate IR schemas) complete: Hybrid LEL+DGR recommended (94/100). Step 5b (LEL prototype) complete. Step 5c (open thread resolution) complete: 5/5 threads resolved/narrowed/deferred with evidence. Step 6 (Hybrid LEL+DGR Phase 2 prototype) complete: `by_id` index implemented, `CausalOverlay` + R14 confounder query implemented. Step 7 (R17+R18 query implementation) complete: `compare_predictions` + `implicate_causal_nodes` implemented with depth-aware BFS helper. Step 9 complete: GROMACS adapter implemented on existing LEL types (`src/gromacs_adapter.rs`), causal overlay path validated cross-framework, crate now at 66/66 passing tests with strict clippy clean.
+IN PROGRESS — Steps 1-7 and all synthesis steps (1d, 2c, 3b) complete. Step 5a (candidate IR schemas) complete: Hybrid LEL+DGR recommended (94/100). Step 5b (LEL prototype) complete. Step 5c (open thread resolution) complete: 5/5 threads resolved/narrowed/deferred with evidence. Step 6 (Hybrid LEL+DGR Phase 2 prototype) complete: `by_id` index implemented, `CausalOverlay` + R14 confounder query implemented. Step 7 (R17+R18 query implementation) complete: `compare_predictions` + `implicate_causal_nodes` implemented with depth-aware BFS helper. Step 9 complete: GROMACS adapter implemented on existing LEL types (`src/gromacs_adapter.rs`). Step 10 complete: VASP adapter implemented on existing LEL types (`src/vasp_adapter.rs`) with first adapter-level use of `ConvergencePoint` and `StateSnapshot`. Step 11 complete: hidden confounder prototype litmus validated end-to-end on VASP-derived traces. Crate now passes 92/92 tests with strict clippy clean.
 
 ## Key Definitions
 
@@ -27,6 +27,55 @@ IN PROGRESS — Steps 1-7 and all synthesis steps (1d, 2c, 3b) complete. Step 5a
 - **Theory-implementation separation**: The API-enforced structural distinction in DSL frameworks between what the user specifies (theory) and how the framework executes it (implementation).
 
 ## Investigation Log
+
+### 2026-02-22: Step 11 — Hidden Confounder Prototype Litmus Test
+
+**Scope:** Validate that the R14 confounder detection mechanism works end-to-end on VASP-derived LEL data.
+
+**Method:** Added `test_vasp_hidden_confounder_litmus` and `test_vasp_hidden_confounder_controlled_excluded` in `prototypes/lel-ir-prototype/src/tests/mod.rs`. Parsed VASP INCAR/OSZICAR/OUTCAR via `VaspAdapter`, planted `PREC` as a common ancestor of `SIGMA` and `IBRION` by mutating `causal_refs`, rebuilt indexes, and executed `CausalOverlay::detect_confounders`.
+
+**Findings:**
+
+1. **`detect_confounders` identifies the planted confounder in the VASP path.** The litmus test returns non-empty candidates and includes `dag_node == "PREC"` for the planted common-cause structure.
+
+2. **Controlled-variable exclusion works as required by R14 semantics.** When `PREC` is added to `spec.controlled_variables`, confounder detection correctly returns no candidates for the same planted graph.
+
+3. **The validation is integrated into the main crate quality gates.** The prototype now passes 92/92 tests and strict clippy clean, with the litmus included in the standard run.
+
+**Implications:**
+- LEL IR now demonstrates causal-query diagnostic value beyond parsing fidelity.
+- The hidden confounder mechanism is validated in prototype scope on realistic DFT-flavored traces.
+
+**Open Threads:**
+- Full 50-cycle hidden-confounder evaluation environment still depends on adversarial-reward formalization (`research/adversarial-reward/`).
+
+---
+
+### 2026-02-22: Step 10 — VASP Adapter Implementation
+
+**Scope:** Parse VASP INCAR/OSZICAR/OUTCAR into LEL using existing types only, addressing What We Don't Know #12 ("whether one IR schema can accommodate both DFT and MD frameworks").
+
+**Method:** Added `src/vasp_adapter.rs` mirroring the GROMACS adapter structure (classification function, per-file parsers, `DslAdapter` integration, causal wiring, `LayeredEventLogBuilder` assembly). Added 25 `test_vasp_*` tests in `src/tests/mod.rs` covering classification, parser behavior, integration, overlay construction, confounder litmus behavior, and error handling.
+
+**Findings:**
+
+1. **No `EventKind` or core-type changes were required for VASP.** INCAR/OSZICAR/OUTCAR content mapped into existing LEL structures, affirmatively resolving WDK#12 in prototype scope.
+
+2. **Previously unexercised variants are now covered by adapter paths.** `ConvergencePoint` is emitted from OSZICAR SCF iterations and `StateSnapshot` is emitted from OUTCAR force-block headers.
+
+3. **Multi-file section-marker composition works for three VASP sources.** The adapter composes marker-delimited sections order-agnostically and supports INCAR-only fallback.
+
+4. **Quality gates remain clean after expansion.** The crate now passes 92/92 tests with strict clippy clean.
+
+**Implications:**
+- The single IR design now covers both MD (OpenMM/GROMACS) and DFT (VASP) adapter paths without schema branching.
+- Hybrid overlay queries remain compatible after adding a materially different simulation paradigm.
+
+**Open Threads:**
+- Validate parser behavior against additional real VASP outputs beyond prototype samples.
+- POTCAR/pseudopotential-specific parsing remains out of scope for the current adapter.
+
+---
 
 ### 2026-02-21: Step 9: GROMACS Adapter for Cross-Framework Validation
 
@@ -906,7 +955,13 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 
 53. **Prototype Stage 2-3 query surface is now validated end-to-end (`R14 + R17 + R18`).** The crate passes 44/44 tests with zero clippy warnings after adding comparison and implication query coverage. [Step 7 log 2026-02-21; `lel-ir-prototype/src/tests/mod.rs`]
 
-54. **Cross-framework IR generalization is now demonstrated with a GROMACS adapter using existing LEL types.** `src/gromacs_adapter.rs` maps `.mdp`/`.log` content into existing `EventKind` variants, preserves line-level provenance, and supports `CausalOverlay::from_log` + R14 confounder detection without IR schema changes. Crate quality gates now pass at 66/66 tests and strict clippy clean. [Step 9 log 2026-02-21; `lel-ir-prototype/src/gromacs_adapter.rs`, `lel-ir-prototype/src/tests/mod.rs`]
+54. **Cross-framework IR generalization is now demonstrated across GROMACS and VASP adapters using existing LEL types.** `src/gromacs_adapter.rs` and `src/vasp_adapter.rs` map MD and DFT trace sources into the same `EventKind`/LEL structures and remain compatible with `CausalOverlay::from_log` + R14 query behavior. Crate quality gates now pass at 92/92 tests with strict clippy clean. [Step 9 log 2026-02-21; Step 10 log 2026-02-22; `lel-ir-prototype/src/tests/mod.rs`]
+
+55. **WDK#12 is resolved in prototype scope: one IR schema accommodates both DFT and MD traces.** Step 10 VASP adapter implementation required no core IR type changes and passed integration/overlay tests alongside OpenMM and GROMACS paths. [Step 10 log 2026-02-22; `lel-ir-prototype/src/vasp_adapter.rs`, `lel-ir-prototype/src/tests/mod.rs`]
+
+56. **`ConvergencePoint` and `StateSnapshot` are now exercised by a concrete adapter path.** Step 10 VASP parsing emits `ConvergencePoint` from OSZICAR SCF trajectories and `StateSnapshot` from OUTCAR force snapshots, closing prior coverage gaps for these variants. [Step 10 log 2026-02-22; `lel-ir-prototype/src/vasp_adapter.rs`, `lel-ir-prototype/src/tests/mod.rs`]
+
+57. **Hidden confounder detection is now validated end-to-end on VASP-derived LEL data.** Step 11 litmus tests demonstrate positive detection of planted `PREC` confounders and correct controlled-variable exclusion behavior. [Step 11 log 2026-02-22; `lel-ir-prototype/src/tests/mod.rs`]
 
 ### What We Suspect
 
@@ -992,7 +1047,7 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 
 11. **What the minimum granularity of provenance recording is** that still enables correct fault classification. Full-granularity is an anti-pattern; DSL-API-call level needs validation. [Provenance survey 2026-02-20]
 
-12. **Whether a single IR schema can accommodate both DFT codes (VASP) and MD codes (OpenMM, GROMACS)** or whether structural differences require fundamentally different IR designs with a common interface. [VASP log 2026-02-20; cross-framework]
+12. ~~**Whether a single IR schema can accommodate both DFT codes (VASP) and MD codes (OpenMM, GROMACS)** or whether structural differences require fundamentally different IR designs with a common interface.~~ RESOLVED: Step 10 VASP adapter maps INCAR/OSZICAR/OUTCAR into existing LEL/EventKind structures with no schema changes, alongside existing OpenMM/GROMACS paths. See What We Know #55. [Step 10 log 2026-02-22; `lel-ir-prototype/src/vasp_adapter.rs`, `lel-ir-prototype/src/tests/mod.rs`]
 
 13. **How convergence trajectories should be represented in the IR** (raw time series, classified patterns, or derived features). [VASP log 2026-02-20]
 
@@ -1061,9 +1116,10 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 | Filename | Purpose | Status | Demonstrated |
 | :--- | :--- | :--- | :--- |
 | `codex-prompt-5b-lel-prototype.md` | Codex prompt to produce the LEL IR Rust crate prototype (Step 5b) | Complete | Specifies LEL core types (§1/§2), OpenMM mock adapter, builder helpers, 11 unit tests; validates event typing, layer tagging, spec separation, Hybrid upgrade path fields |
-| `lel-ir-prototype/` | LEL + Hybrid CausalOverlay Rust prototype crate | Complete | Compiles clean, 66/66 tests pass, clippy zero warnings. Validates: event typing (12 EventKind variants), layer tagging, spec separation (AP1 avoidance), serde roundtrip, `by_id` indexing, CausalOverlay construction/traversal, and Stage 2-3 query behavior (`R14 + R17 + R18`) across OpenMM and GROMACS adapters. |
+| `lel-ir-prototype/` | LEL + Hybrid CausalOverlay Rust prototype crate | Complete | Compiles clean, 92/92 tests pass, clippy zero warnings. Validates: event typing (12 EventKind variants), layer tagging, spec separation (AP1 avoidance), serde roundtrip, `by_id` indexing, CausalOverlay construction/traversal, and Stage 2-3 query behavior (`R14 + R17 + R18`) across OpenMM, GROMACS, and VASP adapters. |
 | `lel-ir-prototype/src/overlay.rs` | CausalOverlay implementation (Steps 6-7) | Complete | Implements index-only overlay entities, `from_log` O(n) construction, `transitive_ancestors` BFS traversal, private `ancestors_with_depth`, `detect_confounders` (R14), `compare_predictions` (R17), and `implicate_causal_nodes` (R18). |
 | `lel-ir-prototype/src/gromacs_adapter.rs` | GROMACS `.mdp`/`.log` parser, DslAdapter impl | Complete | Cross-framework IR generalization: maps GROMACS traces to existing LEL `EventKind`s, preserves provenance, wires causal refs, and validates overlay + confounder queries with new integration tests. |
+| `lel-ir-prototype/src/vasp_adapter.rs` | VASP INCAR/OSZICAR/OUTCAR -> LEL adapter | Complete | DFT compatibility on existing IR types, section-marker composition across 3 files, and first adapter-level exercise of `ConvergencePoint` + `StateSnapshot`. |
 | `lel-ir-prototype/src/bench.rs` | CausalOverlay construction benchmark | Complete | Benchmarks real `CausalOverlay::from_log` at 4 scales (10^3-10^6). Latest result: 251.82ms overlay construction at 10^6 events (22.62ms at 10^5), confirming practical O(n) behavior. |
 
 ## Next Steps

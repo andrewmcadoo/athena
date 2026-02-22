@@ -8,6 +8,9 @@ use crate::gromacs_adapter::{
 };
 use crate::lel::*;
 use crate::overlay::{CausalOverlay, PredictionComparison};
+use crate::vasp_adapter::{
+    classify_incar_parameter, parse_incar, parse_oszicar, parse_outcar, VaspAdapter,
+};
 
 /// Helper: initialize the global event ID counter once for the test process.
 fn setup() {
@@ -3047,4 +3050,639 @@ fn test_gromacs_e2e_confounder_detection() {
     let candidates = overlay.detect_confounders(&log, "ref_t", "dt");
     assert!(!candidates.is_empty());
     assert!(candidates.iter().any(|candidate| candidate.dag_node == "tau_t"));
+}
+
+const VASP_INCAR_SAMPLE: &str = r#"
+GGA = PE
+ENCUT = 520 ! cutoff energy
+PREC = Accurate
+SIGMA = 0.05 # smearing width
+ISMEAR = 0
+IBRION = 2
+NSW = 50
+ISIF = 3
+EDIFF = 1E-6
+EDIFFG = -0.01
+NCORE = 4
+KPAR = 2
+ALGO = Fast
+"#;
+
+const VASP_OSZICAR_SAMPLE: &str = r#"
+DAV:   1    0.400E+03    0.400E+03   -0.500E+00   200   0.200E+02
+DAV:   2   -0.200E+02   -0.100E+01   -0.200E+00   220   0.120E+02
+DAV:   3   -0.100E+01   -0.500E+00   -0.100E-01   240   0.800E+01
+   1 F= -.11401725E+03 E0= -.11400000E+03  d E =-.11401725E+03
+RMM:   1   -0.300E+01   -0.300E+00   -0.300E-01   260   0.600E+01
+RMM:   2   -0.200E+00   -0.100E+00   -0.100E-02   280   0.400E+01
+DAV:   3   -0.100E+00   -0.500E-01   -0.500E-03   300   0.200E+01
+   2 F= -.11411725E+03 E0= -.11410000E+03  dE = -.10000000E+00
+"#;
+
+const VASP_OUTCAR_SAMPLE: &str = r#"
+vasp.6.4.2 18Apr23 complex
+running on    16 total cores
+free  energy   TOTEN  =      -114.50000000 eV
+POSITION                                       TOTAL-FORCE (eV/Angst)
+General timing and accounting
+"#;
+
+const VASP_OUTCAR_TRUNCATED: &str = r#"
+vasp.6.4.2 18Apr23 complex
+free  energy   TOTEN  =      -113.75000000 eV
+"#;
+
+const VASP_OUTCAR_ERROR: &str = r#"
+vasp.6.4.2 18Apr23 complex
+VERY BAD NEWS
+"#;
+
+const VASP_COMBINED_SAMPLE: &str = r#"--- INCAR ---
+GGA = PE
+ENCUT = 520 ! cutoff energy
+PREC = Accurate
+SIGMA = 0.05 # smearing width
+ISMEAR = 0
+IBRION = 2
+NSW = 50
+ISIF = 3
+EDIFF = 1E-6
+EDIFFG = -0.01
+NCORE = 4
+KPAR = 2
+ALGO = Fast
+--- OSZICAR ---
+DAV:   1    0.400E+03    0.400E+03   -0.500E+00   200   0.200E+02
+DAV:   2   -0.200E+02   -0.100E+01   -0.200E+00   220   0.120E+02
+DAV:   3   -0.100E+01   -0.500E+00   -0.100E-01   240   0.800E+01
+   1 F= -.11401725E+03 E0= -.11400000E+03  d E =-.11401725E+03
+RMM:   1   -0.300E+01   -0.300E+00   -0.300E-01   260   0.600E+01
+RMM:   2   -0.200E+00   -0.100E+00   -0.100E-02   280   0.400E+01
+DAV:   3   -0.100E+00   -0.500E-01   -0.500E-03   300   0.200E+01
+   2 F= -.11411725E+03 E0= -.11410000E+03  dE = -.10000000E+00
+--- OUTCAR ---
+vasp.6.4.2 18Apr23 complex
+running on    16 total cores
+free  energy   TOTEN  =      -114.50000000 eV
+POSITION                                       TOTAL-FORCE (eV/Angst)
+General timing and accounting
+"#;
+
+fn test_vasp_rebuild_log(log: &LayeredEventLog) -> LayeredEventLog {
+    let mut builder = LayeredEventLogBuilder::new(log.experiment_ref.clone(), log.spec.clone());
+    for event in log.events.clone() {
+        builder = builder.add_event(event);
+    }
+    builder.build()
+}
+
+#[test]
+fn test_vasp_classify_theory_params() {
+    setup();
+    let (layer, boundary, units) = classify_incar_parameter("GGA", "PE");
+    assert_eq!(layer, Layer::Theory);
+    assert_eq!(boundary, BoundaryClassification::PrimaryLayer);
+    assert_eq!(units, None);
+
+    let (layer, boundary, units) = classify_incar_parameter("ISMEAR", "0");
+    assert_eq!(layer, Layer::Theory);
+    assert_eq!(boundary, BoundaryClassification::PrimaryLayer);
+    assert_eq!(units, None);
+}
+
+#[test]
+fn test_vasp_classify_methodology_params() {
+    setup();
+    let (layer, boundary, units) = classify_incar_parameter("IBRION", "2");
+    assert_eq!(layer, Layer::Methodology);
+    assert_eq!(boundary, BoundaryClassification::PrimaryLayer);
+    assert_eq!(units, None);
+
+    let (layer, boundary, units) = classify_incar_parameter("EDIFF", "1E-6");
+    assert_eq!(layer, Layer::Methodology);
+    assert_eq!(boundary, BoundaryClassification::PrimaryLayer);
+    assert_eq!(units, Some("eV"));
+
+    let (layer, boundary, units) = classify_incar_parameter("NSW", "50");
+    assert_eq!(layer, Layer::Methodology);
+    assert_eq!(boundary, BoundaryClassification::PrimaryLayer);
+    assert_eq!(units, None);
+}
+
+#[test]
+fn test_vasp_classify_implementation_params() {
+    setup();
+    let (layer, boundary, units) = classify_incar_parameter("NCORE", "4");
+    assert_eq!(layer, Layer::Implementation);
+    assert_eq!(boundary, BoundaryClassification::PrimaryLayer);
+    assert_eq!(units, None);
+
+    let (layer, boundary, units) = classify_incar_parameter("KPAR", "2");
+    assert_eq!(layer, Layer::Implementation);
+    assert_eq!(boundary, BoundaryClassification::PrimaryLayer);
+    assert_eq!(units, None);
+}
+
+#[test]
+fn test_vasp_classify_dual_annotated() {
+    setup();
+
+    let (_, boundary, _) = classify_incar_parameter("ENCUT", "520");
+    match boundary {
+        BoundaryClassification::DualAnnotated {
+            secondary_layer,
+            rationale,
+        } => {
+            assert_eq!(secondary_layer, Layer::Implementation);
+            assert_eq!(
+                rationale,
+                "cutoff determines both physics accuracy and memory/compute cost"
+            );
+        }
+        other => panic!("Expected DualAnnotated for ENCUT, got {:?}", other),
+    }
+
+    let (_, boundary, _) = classify_incar_parameter("ALGO", "Fast");
+    match boundary {
+        BoundaryClassification::DualAnnotated {
+            secondary_layer,
+            rationale,
+        } => {
+            assert_eq!(secondary_layer, Layer::Methodology);
+            assert_eq!(
+                rationale,
+                "algorithm can affect which SCF minimum is found"
+            );
+        }
+        other => panic!("Expected DualAnnotated for ALGO, got {:?}", other),
+    }
+
+    let (_, boundary, _) = classify_incar_parameter("LREAL", "Auto");
+    match boundary {
+        BoundaryClassification::DualAnnotated {
+            secondary_layer,
+            rationale,
+        } => {
+            assert_eq!(secondary_layer, Layer::Theory);
+            assert_eq!(rationale, "real-space projection trades accuracy for speed");
+        }
+        other => panic!("Expected DualAnnotated for LREAL, got {:?}", other),
+    }
+
+    let (_, boundary, _) = classify_incar_parameter("SIGMA", "0.05");
+    match boundary {
+        BoundaryClassification::DualAnnotated {
+            secondary_layer,
+            rationale,
+        } => {
+            assert_eq!(secondary_layer, Layer::Methodology);
+            assert_eq!(
+                rationale,
+                "smearing width affects both electronic structure accuracy and BZ integration convergence"
+            );
+        }
+        other => panic!("Expected DualAnnotated for SIGMA, got {:?}", other),
+    }
+
+    let (_, boundary, _) = classify_incar_parameter("PREC", "Accurate");
+    match boundary {
+        BoundaryClassification::DualAnnotated {
+            secondary_layer,
+            rationale,
+        } => {
+            assert_eq!(secondary_layer, Layer::Implementation);
+            assert_eq!(
+                rationale,
+                "precision affects both physical accuracy and FFT grid resources"
+            );
+        }
+        other => panic!("Expected DualAnnotated for PREC, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_vasp_classify_unknown_param() {
+    setup();
+    let (layer, boundary, units) = classify_incar_parameter("MYSTERY", "42");
+    assert_eq!(layer, Layer::Implementation);
+    assert_eq!(units, None);
+
+    match boundary {
+        BoundaryClassification::ContextDependent {
+            default_layer,
+            context_note,
+        } => {
+            assert_eq!(default_layer, Layer::Implementation);
+            assert_eq!(context_note, "VASP parameter not in classification table");
+        }
+        other => panic!("Expected ContextDependent, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_vasp_parse_incar_basic() {
+    setup();
+    let events = parse_incar(VASP_INCAR_SAMPLE).unwrap();
+    assert_eq!(events.len(), 13);
+    assert!(events
+        .iter()
+        .all(|event| matches!(event.kind, EventKind::ParameterRecord { .. })));
+
+    let names: Vec<String> = events
+        .iter()
+        .map(|event| match &event.kind {
+            EventKind::ParameterRecord { name, .. } => name.clone(),
+            other => panic!("Expected ParameterRecord, got {:?}", other),
+        })
+        .collect();
+
+    assert_eq!(
+        names,
+        vec![
+            "GGA", "ENCUT", "PREC", "SIGMA", "ISMEAR", "IBRION", "NSW", "ISIF", "EDIFF",
+            "EDIFFG", "NCORE", "KPAR", "ALGO"
+        ]
+    );
+
+    let gga = events
+        .iter()
+        .find(|event| matches!(&event.kind, EventKind::ParameterRecord { name, .. } if name == "GGA"))
+        .expect("Expected GGA parameter");
+    match &gga.kind {
+        EventKind::ParameterRecord { actual_value, .. } => {
+            assert_eq!(actual_value, &Value::KnownCat("PE".to_string()));
+        }
+        other => panic!("Expected ParameterRecord, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_vasp_parse_incar_comments_stripped() {
+    setup();
+    let events = parse_incar(VASP_INCAR_SAMPLE).unwrap();
+
+    let encut = events
+        .iter()
+        .find(|event| {
+            matches!(
+                &event.kind,
+                EventKind::ParameterRecord { name, .. } if name == "ENCUT"
+            )
+        })
+        .expect("Expected ENCUT");
+    match &encut.kind {
+        EventKind::ParameterRecord { actual_value, .. } => {
+            assert_eq!(actual_value, &Value::Known(520.0, "eV".to_string()));
+        }
+        other => panic!("Expected ParameterRecord for ENCUT, got {:?}", other),
+    }
+
+    let sigma = events
+        .iter()
+        .find(|event| {
+            matches!(
+                &event.kind,
+                EventKind::ParameterRecord { name, .. } if name == "SIGMA"
+            )
+        })
+        .expect("Expected SIGMA");
+    match &sigma.kind {
+        EventKind::ParameterRecord { actual_value, .. } => {
+            assert_eq!(actual_value, &Value::Known(0.05, "eV".to_string()));
+        }
+        other => panic!("Expected ParameterRecord for SIGMA, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_vasp_parse_incar_empty() {
+    setup();
+    let events = parse_incar("").unwrap();
+    assert!(events.is_empty());
+}
+
+#[test]
+fn test_vasp_parse_incar_layer_distribution() {
+    setup();
+    let events = parse_incar(VASP_INCAR_SAMPLE).unwrap();
+    let layers: std::collections::HashSet<Layer> =
+        events.iter().map(|event| event.layer).collect();
+
+    assert!(layers.contains(&Layer::Theory));
+    assert!(layers.contains(&Layer::Methodology));
+    assert!(layers.contains(&Layer::Implementation));
+}
+
+#[test]
+fn test_vasp_parse_oszicar_convergence_points() {
+    setup();
+    let events = parse_oszicar(VASP_OSZICAR_SAMPLE, 0).unwrap();
+    let convergence_count = events
+        .iter()
+        .filter(|event| matches!(event.kind, EventKind::ConvergencePoint { .. }))
+        .count();
+    assert_eq!(convergence_count, 6);
+}
+
+#[test]
+fn test_vasp_parse_oszicar_energy_records() {
+    setup();
+    let events = parse_oszicar(VASP_OSZICAR_SAMPLE, 0).unwrap();
+    let totals: Vec<f64> = events
+        .iter()
+        .filter_map(|event| match &event.kind {
+            EventKind::EnergyRecord {
+                total: Value::Known(value, _),
+                ..
+            } => Some(*value),
+            _ => None,
+        })
+        .collect();
+
+    assert_eq!(totals.len(), 2);
+    assert!((totals[0] + 114.01725).abs() < 1e-6);
+    assert!((totals[1] + 114.11725).abs() < 1e-6);
+}
+
+#[test]
+fn test_vasp_parse_oszicar_convergence_flagged() {
+    setup();
+    let events = parse_oszicar(VASP_OSZICAR_SAMPLE, 0).unwrap();
+    let converged_count = events
+        .iter()
+        .filter(|event| {
+            matches!(
+                event.kind,
+                EventKind::ConvergencePoint {
+                    converged: Some(true),
+                    ..
+                }
+            )
+        })
+        .count();
+    assert_eq!(converged_count, 2);
+}
+
+#[test]
+fn test_vasp_parse_oszicar_single_step() {
+    setup();
+    let sample = r#"
+DAV:   1    0.100E+02    0.100E+02   -0.500E+00   200   0.200E+02
+DAV:   2   -0.200E+01   -0.100E+01   -0.100E+00   220   0.120E+02
+   1 F= -.10000000E+02 E0= -.99900000E+01  d E =-.10000000E-01
+"#;
+    let events = parse_oszicar(sample, 0).unwrap();
+
+    let convergence_count = events
+        .iter()
+        .filter(|event| matches!(event.kind, EventKind::ConvergencePoint { .. }))
+        .count();
+    let energy_count = events
+        .iter()
+        .filter(|event| matches!(event.kind, EventKind::EnergyRecord { .. }))
+        .count();
+
+    assert_eq!(convergence_count, 2);
+    assert_eq!(energy_count, 1);
+}
+
+#[test]
+fn test_vasp_parse_outcar_resource_status() {
+    setup();
+    let events = parse_outcar(VASP_OUTCAR_SAMPLE, 0).unwrap();
+    let resource = events
+        .iter()
+        .find_map(|event| match &event.kind {
+            EventKind::ResourceStatus {
+                platform_type,
+                parallelization,
+                device_ids,
+                ..
+            } => Some((platform_type, parallelization, device_ids)),
+            _ => None,
+        })
+        .expect("Expected ResourceStatus");
+
+    assert!(resource.0.to_ascii_lowercase().contains("vasp"));
+    assert_eq!(resource.1, &Some("16 cores".to_string()));
+    assert_eq!(resource.2.len(), 1);
+}
+
+#[test]
+fn test_vasp_parse_outcar_energy_and_forces() {
+    setup();
+    let events = parse_outcar(VASP_OUTCAR_SAMPLE, 0).unwrap();
+
+    assert!(events
+        .iter()
+        .any(|event| matches!(event.kind, EventKind::EnergyRecord { .. })));
+    assert!(events.iter().any(|event| matches!(
+        event.kind,
+        EventKind::StateSnapshot {
+            snapshot_type: SnapshotType::Forces,
+            ..
+        }
+    )));
+}
+
+#[test]
+fn test_vasp_parse_outcar_success() {
+    setup();
+    let events = parse_outcar(VASP_OUTCAR_SAMPLE, 0).unwrap();
+    assert!(events.iter().any(|event| matches!(
+        event.kind,
+        EventKind::ExecutionStatus {
+            status: ExecutionOutcome::Success,
+            ..
+        }
+    )));
+}
+
+#[test]
+fn test_vasp_parse_outcar_truncated() {
+    setup();
+    let events = parse_outcar(VASP_OUTCAR_TRUNCATED, 0).unwrap();
+    let timeout = events
+        .iter()
+        .find(|event| {
+            matches!(
+                event.kind,
+                EventKind::ExecutionStatus {
+                    status: ExecutionOutcome::Timeout,
+                    ..
+                }
+            )
+        })
+        .expect("Expected timeout event");
+
+    match &timeout.confidence.completeness {
+        Completeness::PartiallyInferred { inference_method } => {
+            assert_eq!(inference_method, "no completion marker in OUTCAR");
+        }
+        other => panic!("Expected PartiallyInferred, got {:?}", other),
+    }
+    assert!((timeout.confidence.field_coverage - 0.5).abs() < f32::EPSILON);
+}
+
+#[test]
+fn test_vasp_adapter_combined() {
+    setup();
+    let adapter = VaspAdapter;
+    let log = adapter.parse_trace(VASP_COMBINED_SAMPLE).unwrap();
+
+    assert!(log
+        .events
+        .iter()
+        .any(|event| matches!(event.kind, EventKind::ParameterRecord { .. })));
+    assert!(log
+        .events
+        .iter()
+        .any(|event| matches!(event.kind, EventKind::ConvergencePoint { .. })));
+    assert!(log
+        .events
+        .iter()
+        .any(|event| matches!(event.kind, EventKind::EnergyRecord { .. })));
+    assert!(log
+        .events
+        .iter()
+        .any(|event| matches!(event.kind, EventKind::StateSnapshot { .. })));
+    assert!(log
+        .events
+        .iter()
+        .any(|event| matches!(event.kind, EventKind::ResourceStatus { .. })));
+    assert!(log
+        .events
+        .iter()
+        .any(|event| matches!(event.kind, EventKind::ExecutionStatus { .. })));
+}
+
+#[test]
+fn test_vasp_adapter_incar_only() {
+    setup();
+    let adapter = VaspAdapter;
+    let log = adapter.parse_trace(VASP_INCAR_SAMPLE).unwrap();
+
+    assert!(!log.events.is_empty());
+    assert!(log
+        .events
+        .iter()
+        .all(|event| matches!(event.kind, EventKind::ParameterRecord { .. })));
+}
+
+#[test]
+fn test_vasp_adapter_controlled_vars_empty() {
+    setup();
+    let adapter = VaspAdapter;
+    let log = adapter.parse_trace(VASP_COMBINED_SAMPLE).unwrap();
+    assert!(log.spec.controlled_variables.is_empty());
+}
+
+#[test]
+fn test_vasp_overlay_construction() {
+    setup();
+    let adapter = VaspAdapter;
+    let log = adapter.parse_trace(VASP_COMBINED_SAMPLE).unwrap();
+    let overlay = CausalOverlay::from_log(&log);
+    assert_eq!(overlay.len(), log.events.len());
+}
+
+#[test]
+fn test_vasp_overlay_layer_span() {
+    setup();
+    let adapter = VaspAdapter;
+    let log = adapter.parse_trace(VASP_COMBINED_SAMPLE).unwrap();
+    assert!(log.indexes.by_layer.contains_key(&Layer::Theory));
+    assert!(log.indexes.by_layer.contains_key(&Layer::Methodology));
+    assert!(log.indexes.by_layer.contains_key(&Layer::Implementation));
+}
+
+#[test]
+fn test_vasp_hidden_confounder_litmus() {
+    setup();
+    let adapter = VaspAdapter;
+    let mut log = adapter.parse_trace(VASP_COMBINED_SAMPLE).unwrap();
+
+    let resolve_position = |variable: &str, log: &LayeredEventLog| -> usize {
+        let event_id = *log
+            .indexes
+            .by_variable
+            .get(variable)
+            .and_then(|ids| ids.first())
+            .expect("Expected variable to be indexed");
+        *log.indexes
+            .by_id
+            .get(&event_id)
+            .expect("Expected EventId to resolve to event position")
+    };
+
+    let prec_pos = resolve_position("PREC", &log);
+    let sigma_pos = resolve_position("SIGMA", &log);
+    let ibrion_pos = resolve_position("IBRION", &log);
+    let prec_event_id = log.events[prec_pos].id;
+
+    log.events[sigma_pos].causal_refs = vec![prec_event_id];
+    log.events[ibrion_pos].causal_refs = vec![prec_event_id];
+
+    log = test_vasp_rebuild_log(&log);
+
+    let overlay = CausalOverlay::from_log(&log);
+    let confounders = overlay.detect_confounders(&log, "SIGMA", "IBRION");
+    assert!(!confounders.is_empty());
+    assert!(confounders
+        .iter()
+        .any(|candidate| candidate.dag_node == "PREC"));
+}
+
+#[test]
+fn test_vasp_hidden_confounder_controlled_excluded() {
+    setup();
+    let adapter = VaspAdapter;
+    let mut log = adapter.parse_trace(VASP_COMBINED_SAMPLE).unwrap();
+
+    let resolve_position = |variable: &str, log: &LayeredEventLog| -> usize {
+        let event_id = *log
+            .indexes
+            .by_variable
+            .get(variable)
+            .and_then(|ids| ids.first())
+            .expect("Expected variable to be indexed");
+        *log.indexes
+            .by_id
+            .get(&event_id)
+            .expect("Expected EventId to resolve to event position")
+    };
+
+    let prec_pos = resolve_position("PREC", &log);
+    let sigma_pos = resolve_position("SIGMA", &log);
+    let ibrion_pos = resolve_position("IBRION", &log);
+    let prec_event_id = log.events[prec_pos].id;
+
+    log.events[sigma_pos].causal_refs = vec![prec_event_id];
+    log.events[ibrion_pos].causal_refs = vec![prec_event_id];
+    log.spec.controlled_variables.push(ControlledVariable {
+        id: SpecElementId(9_999),
+        parameter: "PREC".to_string(),
+        held_value: Value::KnownCat("Accurate".to_string()),
+    });
+
+    log = test_vasp_rebuild_log(&log);
+
+    let overlay = CausalOverlay::from_log(&log);
+    let confounders = overlay.detect_confounders(&log, "SIGMA", "IBRION");
+    assert!(confounders.is_empty());
+}
+
+#[test]
+fn test_vasp_adapter_error_execution() {
+    setup();
+    let events = parse_outcar(VASP_OUTCAR_ERROR, 0).unwrap();
+    let execution = events
+        .iter()
+        .find_map(|event| match &event.kind {
+            EventKind::ExecutionStatus { status, .. } => Some(status),
+            _ => None,
+        })
+        .expect("Expected ExecutionStatus event");
+
+    assert_eq!(*execution, ExecutionOutcome::CrashDivergent);
 }
