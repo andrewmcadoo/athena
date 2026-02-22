@@ -119,6 +119,14 @@
       "slug": "session5-hybrid-stretch",
       "goal": "Implement stretch test script for post-ceiling hybrid aggregation candidate with calibration simulation, correlation robustness, and output generation",
       "framework": "RISEN"
+    },
+    {
+      "sequence": 16,
+      "filename": "prompt_016_2026-02-22_regime-validity-guardrail-spec.md",
+      "created": "2026-02-22T15:29:04.044427",
+      "slug": "regime-validity-guardrail-spec",
+      "goal": "Determine whether hybrid failure modes fall within realistic DSL operating ranges, then codify x0>=0 guardrail to unblock Session 6",
+      "framework": "RISEN"
     }
   ]
 }
