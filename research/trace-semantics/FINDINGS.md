@@ -26,7 +26,72 @@ IN PROGRESS — Steps 1-7 and all synthesis steps (1d, 2c, 3b) complete. Step 5a
 - **Fault classification boundary**: The minimum IR resolution at which the LFI's three-stage audit (implementation -> methodology -> theory) can produce determinate classifications rather than ambiguous ones.
 - **Theory-implementation separation**: The API-enforced structural distinction in DSL frameworks between what the user specifies (theory) and how the framework executes it (implementation).
 
+
+## Table of Contents
+
+- [Research Question](#research-question)
+- [Investigation Log](#investigation-log)
+  1. [2026-02-21: WDK#26 — INCAR Classification Table Completeness](#2026-02-21-wdk26--incar-classification-table-completeness)
+  2. [2026-02-21: WDK#25 — VASP Closed-Source Observability Ceiling](#2026-02-21-wdk25--vasp-closed-source-observability-ceiling)
+  3. [2026-02-21: WDK#39 — prediction_id Type Harmonization](#2026-02-21-wdk39--prediction_id-type-harmonization)
+  4. [2026-02-21: WDK#35 + WDK#36 — ContractTerm Value Extensions for VASP](#2026-02-21-wdk35--wdk36--contractterm-value-extensions-for-vasp)
+  5. [2026-02-22: Step 14 — UncertaintySummary Schema for Divergence Metrics (WDK#40)](#2026-02-22-step-14--uncertaintysummary-schema-for-divergence-metrics-wdk40)
+  6. [2026-02-22: Step 13 — Convergence Trajectory Representation (WDK#13)](#2026-02-22-step-13--convergence-trajectory-representation-wdk13)
+  7. [2026-02-22: Step 12 — R17 Quantitative Comparison Formalization and Interface Contract](#2026-02-22-step-12--r17-quantitative-comparison-formalization-and-interface-contract)
+  8. [2026-02-22: Step 11 — Hidden Confounder Prototype Litmus Test](#2026-02-22-step-11--hidden-confounder-prototype-litmus-test)
+  9. [2026-02-22: Step 10 — VASP Adapter Implementation](#2026-02-22-step-10--vasp-adapter-implementation)
+  10. [2026-02-21: Step 9: GROMACS Adapter for Cross-Framework Validation](#2026-02-21-step-9-gromacs-adapter-for-cross-framework-validation)
+  11. [2026-02-21: Step 7: R17+R18 Query Implementation](#2026-02-21-step-7-r17r18-query-implementation)
+  12. [2026-02-21: Hybrid LEL+DGR Phase 2 Prototype — CausalOverlay + R14 Query (Step 6)](#2026-02-21-hybrid-leldgr-phase-2-prototype--causaloverlay--r14-query-step-6)
+  13. [2026-02-21: Open Thread Resolution (Step 5c)](#2026-02-21-open-thread-resolution-step-5c)
+  14. [2026-02-20: Candidate IR Schemas with Hybrid LEL-DGR Recommendation (Step 5a)](#2026-02-20-candidate-ir-schemas-with-hybrid-lel-dgr-recommendation-step-5a)
+  15. [2026-02-20: Requirements Coverage Matrix and Gap Analysis (Step 3b)](#2026-02-20-requirements-coverage-matrix-and-gap-analysis-step-3b)
+  16. [2026-02-20: Comparative IR Synthesis (Step 2c)](#2026-02-20-comparative-ir-synthesis-step-2c)
+  17. [2026-02-20: Cross-Framework Trace Synthesis (Step 1d)](#2026-02-20-cross-framework-trace-synthesis-step-1d)
+  18. [2026-02-20: 21% RCA Baseline Characterization](#2026-02-20-21-rca-baseline-characterization)
+  19. [2026-02-20: LFI Audit → IR Requirements Mapping](#2026-02-20-lfi-audit--ir-requirements-mapping)
+  20. [2026-02-20 — Provenance Data Models and Scientific Workflow IR Survey](#2026-02-20--provenance-data-models-and-scientific-workflow-ir-survey)
+  21. [Entry 1 — 2026-02-20: RCA and Formal Verification IR Survey](#entry-1--2026-02-20-rca-and-formal-verification-ir-survey)
+  22. [Entry 001 — 2026-02-20: VASP Trace Output System Survey](#entry-001--2026-02-20-vasp-trace-output-system-survey)
+  23. [2026-02-20: GROMACS Trace Format Characterization](#2026-02-20-gromacs-trace-format-characterization)
+  24. [2026-02-20: OpenMM Trace Format Characterization](#2026-02-20-openmm-trace-format-characterization)
+- [Accumulated Findings](#accumulated-findings)
+  - [What We Know](#what-we-know)
+  - [What We Suspect](#what-we-suspect)
+  - [What We Don't Know](#what-we-dont-know)
+- [Prototype Index](#prototype-index)
+- [Next Steps](#next-steps)
+
 ## Investigation Log
+
+> **Investigation Log Index** — 24 entries, reverse chronological.
+>
+> | # | Date | Identifier | Scope |
+> | :--- | :--- | :--- | :--- |
+> | 1 | 2026-02-21 | WDK#26 | INCAR classification table completeness |
+> | 2 | 2026-02-21 | WDK#25 | VASP closed-source observability ceiling |
+> | 3 | 2026-02-21 | WDK#39 | prediction_id type harmonization |
+> | 4 | 2026-02-21 | WDK#35 + WDK#36 | ContractTerm value extensions for VASP |
+> | 5 | 2026-02-22 | Step 14 | UncertaintySummary schema for divergence metrics |
+> | 6 | 2026-02-22 | Step 13 | Convergence trajectory representation |
+> | 7 | 2026-02-22 | Step 12 | R17 comparison formalization and interface contract |
+> | 8 | 2026-02-22 | Step 11 | Hidden confounder prototype litmus test |
+> | 9 | 2026-02-22 | Step 10 | VASP adapter implementation |
+> | 10 | 2026-02-21 | Step 9 | GROMACS adapter for cross-framework validation |
+> | 11 | 2026-02-21 | Step 7 | R17+R18 query implementation |
+> | 12 | 2026-02-21 | Step 6 | Hybrid LEL+DGR Phase 2 prototype |
+> | 13 | 2026-02-21 | Step 5c | Open thread resolution |
+> | 14 | 2026-02-20 | Step 5a | Candidate IR schemas with Hybrid recommendation |
+> | 15 | 2026-02-20 | Step 3b | Requirements coverage matrix and gap analysis |
+> | 16 | 2026-02-20 | Step 2c | Comparative IR synthesis |
+> | 17 | 2026-02-20 | Step 1d | Cross-framework trace synthesis |
+> | 18 | 2026-02-20 | — | 21% RCA baseline characterization |
+> | 19 | 2026-02-20 | — | LFI audit to IR requirements mapping |
+> | 20 | 2026-02-20 | — | Provenance and scientific workflow IR survey |
+> | 21 | 2026-02-20 | Entry 1 | RCA and formal verification IR survey |
+> | 22 | 2026-02-20 | Entry 001 | VASP trace output system survey |
+> | 23 | 2026-02-20 | — | GROMACS trace format characterization |
+> | 24 | 2026-02-20 | — | OpenMM trace format characterization |
 
 ### 2026-02-21: WDK#26 — INCAR Classification Table Completeness
 **Date:** 2026-02-21
@@ -1507,11 +1572,12 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 4. How should the IR represent the "unknown state" in temporal gaps between reporter intervals?
 5. Can the atom type assignment trail be reconstructed by re-running `createSystem()` with instrumentation, or must it be captured at compilation time?
 
+
 ## Accumulated Findings
 
 ### What We Know
 
-**DSL Trace Architecture**
+**Framework Trace Analysis and Baseline**
 
 1. **All three target DSLs provide sufficient structured output for the Trace Semantics Engine to operate, but none provides sufficient *default* output for three-way fault classification.** OpenMM: only 4 of 17 failure modes detectable from default reporters. GROMACS: error messages are free-text with no classification taxonomy; most common failures (constraint violations) are inherently ambiguous. VASP: the most dangerous failures (insufficient ENCUT, inadequate k-points, wrong functional) are completely silent. Each framework requires custom instrumentation or supplementary analysis. [OpenMM log 2026-02-20; GROMACS log 2026-02-20; VASP log 2026-02-20]
 
@@ -1525,7 +1591,25 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 
 6. **VASP's input is purely declarative; OpenMM requires Python scripting; GROMACS uses a hybrid (declarative .mdp + topology files).** This structural difference means the IR needs DSL-specific adapters rather than a universal input parser. [VASP log 2026-02-20 Finding 8; OpenMM log 2026-02-20; GROMACS log 2026-02-20]
 
-**IR Design Patterns**
+28. **Trace completeness varies substantially: OpenMM 30-40% default / 70-80% max, GROMACS 60-70% / 75-85%, VASP 50-60% / 50-60% ceiling.** VASP hits a hard closed-source ceiling that cannot be overcome with custom instrumentation. OpenMM has the widest gap between default and instrumented coverage, meaning custom reporters provide the most marginal value. [Cross-framework synthesis log 2026-02-20; cross-framework-synthesis.md §4]
+
+29. **49 failure modes taxonomized: 8 harmonized cross-framework patterns, 7 DSL-specific modes.** Common patterns include: numerical overflow, constraint/convergence failure, memory exhaustion, parameter misspecification, silent methodology inadequacy. DSL-specific modes include VASP SCF non-convergence, GROMACS domain decomposition failure, OpenMM platform-dependent precision divergence. [Cross-framework synthesis log 2026-02-20; cross-framework-synthesis.md §3]
+
+30. **Decision Gate 1 resolved: VASP accepted with external classification table.** 70-80% of standard VASP calculations classifiable with full confidence; 20-30% have degraded confidence from ambiguous parameters (PREC, ALGO, LREAL). Five items flagged for adversarial review. [Cross-framework synthesis log 2026-02-20; cross-framework-synthesis.md §6]
+
+31. **Seven common IR core elements identified.** Timestamped events, energy time series, parameter records, error events, state snapshots, convergence trajectories, and data absence records generalize across all three frameworks and form the universal IR schema core. [Cross-framework synthesis log 2026-02-20; cross-framework-synthesis.md §5]
+
+32. **Adapter contract defined: 7 mandatory + 7 optional methods.** Mandatory: extract_parameters, extract_energy_series, extract_state_snapshots, extract_errors, extract_convergence_metrics, extract_execution_metadata, declare_data_completeness. Optional: validate_preprocessing, extract_runtime_adjustments, extract_scf_convergence, extract_electronic_structure, validate_silent_failures, extract_force_field_compilation, compare_platforms. [Cross-framework synthesis log 2026-02-20; cross-framework-synthesis.md §5.3]
+
+37. **The 21% Top@1 figure in VISION.md is uncited.** It carries no reference number, unlike most other claims in the document. The anchoring number for ATHENA's value proposition is unsourced. [Baseline log 2026-02-20]
+
+38. **The 21% figure almost certainly originates from cloud/AIOps RCA benchmarks, not scientific computing.** The domain is structurally harder than ATHENA's target on every relevant dimension: trace structure, candidate set size, causal complexity, and observability. The figure is a conservative contrast, not a direct baseline. [Baseline log 2026-02-20; evidence quality B]
+
+39. **ATHENA's three-way classification (implementation/methodology/theory) has a candidate set of 3 with random baseline 33%. Cloud RCA Top@1 operates over 50-500+ candidates with random baseline 0.2-2%.** These are fundamentally different metrics and should not be directly compared. [Baseline log 2026-02-20]
+
+40. **Six specific structural properties of traces improve RCA accuracy** (with estimated improvements): temporal/causal ordering (+15-25%), event type taxonomies (+10-20%), schema conformance (+10-20%), causal annotations/dependency graphs (+20-35%), severity levels (+5-10%), layer/component separation (+10-15%). Improvements interact positively. [Baseline log 2026-02-20; evidence quality B]
+
+**IR Architecture Foundations**
 
 7. **LLM-based RCA without formal IR achieves ~21% Top@1 accuracy on unstructured traces.** The root cause is architectural (no structured representation of causal chains), not a capability limitation of the LLMs. [RCA/FV survey 2026-02-20; arxiv:2403.04123; ARCHITECTURE.md 4.5]
 
@@ -1539,8 +1623,6 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 
 12. **All identified transferable patterns are compatible with Rust zero-copy/streaming parsing.** Dialect tags as enum variants, contracts as structured records, event chains constructed incrementally. [RCA/FV survey 2026-02-20; ADR 001]
 
-**Provenance Models**
-
 13. **PROV-DM covers approximately 60-70% of ATHENA's IR requirements.** Entity-Activity-Agent model maps well to simulation states and steps. The Agent model is the weakest mapping — it captures "who" but not "what kind" of responsibility. [Provenance survey 2026-02-20; W3C PROV-DM §2-5]
 
 14. **PROV-DM does not natively represent the theory-implementation-methodology trichotomy.** The distinction must be added as a structural extension, not as metadata attributes. [Provenance survey 2026-02-20]
@@ -1553,32 +1635,6 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 
 18. **No existing provenance system natively supports the theory-implementation distinction or fault classification** at the DSL-internal semantic level ATHENA requires. [Provenance survey 2026-02-20]
 
-**IR Requirements**
-
-19. **The IR must represent a minimum of 29 distinct semantic elements (R1-R29) to support the LFI's three-stage audit.** Derived by backward analysis from each deterministic question the LFI must answer per ARCHITECTURE.md §5.3. [LFI requirements log 2026-02-20]
-
-20. **The IR is not a pure trace-log derivative.** It is a composite of trace-extracted data (R1, R2, R6-R8, R12, R16), experiment specification data (R3, R4, R10, R13), hypothesis-derived data (R15), computed/derived elements (R5, R17), and DAG cross-references (R9, R11, R14, R18). [LFI requirements log 2026-02-20]
-
-21. **R19 (layer tag) is the load-bearing structural distinction.** Without it, the three-stage sequential audit cannot function. The DSL's API separation is what makes this tagging possible. [LFI requirements log 2026-02-20; ARCHITECTURE.md §3.1]
-
-22. **The IR must explicitly represent its own observability gaps (R26).** Silent omission of unobservable elements causes the LFI to misattribute failures. The LFI must distinguish "checked and fine" from "not checkable." [LFI requirements log 2026-02-20; ARCHITECTURE.md §8.4]
-
-23. **Stage 2 requirements (R8-R14) are bounded by DAG accuracy.** Every confounder judgment must be traceable to specific DAG edges consulted, enabling reclassification when the DAG changes. [LFI requirements log 2026-02-20; ARCHITECTURE.md §5.3, §8.5]
-
-**Cross-Framework Synthesis**
-
-28. **Trace completeness varies substantially: OpenMM 30-40% default / 70-80% max, GROMACS 60-70% / 75-85%, VASP 50-60% / 50-60% ceiling.** VASP hits a hard closed-source ceiling that cannot be overcome with custom instrumentation. OpenMM has the widest gap between default and instrumented coverage, meaning custom reporters provide the most marginal value. [Cross-framework synthesis log 2026-02-20; cross-framework-synthesis.md §4]
-
-29. **49 failure modes taxonomized: 8 harmonized cross-framework patterns, 7 DSL-specific modes.** Common patterns include: numerical overflow, constraint/convergence failure, memory exhaustion, parameter misspecification, silent methodology inadequacy. DSL-specific modes include VASP SCF non-convergence, GROMACS domain decomposition failure, OpenMM platform-dependent precision divergence. [Cross-framework synthesis log 2026-02-20; cross-framework-synthesis.md §3]
-
-30. **Decision Gate 1 resolved: VASP accepted with external classification table.** 70-80% of standard VASP calculations classifiable with full confidence; 20-30% have degraded confidence from ambiguous parameters (PREC, ALGO, LREAL). Five items flagged for adversarial review. [Cross-framework synthesis log 2026-02-20; cross-framework-synthesis.md §6]
-
-31. **Seven common IR core elements identified.** Timestamped events, energy time series, parameter records, error events, state snapshots, convergence trajectories, and data absence records generalize across all three frameworks and form the universal IR schema core. [Cross-framework synthesis log 2026-02-20; cross-framework-synthesis.md §5]
-
-32. **Adapter contract defined: 7 mandatory + 7 optional methods.** Mandatory: extract_parameters, extract_energy_series, extract_state_snapshots, extract_errors, extract_convergence_metrics, extract_execution_metadata, declare_data_completeness. Optional: validate_preprocessing, extract_runtime_adjustments, extract_scf_convergence, extract_electronic_structure, validate_silent_failures, extract_force_field_compilation, compare_platforms. [Cross-framework synthesis log 2026-02-20; cross-framework-synthesis.md §5.3]
-
-**Comparative IR Synthesis**
-
 33. **MLIR dialects and PROV-DM serve complementary roles in the IR architecture.** Dialects provide classification/routing (which LFI stage handles an element); PROV-DM provides causal structure (how elements relate within each stage). The unified architecture uses dialect structure as primary organization with PROV-DM-like causal graphs within each layer. [IR synthesis log 2026-02-20; ir-pattern-catalog.md §4]
 
 34. **Decision Gate 2 resolved: hybrid adaptation, MEDIUM risk.** ~65-70% transfers from existing systems. ~30-35% requires novel design: three-way layer typing vocabulary, fault classification ontology, quantitative prediction-observation comparison formalization, methodology detection rules. [IR synthesis log 2026-02-20; ir-pattern-catalog.md §5]
@@ -1586,28 +1642,6 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 35. **Nine anti-patterns cataloged with severity ratings and avoidance guidance.** CRITICAL: specification-implementation conflation (directly disables three-stage audit). HIGH: post-mortem-only design (blocks streaming per ADR 001), full-granularity recording (10^8+ nodes), binary pass/fail (collapses three-way), lossy compression without principled selection. [IR synthesis log 2026-02-20; ir-pattern-catalog.md §3]
 
 36. **Three candidate IR designs have distinct pattern-source profiles.** LEL (Layered Event Log): simplest, Stage 1 strongest, log-based. DGR (Dual-Graph IR): natural synthesis of both surveys, Stages 2-3 strongest, graph-based. TAL (Typed Assertion Log): most ATHENA-specific, highest novelty risk, assertion-based. [IR synthesis log 2026-02-20; ir-pattern-catalog.md §6]
-
-**Requirements Coverage**
-
-24. **Stage 1 requirements (R1-R7) are fully satisfiable for all three frameworks.** OpenMM has 4 DI cells (highest instrumentation burden: no parameter echo, API-only access). GROMACS has 5 DA cells (best default coverage). VASP has 4 DA cells but exit code unreliability for SCF non-convergence. Coverage matrix confirms Stage 1 is the most tractable stage. [Coverage matrix log 2026-02-20; requirements-coverage-matrix.md §1]
-
-25. **31% of R1-R29 requirements (9 of 29) are NT — data sources external to the Trace Semantics Engine.** R9, R10, R11, R15, R18, R22, R23, R28, R29(cycle_id) come from experiment specification, hypothesis, DAG, or workflow controller. This quantifies the IR's composite nature first identified in item 20. [Coverage matrix log 2026-02-20; requirements-coverage-matrix.md §5.1]
-
-26. **R19 (layer tag) availability varies: OpenMM=DA (clean API), GROMACS=DI+ER (~10 boundary params), VASP=ER (~200-300 INCAR tags).** This is the only cross-cutting requirement with framework-dependent classification difficulty. OpenMM's clean boundary confirms the DSL constraint's value. VASP's ER burden is bounded (finite, static tag set) and accepted per Decision Gate 1. [Coverage matrix log 2026-02-20; requirements-coverage-matrix.md §2]
-
-27. **Decision Gate 4: PASS — no LFI stage blocked by FU requirements.** FU cells exist only as partial R6 (sub-component numerical internals) at ~5-10% per framework, well below the 10% threshold. Four conditions attached: OpenMM custom reporter, VASP classification table, VASP degraded confidence for ambiguous params, R17 comparison method formalization. [Coverage matrix log 2026-02-20; requirements-coverage-matrix.md §7]
-
-**Baseline Characterization**
-
-37. **The 21% Top@1 figure in VISION.md is uncited.** It carries no reference number, unlike most other claims in the document. The anchoring number for ATHENA's value proposition is unsourced. [Baseline log 2026-02-20]
-
-38. **The 21% figure almost certainly originates from cloud/AIOps RCA benchmarks, not scientific computing.** The domain is structurally harder than ATHENA's target on every relevant dimension: trace structure, candidate set size, causal complexity, and observability. The figure is a conservative contrast, not a direct baseline. [Baseline log 2026-02-20; evidence quality B]
-
-39. **ATHENA's three-way classification (implementation/methodology/theory) has a candidate set of 3 with random baseline 33%. Cloud RCA Top@1 operates over 50-500+ candidates with random baseline 0.2-2%.** These are fundamentally different metrics and should not be directly compared. [Baseline log 2026-02-20]
-
-40. **Six specific structural properties of traces improve RCA accuracy** (with estimated improvements): temporal/causal ordering (+15-25%), event type taxonomies (+10-20%), schema conformance (+10-20%), causal annotations/dependency graphs (+20-35%), severity levels (+5-10%), layer/component separation (+10-15%). Improvements interact positively. [Baseline log 2026-02-20; evidence quality B]
-
-**Candidate IR Schemas**
 
 41. **Hybrid LEL+DGR is the recommended IR architecture.** Scores 94/100 vs. 82/100 for either standalone candidate (LEL or DGR). Provides per-stage optimized operation: LEL streaming efficiency for Stage 1 (the common classification path) and DGR-like causal reasoning for Stages 2-3 (the differentiating path). PASS on all 9 anti-patterns. Supersedes the suspicion that DGR alone was strongest. [Candidate IR schemas log 2026-02-20; candidate-ir-schemas.md §9-10]
 
@@ -1623,7 +1657,27 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 
 47. **The causal reasoning substrate question has a per-stage answer.** Stage 1: sequential search sufficient (filter-and-inspect on implementation-tagged events). Stages 2-3: graph traversal required (transitive causal ancestry for R14 confounders, structural path finding for R18 causal implications). This per-stage resolution directly motivates the Hybrid design. [Candidate IR schemas log 2026-02-20; candidate-ir-schemas.md §8 OQ3]
 
-**Open Thread Resolution**
+**Requirements Analysis**
+
+19. **The IR must represent a minimum of 29 distinct semantic elements (R1-R29) to support the LFI's three-stage audit.** Derived by backward analysis from each deterministic question the LFI must answer per ARCHITECTURE.md §5.3. [LFI requirements log 2026-02-20]
+
+20. **The IR is not a pure trace-log derivative.** It is a composite of trace-extracted data (R1, R2, R6-R8, R12, R16), experiment specification data (R3, R4, R10, R13), hypothesis-derived data (R15), computed/derived elements (R5, R17), and DAG cross-references (R9, R11, R14, R18). [LFI requirements log 2026-02-20]
+
+21. **R19 (layer tag) is the load-bearing structural distinction.** Without it, the three-stage sequential audit cannot function. The DSL's API separation is what makes this tagging possible. [LFI requirements log 2026-02-20; ARCHITECTURE.md §3.1]
+
+22. **The IR must explicitly represent its own observability gaps (R26).** Silent omission of unobservable elements causes the LFI to misattribute failures. The LFI must distinguish "checked and fine" from "not checkable." [LFI requirements log 2026-02-20; ARCHITECTURE.md §8.4]
+
+23. **Stage 2 requirements (R8-R14) are bounded by DAG accuracy.** Every confounder judgment must be traceable to specific DAG edges consulted, enabling reclassification when the DAG changes. [LFI requirements log 2026-02-20; ARCHITECTURE.md §5.3, §8.5]
+
+24. **Stage 1 requirements (R1-R7) are fully satisfiable for all three frameworks.** OpenMM has 4 DI cells (highest instrumentation burden: no parameter echo, API-only access). GROMACS has 5 DA cells (best default coverage). VASP has 4 DA cells but exit code unreliability for SCF non-convergence. Coverage matrix confirms Stage 1 is the most tractable stage. [Coverage matrix log 2026-02-20; requirements-coverage-matrix.md §1]
+
+25. **31% of R1-R29 requirements (9 of 29) are NT — data sources external to the Trace Semantics Engine.** R9, R10, R11, R15, R18, R22, R23, R28, R29(cycle_id) come from experiment specification, hypothesis, DAG, or workflow controller. This quantifies the IR's composite nature first identified in item 20. [Coverage matrix log 2026-02-20; requirements-coverage-matrix.md §5.1]
+
+26. **R19 (layer tag) availability varies: OpenMM=DA (clean API), GROMACS=DI+ER (~10 boundary params), VASP=ER (~200-300 INCAR tags).** This is the only cross-cutting requirement with framework-dependent classification difficulty. OpenMM's clean boundary confirms the DSL constraint's value. VASP's ER burden is bounded (finite, static tag set) and accepted per Decision Gate 1. [Coverage matrix log 2026-02-20; requirements-coverage-matrix.md §2]
+
+27. **Decision Gate 4: PASS — no LFI stage blocked by FU requirements.** FU cells exist only as partial R6 (sub-component numerical internals) at ~5-10% per framework, well below the 10% threshold. Four conditions attached: OpenMM custom reporter, VASP classification table, VASP degraded confidence for ambiguous params, R17 comparison method formalization. [Coverage matrix log 2026-02-20; requirements-coverage-matrix.md §7]
+
+**Prototype Implementation and Interface Contracts**
 
 48. **Real CausalOverlay construction cost is empirically bounded at 10^6 scale.** With benchmark wired to `CausalOverlay::from_log`, observed overlay construction is 251.82ms at 10^6 events (22.62ms at 10^5), with 1,000,000 overlay entities and 199,998 derivation edges. Construction remains single-pass O(n) and tractable for prototype-scale traces. [Step 6 log 2026-02-21; `lel-ir-prototype/src/bench.rs`]
 
@@ -1670,6 +1724,8 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 69. **WDK#40 is narrowed to a concrete schema contract at findings level: mandatory point uncertainty, optional tagged distribution payload, explicit `NoUncertainty` reason.** This is sufficient to support both V&V/effect-size reporting and Bayesian/adversarial calibration from one `ComparisonProfileV1` metric interface. [Step 14 log 2026-02-22]
 
 70. **`MetricComponent.uncertainty` and `ConvergenceSummary.uncertainty` should share the same numeric uncertainty core, while convergence-pattern confidence remains separate pending WDK#42-44.** This preserves Step 13 compatibility without prematurely freezing pattern-taxonomy semantics. [Step 14 log 2026-02-22; Step 13 log 2026-02-22; WDK#42-44]
+
+**VASP-Specific Extensions**
 
 71. **WDK#35 resolved: `ContractTerm` needs `value: Option<Value>` for machine-readable precondition checking.** Five concrete VASP precondition categories (POTCAR family, ENCUT threshold, KPOINTS density, ISMEAR type, POSCAR consistency) are all representable with existing Value variants. Checking logic belongs in adapters/LFI, consistent with the `ControlledVariable.held_value` pattern. No new Value types needed for preconditions. [WDK#35+#36 log 2026-02-21; `common.rs:94-99,106,115,123`]
 
@@ -1737,6 +1793,7 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 
 23. **The adapter optional methods (validate_silent_failures, extract_scf_convergence, etc.) may evolve into mandatory requirements** as empirical testing reveals which framework-specific data is essential for correct fault classification. [Cross-framework synthesis log 2026-02-20; cross-framework-synthesis.md §5.3]
 
+
 ### What We Don't Know
 
 **DSL-Specific**
@@ -1765,10 +1822,6 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 
 11. **What the minimum granularity of provenance recording is** that still enables correct fault classification. Full-granularity is an anti-pattern; DSL-API-call level needs validation. [Provenance survey 2026-02-20]
 
-12. ~~**Whether a single IR schema can accommodate both DFT codes (VASP) and MD codes (OpenMM, GROMACS)** or whether structural differences require fundamentally different IR designs with a common interface.~~ RESOLVED: Step 10 VASP adapter maps INCAR/OSZICAR/OUTCAR into existing LEL/EventKind structures with no schema changes, alongside existing OpenMM/GROMACS paths. See What We Know #55. [Step 10 log 2026-02-22; `lel-ir-prototype/src/vasp_adapter.rs`, `lel-ir-prototype/src/tests/mod.rs`]
-
-13. ~~**How convergence trajectories should be represented in the IR** (raw time series, classified patterns, or derived features).~~ NARROWED: Step 13 recommends Option D (hybrid raw canonical trajectory + Stage 1->2 summary derivation with derived features, optional pattern classification, and provenance anchors). Remaining uncertainty is implementation detail: pattern taxonomy/confidence, cross-framework derivation rules (especially GROMACS/OpenMM), and summary timing/index strategy. See What We Know #61-#65 and WDK items #42-#44. [Step 13 log 2026-02-22]
-
 **Requirements and Baseline**
 
 14. **Whether the IR should be a single composite structure or a set of joinable structures with defined interfaces.** The composite nature creates a design tension between cohesion and modularity. [LFI requirements log 2026-02-20]
@@ -1789,7 +1842,29 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 
 22. **How the success criterion should be reframed** as three-way classification accuracy rather than direct comparison to cloud RCA Top@1. [Baseline log 2026-02-20]
 
+30. **The per-force-group energy decomposition overhead in OpenMM (R6 DI).** This is the largest unknown affecting OpenMM adapter feasibility. If overhead is prohibitive, alternative R6 strategies are needed (e.g., statistical anomaly detection on total energy only). [Coverage matrix log 2026-02-20; What We Don't Know #2]
+
 **Cross-Framework and IR Synthesis**
+
+27. **What the streaming/buffering trade-off is for Stage 3.** LEL is fully streaming; DGR may require partial graph buffering; TAL may require assertion reordering. Depends on how often Stage 3 needs full-trace access vs. phase-level summaries. [IR synthesis log 2026-02-20; ir-pattern-catalog.md §7]
+
+38. **Whether arena allocation provides measurable benefit for CausalOverlay construction.** NARROWED: Vec-first allocation is now validated on the real overlay path at 10^6 scale (`CausalOverlay::from_log` = 251.82ms). Arena remains deferred and should only be introduced if future profiling shows measurable allocation overhead in broader workloads. [Step 6 log 2026-02-21; `lel-ir-prototype/src/bench.rs`]
+
+**Candidate IR Schemas**
+
+41. **How to standardize profile aggregation into a bounded, monotonic reward scalar** that remains calibratable under ARCHITECTURE.md §5.4 feedback and robust against Noisy-TV style reward hacking. [Step 12 log 2026-02-22; ARCHITECTURE.md §5.4; VISION.md §6.2]
+
+42. **What minimal cross-framework `ConvergencePattern` taxonomy should be adopted, and how pattern confidence should be calibrated.** Step 13 narrowed representation direction to hybrid raw+summary, but taxonomy boundaries (e.g., monotonic/oscillatory/stalled/two-plateau/divergent) and confidence semantics remain open and require domain expert input. [Step 13 log 2026-02-22]
+
+43. **How to derive convergence summaries for GROMACS/OpenMM when no native `ConvergencePoint` stream exists.** The current prototype has VASP-native convergence trajectories; equivalent summary derivation for other adapters must be specified from existing events (`EnergyRecord`, `NumericalStatus`, `ExecutionStatus`) without introducing synthetic certainty. [Step 13 log 2026-02-22; `lel-ir-prototype/src/gromacs_adapter.rs`; `lel-ir-prototype/src/adapter.rs`]
+
+44. **Where convergence summary computation should occur and how it should attach graph/query anchors.** Step 13 recommends Stage 1->2 boundary derivation, but exact timing (`CausalOverlay::from_log` vs post-pass), index strategy, and `dag_node_ref`/`parameter_refs` anchoring rules remain unresolved and may affect determinism/performance. [Step 13 log 2026-02-22; `lel-ir-prototype/src/overlay.rs:54-84`; `lel-ir-prototype/src/lel.rs:130-149`]
+
+**Resolved / Narrowed — No Longer Blocking**
+
+12. ~~**Whether a single IR schema can accommodate both DFT codes (VASP) and MD codes (OpenMM, GROMACS)** or whether structural differences require fundamentally different IR designs with a common interface.~~ RESOLVED: Step 10 VASP adapter maps INCAR/OSZICAR/OUTCAR into existing LEL/EventKind structures with no schema changes, alongside existing OpenMM/GROMACS paths. See What We Know #55. [Step 10 log 2026-02-22; `lel-ir-prototype/src/vasp_adapter.rs`, `lel-ir-prototype/src/tests/mod.rs`]
+
+13. ~~**How convergence trajectories should be represented in the IR** (raw time series, classified patterns, or derived features).~~ NARROWED: Step 13 recommends Option D (hybrid raw canonical trajectory + Stage 1->2 summary derivation with derived features, optional pattern classification, and provenance anchors). Remaining uncertainty is implementation detail: pattern taxonomy/confidence, cross-framework derivation rules (especially GROMACS/OpenMM), and summary timing/index strategy. See What We Know #61-#65 and WDK items #42-#44. [Step 13 log 2026-02-22]
 
 23. ~~**Which causal reasoning substrate best matches the LFI's actual query patterns.**~~ RESOLVED: per-stage answer. Stage 1: sequential search sufficient. Stages 2-3: graph traversal required. See What We Know #47. [Candidate IR schemas log 2026-02-20; candidate-ir-schemas.md §8 OQ3]
 
@@ -1799,17 +1874,9 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 
 26. **Whether the INCAR classification table is correct and complete.** ~~The tag-level classification (theory/implementation/ambiguous) for ~200-300 INCAR parameters needs domain expert validation, particularly for context-dependent tags.~~ NARROWED: Prototype covers 16 of ~50-80 commonly used parameters; 2 of 6 identified ambiguous parameters (ADDGRID, NBANDS) are missing. Six additional ambiguous parameters identified (ISYM, SYMPREC, LASPH, LMAXMIX, ENAUG, NGX/NGY/NGZ). Classification strategy recommendation: static table with context-dependent flags (Strategy B). Remaining uncertainty: the 6 newly identified parameters need domain expert validation; ALGO secondary layer (Methodology vs Theory) needs reconsideration for pathological systems; version-specific behavior catalog needed. [WDK#26 log 2026-02-21; cross-framework-synthesis.md §6.4]
 
-27. **What the streaming/buffering trade-off is for Stage 3.** LEL is fully streaming; DGR may require partial graph buffering; TAL may require assertion reordering. Depends on how often Stage 3 needs full-trace access vs. phase-level summaries. [IR synthesis log 2026-02-20; ir-pattern-catalog.md §7]
-
-**Coverage Matrix**
-
 28. ~~**How to formalize the quantitative prediction-observation comparison method (R17).**~~ NARROWED: Step 12 evaluated three candidate formalizations and recommends Candidate B (Multi-Metric Divergence Profile) plus optional posterior hooks, with a concrete trace-semantics -> adversarial-reward interface contract and explicit downstream scoring. Remaining uncertainty is implementation detail (uncertainty schema + aggregation calibration), not baseline formalization direction. [Step 12 log 2026-02-22]
 
 29. ~~**Whether the LEL→DGR incremental implementation path is viable.**~~ RESOLVED: Yes. The Hybrid candidate demonstrates viability by construction. See What We Know #42. [Candidate IR schemas log 2026-02-20; candidate-ir-schemas.md §4, §8 OQ2]
-
-30. **The per-force-group energy decomposition overhead in OpenMM (R6 DI).** This is the largest unknown affecting OpenMM adapter feasibility. If overhead is prohibitive, alternative R6 strategies are needed (e.g., statistical anomaly detection on total energy only). [Coverage matrix log 2026-02-20; What We Don't Know #2]
-
-**Candidate IR Schemas**
 
 31. ~~**DGR overlay construction cost at the Stage 1/2 boundary for megabyte-scale traces.**~~ RESOLVED: Empirically bounded with real `CausalOverlay::from_log` benchmark path at 251.82ms for 10^6 events (22.62ms at 10^5), with 1,000,000 overlay entities and 199,998 derivation edges. See What We Know #48. [Step 6 log 2026-02-21; `lel-ir-prototype/src/bench.rs`]
 
@@ -1825,19 +1892,9 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 
 37. ~~**Whether `EventIndexes` needs a `by_id: HashMap<EventId, usize>` index** for O(1) event lookup by ID.~~ RESOLVED: Implemented in prototype (`EventIndexes.by_id`) with insert-time population and test/serde coverage. See What We Know #49. [Step 6 log 2026-02-21; `lel-ir-prototype/src/lel.rs`, tests]
 
-38. **Whether arena allocation provides measurable benefit for CausalOverlay construction.** NARROWED: Vec-first allocation is now validated on the real overlay path at 10^6 scale (`CausalOverlay::from_log` = 251.82ms). Arena remains deferred and should only be introduced if future profiling shows measurable allocation overhead in broader workloads. [Step 6 log 2026-02-21; `lel-ir-prototype/src/bench.rs`]
-
 39. ~~**Whether `EventKind::ComparisonResult.prediction_id: String` should be harmonized with `PredictionRecord.id: SpecElementId` in production.**~~ RESOLVED (design level): Yes — change `ComparisonResult.prediction_id` to `SpecElementId` (Option a). Zero adapter impact since `ComparisonResult` is a derived event type (no adapter constructs it). Aligns with all four spec element types and ComparisonProfileV1 forward design. Parse-at-query-time workaround has four failure modes (silent mismatch, partial-success, whitespace, overflow). Change scope: 1 type in `event_kinds.rs`, 1 method in `overlay.rs`, 6 test sites. [WDK#39 log 2026-02-21; `event_kinds.rs:88`; `overlay.rs:261`]
 
 40. ~~**What minimal `UncertaintySummary` schema should accompany each divergence metric** so one comparison profile can support both V&V/effect-size reporting and Bayesian/active-learning reward calibration without adapter-specific branching.~~ NARROWED: Step 14 recommends Candidate C (layered point uncertainty + optional tagged distribution payload + explicit `NoUncertainty` reason) as the minimal adapter-agnostic direction. Remaining work is implementation/field canonicalization and downstream aggregation/pattern-taxonomy dependencies (WDK#41-44), not baseline schema shape. [Step 14 log 2026-02-22]
-
-41. **How to standardize profile aggregation into a bounded, monotonic reward scalar** that remains calibratable under ARCHITECTURE.md §5.4 feedback and robust against Noisy-TV style reward hacking. [Step 12 log 2026-02-22; ARCHITECTURE.md §5.4; VISION.md §6.2]
-
-42. **What minimal cross-framework `ConvergencePattern` taxonomy should be adopted, and how pattern confidence should be calibrated.** Step 13 narrowed representation direction to hybrid raw+summary, but taxonomy boundaries (e.g., monotonic/oscillatory/stalled/two-plateau/divergent) and confidence semantics remain open and require domain expert input. [Step 13 log 2026-02-22]
-
-43. **How to derive convergence summaries for GROMACS/OpenMM when no native `ConvergencePoint` stream exists.** The current prototype has VASP-native convergence trajectories; equivalent summary derivation for other adapters must be specified from existing events (`EnergyRecord`, `NumericalStatus`, `ExecutionStatus`) without introducing synthetic certainty. [Step 13 log 2026-02-22; `lel-ir-prototype/src/gromacs_adapter.rs`; `lel-ir-prototype/src/adapter.rs`]
-
-44. **Where convergence summary computation should occur and how it should attach graph/query anchors.** Step 13 recommends Stage 1->2 boundary derivation, but exact timing (`CausalOverlay::from_log` vs post-pass), index strategy, and `dag_node_ref`/`parameter_refs` anchoring rules remain unresolved and may affect determinism/performance. [Step 13 log 2026-02-22; `lel-ir-prototype/src/overlay.rs:54-84`; `lel-ir-prototype/src/lel.rs:130-149`]
 
 ## Prototype Index
 
@@ -1850,7 +1907,10 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 | `lel-ir-prototype/src/vasp_adapter.rs` | VASP INCAR/OSZICAR/OUTCAR -> LEL adapter | Complete | DFT compatibility on existing IR types, section-marker composition across 3 files, and first adapter-level exercise of `ConvergencePoint` + `StateSnapshot`. |
 | `lel-ir-prototype/src/bench.rs` | CausalOverlay construction benchmark | Complete | Benchmarks real `CausalOverlay::from_log` at 4 scales (10^3-10^6). Latest result: 251.82ms overlay construction at 10^6 events (22.62ms at 10^5), confirming practical O(n) behavior. |
 
+
 ## Next Steps
+
+> **Status as of 2026-02-22:** All originally scoped next steps are complete. New next steps should be appended below.
 
 1. ~~**Survey DSL trace formats**~~ — **COMPLETE.** OpenMM, GROMACS, and VASP surveys done. See investigation logs above and `dsl-evaluation/` analysis documents.
 
