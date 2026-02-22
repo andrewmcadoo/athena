@@ -1,0 +1,5037 @@
+{
+  "generated_at_utc": "2026-02-22T06:06:12.233377+00:00",
+  "candidate_order": [
+    "IVW-CDF",
+    "HTG-Max",
+    "Fisher-UP"
+  ],
+  "fixtures": [
+    {
+      "idx": 1,
+      "name": "Noisy TV",
+      "what_it_tests": "One metric with high divergence and high uncertainty; inflation should be suppressed.",
+      "pass_criterion": "score(value*2, se*2) <= score(value, se)",
+      "datasets": {
+        "base": [
+          {
+            "kind": "AbsoluteDifference",
+            "value": 0.0012,
+            "direction": "Contradiction",
+            "uncertainty": {
+              "point": {
+                "sample_size": 80,
+                "standard_error": 0.3,
+                "interval": null,
+                "method_ref": "s1.absdiff.base.unc"
+              },
+              "distribution": null
+            },
+            "sample_size": null,
+            "units": "eV",
+            "method_ref": "s1.absdiff.base"
+          }
+        ],
+        "doubled": [
+          {
+            "kind": "AbsoluteDifference",
+            "value": 0.0024,
+            "direction": "Contradiction",
+            "uncertainty": {
+              "point": {
+                "sample_size": 80,
+                "standard_error": 0.6,
+                "interval": null,
+                "method_ref": "s1.absdiff.doubled.unc"
+              },
+              "distribution": null
+            },
+            "sample_size": null,
+            "units": "eV",
+            "method_ref": "s1.absdiff.doubled"
+          }
+        ]
+      }
+    },
+    {
+      "idx": 2,
+      "name": "Unanimous weak signal",
+      "what_it_tests": "Eight weak but consistent contradiction metrics.",
+      "pass_criterion": "aggregate >= 1.5 * max(single_metric_scores)",
+      "datasets": {
+        "unanimous": [
+          {
+            "kind": "ZScore",
+            "value": 0.3,
+            "direction": "Contradiction",
+            "uncertainty": {
+              "point": {
+                "sample_size": 120,
+                "standard_error": 0.25,
+                "interval": null,
+                "method_ref": "s2.z.1.unc"
+              },
+              "distribution": null
+            },
+            "sample_size": null,
+            "units": null,
+            "method_ref": "s2.z.1"
+          },
+          {
+            "kind": "EffectSize",
+            "value": 0.25,
+            "direction": "Contradiction",
+            "uncertainty": {
+              "point": {
+                "sample_size": 140,
+                "standard_error": 0.23,
+                "interval": null,
+                "method_ref": "s2.d.1.unc"
+              },
+              "distribution": null
+            },
+            "sample_size": null,
+            "units": null,
+            "method_ref": "s2.d.1"
+          },
+          {
+            "kind": "KLDivergence",
+            "value": 0.1,
+            "direction": "Contradiction",
+            "uncertainty": {
+              "point": {
+                "sample_size": 150,
+                "standard_error": 0.21,
+                "interval": null,
+                "method_ref": "s2.kl.1.unc"
+              },
+              "distribution": null
+            },
+            "sample_size": null,
+            "units": null,
+            "method_ref": "s2.kl.1"
+          },
+          {
+            "kind": "AbsoluteDifference",
+            "value": 0.0003,
+            "direction": "Contradiction",
+            "uncertainty": {
+              "point": {
+                "sample_size": 160,
+                "standard_error": 0.2,
+                "interval": null,
+                "method_ref": "s2.abs.1.unc"
+              },
+              "distribution": null
+            },
+            "sample_size": null,
+            "units": "eV",
+            "method_ref": "s2.abs.1"
+          },
+          {
+            "kind": "ZScore",
+            "value": 0.34,
+            "direction": "Contradiction",
+            "uncertainty": {
+              "point": {
+                "sample_size": 110,
+                "standard_error": 0.26,
+                "interval": null,
+                "method_ref": "s2.z.2.unc"
+              },
+              "distribution": null
+            },
+            "sample_size": null,
+            "units": null,
+            "method_ref": "s2.z.2"
+          },
+          {
+            "kind": "EffectSize",
+            "value": 0.28,
+            "direction": "Contradiction",
+            "uncertainty": {
+              "point": {
+                "sample_size": 130,
+                "standard_error": 0.24,
+                "interval": null,
+                "method_ref": "s2.d.2.unc"
+              },
+              "distribution": null
+            },
+            "sample_size": null,
+            "units": null,
+            "method_ref": "s2.d.2"
+          },
+          {
+            "kind": "KLDivergence",
+            "value": 0.12,
+            "direction": "Contradiction",
+            "uncertainty": {
+              "point": {
+                "sample_size": 115,
+                "standard_error": 0.25,
+                "interval": null,
+                "method_ref": "s2.kl.2.unc"
+              },
+              "distribution": null
+            },
+            "sample_size": null,
+            "units": null,
+            "method_ref": "s2.kl.2"
+          },
+          {
+            "kind": "Custom",
+            "value": 0.15,
+            "direction": "Contradiction",
+            "uncertainty": {
+              "point": {
+                "sample_size": 125,
+                "standard_error": 0.22,
+                "interval": null,
+                "method_ref": "s2.custom.1.unc"
+              },
+              "distribution": null
+            },
+            "sample_size": null,
+            "units": null,
+            "method_ref": "s2.custom.1"
+          }
+        ]
+      }
+    },
+    {
+      "idx": 3,
+      "name": "Mixed signal",
+      "what_it_tests": "Three contradiction + three agreement metrics.",
+      "pass_criterion": "all_agreement <= mixed <= all_contradiction",
+      "datasets": {
+        "mixed": [
+          {
+            "kind": "ZScore",
+            "value": 1.5,
+            "direction": "Contradiction",
+            "uncertainty": {
+              "point": {
+                "sample_size": 100,
+                "standard_error": 0.22,
+                "interval": null,
+                "method_ref": "s3.z.c1.unc"
+              },
+              "distribution": null
+            },
+            "sample_size": null,
+            "units": null,
+            "method_ref": "s3.z.c1"
+          },
+          {
+            "kind": "KLDivergence",
+            "value": 0.8,
+            "direction": "Contradiction",
+            "uncertainty": {
+              "point": {
+                "sample_size": 95,
+                "standard_error": 0.24,
+                "interval": null,
+                "method_ref": "s3.kl.c1.unc"
+              },
+              "distribution": null
+            },
+            "sample_size": null,
+            "units": null,
+            "method_ref": "s3.kl.c1"
+          },
+          {
+            "kind": "AbsoluteDifference",
+            "value": 0.0011,
+            "direction": "Contradiction",
+            "uncertainty": {
+              "point": {
+                "sample_size": 110,
+                "standard_error": 0.26,
+                "interval": null,
+                "method_ref": "s3.abs.c1.unc"
+              },
+              "distribution": null
+            },
+            "sample_size": null,
+            "units": "eV",
+            "method_ref": "s3.abs.c1"
+          },
+          {
+            "kind": "ZScore",
+            "value": 1.4,
+            "direction": "Agreement",
+            "uncertainty": {
+              "point": {
+                "sample_size": 100,
+                "standard_error": 0.22,
+                "interval": null,
+                "method_ref": "s3.z.a1.unc"
+              },
+              "distribution": null
+            },
+            "sample_size": null,
+            "units": null,
+            "method_ref": "s3.z.a1"
+          },
+          {
+            "kind": "KLDivergence",
+            "value": 0.7,
+            "direction": "Agreement",
+            "uncertainty": {
+              "point": {
+                "sample_size": 95,
+                "standard_error": 0.24,
+                "interval": null,
+                "method_ref": "s3.kl.a1.unc"
+              },
+              "distribution": null
+            },
+            "sample_size": null,
+            "units": null,
+            "method_ref": "s3.kl.a1"
+          },
+          {
+            "kind": "AbsoluteDifference",
+            "value": 0.001,
+            "direction": "Agreement",
+            "uncertainty": {
+              "point": {
+                "sample_size": 110,
+                "standard_error": 0.26,
+                "interval": null,
+                "method_ref": "s3.abs.a1.unc"
+              },
+              "distribution": null
+            },
+            "sample_size": null,
+            "units": "eV",
+            "method_ref": "s3.abs.a1"
+          }
+        ],
+        "all_contradiction": [
+          {
+            "kind": "ZScore",
+            "value": 1.5,
+            "direction": "Contradiction",
+            "uncertainty": {
+              "point": {
+                "sample_size": 100,
+                "standard_error": 0.22,
+                "interval": null,
+                "method_ref": "s3.z.c1.unc"
+              },
+              "distribution": null
+            },
+            "sample_size": null,
+            "units": null,
+            "method_ref": "s3.z.c1"
+          },
+          {
+            "kind": "KLDivergence",
+            "value": 0.8,
+            "direction": "Contradiction",
+            "uncertainty": {
+              "point": {
+                "sample_size": 95,
+                "standard_error": 0.24,
+                "interval": null,
+                "method_ref": "s3.kl.c1.unc"
+              },
+              "distribution": null
+            },
+            "sample_size": null,
+            "units": null,
+            "method_ref": "s3.kl.c1"
+          },
+          {
+            "kind": "AbsoluteDifference",
+            "value": 0.0011,
+            "direction": "Contradiction",
+            "uncertainty": {
+              "point": {
+                "sample_size": 110,
+                "standard_error": 0.26,
+                "interval": null,
+                "method_ref": "s3.abs.c1.unc"
+              },
+              "distribution": null
+            },
+            "sample_size": null,
+            "units": "eV",
+            "method_ref": "s3.abs.c1"
+          },
+          {
+            "kind": "ZScore",
+            "value": 1.4,
+            "direction": "Contradiction",
+            "uncertainty": {
+              "point": {
+                "sample_size": 100,
+                "standard_error": 0.22,
+                "interval": null,
+                "method_ref": "s3.z.a1.unc"
+              },
+              "distribution": null
+            },
+            "sample_size": null,
+            "units": null,
+            "method_ref": "s3.z.a1"
+          },
+          {
+            "kind": "KLDivergence",
+            "value": 0.7,
+            "direction": "Contradiction",
+            "uncertainty": {
+              "point": {
+                "sample_size": 95,
+                "standard_error": 0.24,
+                "interval": null,
+                "method_ref": "s3.kl.a1.unc"
+              },
+              "distribution": null
+            },
+            "sample_size": null,
+            "units": null,
+            "method_ref": "s3.kl.a1"
+          },
+          {
+            "kind": "AbsoluteDifference",
+            "value": 0.001,
+            "direction": "Contradiction",
+            "uncertainty": {
+              "point": {
+                "sample_size": 110,
+                "standard_error": 0.26,
+                "interval": null,
+                "method_ref": "s3.abs.a1.unc"
+              },
+              "distribution": null
+            },
+            "sample_size": null,
+            "units": "eV",
+            "method_ref": "s3.abs.a1"
+          }
+        ],
+        "all_agreement": [
+          {
+            "kind": "ZScore",
+            "value": 1.5,
+            "direction": "Agreement",
+            "uncertainty": {
+              "point": {
+                "sample_size": 100,
+                "standard_error": 0.22,
+                "interval": null,
+                "method_ref": "s3.z.c1.unc"
+              },
+              "distribution": null
+            },
+            "sample_size": null,
+            "units": null,
+            "method_ref": "s3.z.c1"
+          },
+          {
+            "kind": "KLDivergence",
+            "value": 0.8,
+            "direction": "Agreement",
+            "uncertainty": {
+              "point": {
+                "sample_size": 95,
+                "standard_error": 0.24,
+                "interval": null,
+                "method_ref": "s3.kl.c1.unc"
+              },
+              "distribution": null
+            },
+            "sample_size": null,
+            "units": null,
+            "method_ref": "s3.kl.c1"
+          },
+          {
+            "kind": "AbsoluteDifference",
+            "value": 0.0011,
+            "direction": "Agreement",
+            "uncertainty": {
+              "point": {
+                "sample_size": 110,
+                "standard_error": 0.26,
+                "interval": null,
+                "method_ref": "s3.abs.c1.unc"
+              },
+              "distribution": null
+            },
+            "sample_size": null,
+            "units": "eV",
+            "method_ref": "s3.abs.c1"
+          },
+          {
+            "kind": "ZScore",
+            "value": 1.4,
+            "direction": "Agreement",
+            "uncertainty": {
+              "point": {
+                "sample_size": 100,
+                "standard_error": 0.22,
+                "interval": null,
+                "method_ref": "s3.z.a1.unc"
+              },
+              "distribution": null
+            },
+            "sample_size": null,
+            "units": null,
+            "method_ref": "s3.z.a1"
+          },
+          {
+            "kind": "KLDivergence",
+            "value": 0.7,
+            "direction": "Agreement",
+            "uncertainty": {
+              "point": {
+                "sample_size": 95,
+                "standard_error": 0.24,
+                "interval": null,
+                "method_ref": "s3.kl.a1.unc"
+              },
+              "distribution": null
+            },
+            "sample_size": null,
+            "units": null,
+            "method_ref": "s3.kl.a1"
+          },
+          {
+            "kind": "AbsoluteDifference",
+            "value": 0.001,
+            "direction": "Agreement",
+            "uncertainty": {
+              "point": {
+                "sample_size": 110,
+                "standard_error": 0.26,
+                "interval": null,
+                "method_ref": "s3.abs.a1.unc"
+              },
+              "distribution": null
+            },
+            "sample_size": null,
+            "units": "eV",
+            "method_ref": "s3.abs.a1"
+          }
+        ]
+      }
+    },
+    {
+      "idx": 4,
+      "name": "Missing data",
+      "what_it_tests": "Partial uncertainty payloads and NoUncertainty variants.",
+      "pass_criterion": "finite score and within 20% of full-uncertainty baseline",
+      "datasets": {
+        "missing": [
+          {
+            "kind": "ZScore",
+            "value": 1.1,
+            "direction": "Contradiction",
+            "uncertainty": {
+              "point": {
+                "reason": "simulator omitted SE"
+              },
+              "distribution": null
+            },
+            "sample_size": 90,
+            "units": null,
+            "method_ref": "s4.z.1"
+          },
+          {
+            "kind": "EffectSize",
+            "value": 0.8,
+            "direction": "Contradiction",
+            "uncertainty": {
+              "point": {
+                "sample_size": 85,
+                "standard_error": null,
+                "interval": null,
+                "method_ref": "s4.d.1.unc"
+              },
+              "distribution": null
+            },
+            "sample_size": null,
+            "units": null,
+            "method_ref": "s4.d.1"
+          },
+          {
+            "kind": "KLDivergence",
+            "value": 0.4,
+            "direction": "Contradiction",
+            "uncertainty": null,
+            "sample_size": 92,
+            "units": null,
+            "method_ref": "s4.kl.1"
+          },
+          {
+            "kind": "AbsoluteDifference",
+            "value": 0.0008,
+            "direction": "Contradiction",
+            "uncertainty": {
+              "point": {
+                "sample_size": 80,
+                "standard_error": 0.24,
+                "interval": null,
+                "method_ref": "s4.abs.1.unc"
+              },
+              "distribution": null
+            },
+            "sample_size": null,
+            "units": "eV",
+            "method_ref": "s4.abs.1"
+          }
+        ],
+        "baseline_full": [
+          {
+            "kind": "ZScore",
+            "value": 1.1,
+            "direction": "Contradiction",
+            "uncertainty": {
+              "point": {
+                "sample_size": 90,
+                "standard_error": 0.2,
+                "interval": null,
+                "method_ref": "s4.z.1.unc"
+              },
+              "distribution": null
+            },
+            "sample_size": null,
+            "units": null,
+            "method_ref": "s4.z.1"
+          },
+          {
+            "kind": "EffectSize",
+            "value": 0.8,
+            "direction": "Contradiction",
+            "uncertainty": {
+              "point": {
+                "sample_size": 85,
+                "standard_error": 0.21,
+                "interval": null,
+                "method_ref": "s4.d.1.unc"
+              },
+              "distribution": null
+            },
+            "sample_size": null,
+            "units": null,
+            "method_ref": "s4.d.1"
+          },
+          {
+            "kind": "KLDivergence",
+            "value": 0.4,
+            "direction": "Contradiction",
+            "uncertainty": {
+              "point": {
+                "sample_size": 92,
+                "standard_error": 0.18,
+                "interval": null,
+                "method_ref": "s4.kl.1.unc"
+              },
+              "distribution": null
+            },
+            "sample_size": null,
+            "units": null,
+            "method_ref": "s4.kl.1"
+          },
+          {
+            "kind": "AbsoluteDifference",
+            "value": 0.0008,
+            "direction": "Contradiction",
+            "uncertainty": {
+              "point": {
+                "sample_size": 80,
+                "standard_error": 0.24,
+                "interval": null,
+                "method_ref": "s4.abs.1.unc"
+              },
+              "distribution": null
+            },
+            "sample_size": null,
+            "units": null,
+            "method_ref": "s4.abs.1"
+          }
+        ]
+      }
+    },
+    {
+      "idx": 5,
+      "name": "Scale heterogeneity",
+      "what_it_tests": "Z=2.0, BF=100, AbsDiff=0.001eV normalization behavior.",
+      "pass_criterion": "all normalized scores in [0.3, 0.99] (with tolerance) and stable ranking",
+      "datasets": {
+        "heterogeneous": [
+          {
+            "kind": "ZScore",
+            "value": 2.0,
+            "direction": "Contradiction",
+            "uncertainty": {
+              "point": {
+                "sample_size": 120,
+                "standard_error": 0.2,
+                "interval": null,
+                "method_ref": "s5.z.1.unc"
+              },
+              "distribution": null
+            },
+            "sample_size": null,
+            "units": null,
+            "method_ref": "s5.z.1"
+          },
+          {
+            "kind": "BayesFactor",
+            "value": 100.0,
+            "direction": "Contradiction",
+            "uncertainty": {
+              "point": {
+                "sample_size": 120,
+                "standard_error": 0.2,
+                "interval": null,
+                "method_ref": "s5.bf.1.unc"
+              },
+              "distribution": null
+            },
+            "sample_size": null,
+            "units": null,
+            "method_ref": "s5.bf.1"
+          },
+          {
+            "kind": "AbsoluteDifference",
+            "value": 0.001,
+            "direction": "Contradiction",
+            "uncertainty": {
+              "point": {
+                "sample_size": 120,
+                "standard_error": 0.2,
+                "interval": null,
+                "method_ref": "s5.abs.1.unc"
+              },
+              "distribution": null
+            },
+            "sample_size": null,
+            "units": "eV",
+            "method_ref": "s5.abs.1"
+          }
+        ]
+      }
+    },
+    {
+      "idx": 6,
+      "name": "Calibration decomposability",
+      "what_it_tests": "Per-component decomposition should reconstruct aggregate and expose dominant term.",
+      "pass_criterion": "sum(w_i*u_i) ~= aggregate and one component clearly dominates",
+      "datasets": {
+        "calibration": [
+          {
+            "kind": "ZScore",
+            "value": 3.0,
+            "direction": "Contradiction",
+            "uncertainty": {
+              "point": {
+                "sample_size": 220,
+                "standard_error": 0.1,
+                "interval": null,
+                "method_ref": "s6.z.strong.unc"
+              },
+              "distribution": null
+            },
+            "sample_size": null,
+            "units": null,
+            "method_ref": "s6.z.strong"
+          },
+          {
+            "kind": "EffectSize",
+            "value": 0.9,
+            "direction": "Contradiction",
+            "uncertainty": {
+              "point": {
+                "sample_size": 140,
+                "standard_error": 0.18,
+                "interval": null,
+                "method_ref": "s6.d.mid.unc"
+              },
+              "distribution": null
+            },
+            "sample_size": null,
+            "units": null,
+            "method_ref": "s6.d.mid"
+          },
+          {
+            "kind": "KLDivergence",
+            "value": 0.3,
+            "direction": "Contradiction",
+            "uncertainty": {
+              "point": {
+                "sample_size": 130,
+                "standard_error": 0.24,
+                "interval": null,
+                "method_ref": "s6.kl.weak.unc"
+              },
+              "distribution": null
+            },
+            "sample_size": null,
+            "units": null,
+            "method_ref": "s6.kl.weak"
+          },
+          {
+            "kind": "AbsoluteDifference",
+            "value": 0.0009,
+            "direction": "Contradiction",
+            "uncertainty": {
+              "point": {
+                "sample_size": 110,
+                "standard_error": 0.26,
+                "interval": null,
+                "method_ref": "s6.abs.mid.unc"
+              },
+              "distribution": null
+            },
+            "sample_size": null,
+            "units": null,
+            "method_ref": "s6.abs.mid"
+          },
+          {
+            "kind": "BayesFactor",
+            "value": 12.0,
+            "direction": "Contradiction",
+            "uncertainty": {
+              "point": {
+                "sample_size": 160,
+                "standard_error": 0.16,
+                "interval": null,
+                "method_ref": "s6.bf.strong.unc"
+              },
+              "distribution": null
+            },
+            "sample_size": null,
+            "units": null,
+            "method_ref": "s6.bf.strong"
+          },
+          {
+            "kind": "Custom",
+            "value": 0.85,
+            "direction": "Contradiction",
+            "uncertainty": {
+              "point": {
+                "sample_size": 125,
+                "standard_error": 0.25,
+                "interval": null,
+                "method_ref": "s6.custom.1.unc"
+              },
+              "distribution": null
+            },
+            "sample_size": null,
+            "units": null,
+            "method_ref": "s6.custom.1"
+          }
+        ]
+      }
+    },
+    {
+      "idx": 7,
+      "name": "Boundary-seeking",
+      "what_it_tests": "High contradiction near parameter bounds with inflated uncertainty.",
+      "pass_criterion": "boundary_case < equivalent_non_boundary_case",
+      "datasets": {
+        "boundary": [
+          {
+            "kind": "ZScore",
+            "value": 3.2,
+            "direction": "Contradiction",
+            "uncertainty": {
+              "point": {
+                "sample_size": 100,
+                "standard_error": 1.2,
+                "interval": null,
+                "method_ref": "s7.z.boundary.unc"
+              },
+              "distribution": null
+            },
+            "sample_size": null,
+            "units": null,
+            "method_ref": "s7.z.boundary"
+          },
+          {
+            "kind": "KLDivergence",
+            "value": 0.9,
+            "direction": "Contradiction",
+            "uncertainty": {
+              "point": {
+                "sample_size": 100,
+                "standard_error": 0.2,
+                "interval": null,
+                "method_ref": "s7.kl.boundary.unc"
+              },
+              "distribution": null
+            },
+            "sample_size": null,
+            "units": null,
+            "method_ref": "s7.kl.boundary"
+          },
+          {
+            "kind": "EffectSize",
+            "value": 1.0,
+            "direction": "Contradiction",
+            "uncertainty": {
+              "point": {
+                "sample_size": 100,
+                "standard_error": 0.25,
+                "interval": null,
+                "method_ref": "s7.d.boundary.unc"
+              },
+              "distribution": null
+            },
+            "sample_size": null,
+            "units": null,
+            "method_ref": "s7.d.boundary"
+          }
+        ],
+        "non_boundary": [
+          {
+            "kind": "ZScore",
+            "value": 3.2,
+            "direction": "Contradiction",
+            "uncertainty": {
+              "point": {
+                "sample_size": 100,
+                "standard_error": 0.2,
+                "interval": null,
+                "method_ref": "s7.z.boundary.unc"
+              },
+              "distribution": null
+            },
+            "sample_size": null,
+            "units": null,
+            "method_ref": "s7.z.boundary"
+          },
+          {
+            "kind": "KLDivergence",
+            "value": 0.9,
+            "direction": "Contradiction",
+            "uncertainty": {
+              "point": {
+                "sample_size": 100,
+                "standard_error": 0.2,
+                "interval": null,
+                "method_ref": "s7.kl.boundary.unc"
+              },
+              "distribution": null
+            },
+            "sample_size": null,
+            "units": null,
+            "method_ref": "s7.kl.boundary"
+          },
+          {
+            "kind": "EffectSize",
+            "value": 1.0,
+            "direction": "Contradiction",
+            "uncertainty": {
+              "point": {
+                "sample_size": 100,
+                "standard_error": 0.25,
+                "interval": null,
+                "method_ref": "s7.d.boundary.unc"
+              },
+              "distribution": null
+            },
+            "sample_size": null,
+            "units": null,
+            "method_ref": "s7.d.boundary"
+          }
+        ]
+      }
+    }
+  ],
+  "matrix": {
+    "IVW-CDF": {
+      "Noisy TV": {
+        "scenario_index": 1,
+        "scenario_name": "Noisy TV",
+        "candidate": "IVW-CDF",
+        "passed": false,
+        "raw_scores": {
+          "base": 0.6456563062257953,
+          "doubled": 0.8849332679544502
+        },
+        "score_summary": "base=0.6457, doubled=0.8849",
+        "pass_reason": "doubled <= base",
+        "bounded": true,
+        "warnings": [],
+        "skipped": [],
+        "decompositions": {
+          "base": [
+            {
+              "index": 0,
+              "method_ref": "s1.absdiff.base",
+              "kind": "AbsoluteDifference",
+              "score": 0.6456563062257954,
+              "weight": 1.0,
+              "contribution": 0.6456563062257954,
+              "diagnostics": {
+                "raw_weight": 888.8888888790124,
+                "sample_size": 80,
+                "standard_error": 0.3,
+                "weight_source": "uncertainty.point.sample_size",
+                "raw_score": 0.6456563062257954,
+                "direction_mode": "Contradiction"
+              }
+            }
+          ],
+          "doubled": [
+            {
+              "index": 0,
+              "method_ref": "s1.absdiff.doubled",
+              "kind": "AbsoluteDifference",
+              "score": 0.8849332679544502,
+              "weight": 1.0,
+              "contribution": 0.8849332679544502,
+              "diagnostics": {
+                "raw_weight": 222.22222222160497,
+                "sample_size": 80,
+                "standard_error": 0.6,
+                "weight_source": "uncertainty.point.sample_size",
+                "raw_score": 0.8849332679544502,
+                "direction_mode": "Contradiction"
+              }
+            }
+          ]
+        }
+      },
+      "Unanimous weak signal": {
+        "scenario_index": 2,
+        "scenario_name": "Unanimous weak signal",
+        "candidate": "IVW-CDF",
+        "passed": false,
+        "raw_scores": {
+          "aggregate": 0.2697576939287771,
+          "max_single": 0.5817593768418363,
+          "threshold": 0.8726390652627545
+        },
+        "score_summary": "agg=0.2698, max1=0.5818, target=0.8726",
+        "pass_reason": "aggregate >= 1.5 * max_single",
+        "bounded": true,
+        "warnings": [],
+        "skipped": [],
+        "decompositions": {
+          "aggregate": [
+            {
+              "index": 0,
+              "method_ref": "s2.z.1",
+              "kind": "ZScore",
+              "score": 0.23582284437790513,
+              "weight": 0.09469943869071112,
+              "contribution": 0.022332290993034538,
+              "diagnostics": {
+                "raw_weight": 1919.9999999692798,
+                "sample_size": 120,
+                "standard_error": 0.25,
+                "weight_source": "uncertainty.point.sample_size",
+                "raw_score": 0.23582284437790513,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 1,
+              "method_ref": "s2.d.1",
+              "kind": "EffectSize",
+              "score": 0.1974126513658474,
+              "weight": 0.13053246511362893,
+              "contribution": 0.025768760027401465,
+              "diagnostics": {
+                "raw_weight": 2646.502835488724,
+                "sample_size": 140,
+                "standard_error": 0.23,
+                "weight_source": "uncertainty.point.sample_size",
+                "raw_score": 0.1974126513658474,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 2,
+              "method_ref": "s2.kl.1",
+              "kind": "KLDivergence",
+              "score": 0.09516258196404048,
+              "weight": 0.16776402829166484,
+              "contribution": 0.01596485809292316,
+              "diagnostics": {
+                "raw_weight": 3401.3605441405593,
+                "sample_size": 150,
+                "standard_error": 0.21,
+                "weight_source": "uncertainty.point.sample_size",
+                "raw_score": 0.09516258196404048,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 3,
+              "method_ref": "s2.abs.1",
+              "kind": "AbsoluteDifference",
+              "score": 0.382252125230751,
+              "weight": 0.1972904972705392,
+              "contribution": 0.0754147118694953,
+              "diagnostics": {
+                "raw_weight": 3999.9999998999992,
+                "sample_size": 160,
+                "standard_error": 0.2,
+                "weight_source": "uncertainty.point.sample_size",
+                "raw_score": 0.382252125230751,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 4,
+              "method_ref": "s2.z.2",
+              "kind": "ZScore",
+              "score": 0.26614347207205613,
+              "weight": 0.08025870820998826,
+              "contribution": 0.021360331267024312,
+              "diagnostics": {
+                "raw_weight": 1627.218934887171,
+                "sample_size": 110,
+                "standard_error": 0.26,
+                "weight_source": "uncertainty.point.sample_size",
+                "raw_score": 0.26614347207205613,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 5,
+              "method_ref": "s2.d.2",
+              "kind": "EffectSize",
+              "score": 0.2205224951115945,
+              "weight": 0.11131842293995671,
+              "contribution": 0.02454821637860701,
+              "diagnostics": {
+                "raw_weight": 2256.9444444052615,
+                "sample_size": 130,
+                "standard_error": 0.24,
+                "weight_source": "uncertainty.point.sample_size",
+                "raw_score": 0.2205224951115945,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 6,
+              "method_ref": "s2.kl.2",
+              "kind": "KLDivergence",
+              "score": 0.11307956328284252,
+              "weight": 0.09075362874526484,
+              "contribution": 0.010262380704847772,
+              "diagnostics": {
+                "raw_weight": 1839.9999999705599,
+                "sample_size": 115,
+                "standard_error": 0.25,
+                "weight_source": "uncertainty.point.sample_size",
+                "raw_score": 0.11307956328284252,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 7,
+              "method_ref": "s2.custom.1",
+              "kind": "Custom",
+              "score": 0.5817593768418363,
+              "weight": 0.12738281073824592,
+              "contribution": 0.07410614459544353,
+              "diagnostics": {
+                "raw_weight": 2582.644628045813,
+                "sample_size": 125,
+                "standard_error": 0.22,
+                "weight_source": "uncertainty.point.sample_size",
+                "raw_score": 0.5817593768418363,
+                "direction_mode": "Contradiction"
+              }
+            }
+          ]
+        }
+      },
+      "Mixed signal": {
+        "scenario_index": 3,
+        "scenario_name": "Mixed signal",
+        "candidate": "IVW-CDF",
+        "passed": true,
+        "raw_scores": {
+          "mixed": 0.5170604622769124,
+          "all_contradiction": 0.6761340241864792,
+          "all_agreement": 0.3238659758135209
+        },
+        "score_summary": "mixed=0.5171, allC=0.6761, allA=0.3239",
+        "pass_reason": "all_agreement <= mixed <= all_contradiction",
+        "bounded": true,
+        "warnings": [],
+        "skipped": [],
+        "decompositions": {
+          "mixed": [
+            {
+              "index": 0,
+              "method_ref": "s3.z.c1",
+              "kind": "ZScore",
+              "score": 0.8663855974622838,
+              "weight": 0.19336092529695567,
+              "contribution": 0.16752512078926296,
+              "diagnostics": {
+                "raw_weight": 2066.1157024366507,
+                "sample_size": 100,
+                "standard_error": 0.22,
+                "weight_source": "uncertainty.point.sample_size",
+                "raw_score": 0.8663855974622838,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 1,
+              "method_ref": "s3.kl.c1",
+              "kind": "KLDivergence",
+              "score": 0.5506710358827784,
+              "weight": 0.15435304418721113,
+              "contribution": 0.08499775073423183,
+              "diagnostics": {
+                "raw_weight": 1649.3055555269218,
+                "sample_size": 95,
+                "standard_error": 0.24,
+                "weight_source": "uncertainty.point.sample_size",
+                "raw_score": 0.5506710358827784,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 2,
+              "method_ref": "s3.abs.c1",
+              "kind": "AbsoluteDifference",
+              "score": 0.617747874769249,
+              "weight": 0.15228603051583325,
+              "contribution": 0.09407437170820099,
+              "diagnostics": {
+                "raw_weight": 1627.218934887171,
+                "sample_size": 110,
+                "standard_error": 0.26,
+                "weight_source": "uncertainty.point.sample_size",
+                "raw_score": 0.617747874769249,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 3,
+              "method_ref": "s3.z.a1",
+              "kind": "ZScore",
+              "score": 0.16151331846754213,
+              "weight": 0.19336092529695567,
+              "contribution": 0.031230364706665827,
+              "diagnostics": {
+                "raw_weight": 2066.1157024366507,
+                "sample_size": 100,
+                "standard_error": 0.22,
+                "weight_source": "uncertainty.point.sample_size",
+                "raw_score": 0.8384866815324579,
+                "direction_mode": "Agreement"
+              }
+            },
+            {
+              "index": 4,
+              "method_ref": "s3.kl.a1",
+              "kind": "KLDivergence",
+              "score": 0.4965853037914095,
+              "weight": 0.15435304418721113,
+              "contribution": 0.07664945333883509,
+              "diagnostics": {
+                "raw_weight": 1649.3055555269218,
+                "sample_size": 95,
+                "standard_error": 0.24,
+                "weight_source": "uncertainty.point.sample_size",
+                "raw_score": 0.5034146962085905,
+                "direction_mode": "Agreement"
+              }
+            },
+            {
+              "index": 5,
+              "method_ref": "s3.abs.a1",
+              "kind": "AbsoluteDifference",
+              "score": 0.41095956594133487,
+              "weight": 0.15228603051583325,
+              "contribution": 0.06258340099971571,
+              "diagnostics": {
+                "raw_weight": 1627.218934887171,
+                "sample_size": 110,
+                "standard_error": 0.26,
+                "weight_source": "uncertainty.point.sample_size",
+                "raw_score": 0.5890404340586651,
+                "direction_mode": "Agreement"
+              }
+            }
+          ],
+          "all_contradiction": [
+            {
+              "index": 0,
+              "method_ref": "s3.z.c1",
+              "kind": "ZScore",
+              "score": 0.8663855974622838,
+              "weight": 0.19336092529695567,
+              "contribution": 0.16752512078926296,
+              "diagnostics": {
+                "raw_weight": 2066.1157024366507,
+                "sample_size": 100,
+                "standard_error": 0.22,
+                "weight_source": "uncertainty.point.sample_size",
+                "raw_score": 0.8663855974622838,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 1,
+              "method_ref": "s3.kl.c1",
+              "kind": "KLDivergence",
+              "score": 0.5506710358827784,
+              "weight": 0.15435304418721113,
+              "contribution": 0.08499775073423183,
+              "diagnostics": {
+                "raw_weight": 1649.3055555269218,
+                "sample_size": 95,
+                "standard_error": 0.24,
+                "weight_source": "uncertainty.point.sample_size",
+                "raw_score": 0.5506710358827784,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 2,
+              "method_ref": "s3.abs.c1",
+              "kind": "AbsoluteDifference",
+              "score": 0.617747874769249,
+              "weight": 0.15228603051583325,
+              "contribution": 0.09407437170820099,
+              "diagnostics": {
+                "raw_weight": 1627.218934887171,
+                "sample_size": 110,
+                "standard_error": 0.26,
+                "weight_source": "uncertainty.point.sample_size",
+                "raw_score": 0.617747874769249,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 3,
+              "method_ref": "s3.z.a1",
+              "kind": "ZScore",
+              "score": 0.8384866815324579,
+              "weight": 0.19336092529695567,
+              "contribution": 0.16213056059028985,
+              "diagnostics": {
+                "raw_weight": 2066.1157024366507,
+                "sample_size": 100,
+                "standard_error": 0.22,
+                "weight_source": "uncertainty.point.sample_size",
+                "raw_score": 0.8384866815324579,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 4,
+              "method_ref": "s3.kl.a1",
+              "kind": "KLDivergence",
+              "score": 0.5034146962085905,
+              "weight": 0.15435304418721113,
+              "contribution": 0.07770359084837604,
+              "diagnostics": {
+                "raw_weight": 1649.3055555269218,
+                "sample_size": 95,
+                "standard_error": 0.24,
+                "weight_source": "uncertainty.point.sample_size",
+                "raw_score": 0.5034146962085905,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 5,
+              "method_ref": "s3.abs.a1",
+              "kind": "AbsoluteDifference",
+              "score": 0.5890404340586651,
+              "weight": 0.15228603051583325,
+              "contribution": 0.08970262951611754,
+              "diagnostics": {
+                "raw_weight": 1627.218934887171,
+                "sample_size": 110,
+                "standard_error": 0.26,
+                "weight_source": "uncertainty.point.sample_size",
+                "raw_score": 0.5890404340586651,
+                "direction_mode": "Contradiction"
+              }
+            }
+          ],
+          "all_agreement": [
+            {
+              "index": 0,
+              "method_ref": "s3.z.c1",
+              "kind": "ZScore",
+              "score": 0.13361440253771617,
+              "weight": 0.19336092529695567,
+              "contribution": 0.0258358045076927,
+              "diagnostics": {
+                "raw_weight": 2066.1157024366507,
+                "sample_size": 100,
+                "standard_error": 0.22,
+                "weight_source": "uncertainty.point.sample_size",
+                "raw_score": 0.8663855974622838,
+                "direction_mode": "Agreement"
+              }
+            },
+            {
+              "index": 1,
+              "method_ref": "s3.kl.c1",
+              "kind": "KLDivergence",
+              "score": 0.44932896411722156,
+              "weight": 0.15435304418721113,
+              "contribution": 0.0693552934529793,
+              "diagnostics": {
+                "raw_weight": 1649.3055555269218,
+                "sample_size": 95,
+                "standard_error": 0.24,
+                "weight_source": "uncertainty.point.sample_size",
+                "raw_score": 0.5506710358827784,
+                "direction_mode": "Agreement"
+              }
+            },
+            {
+              "index": 2,
+              "method_ref": "s3.abs.c1",
+              "kind": "AbsoluteDifference",
+              "score": 0.382252125230751,
+              "weight": 0.15228603051583325,
+              "contribution": 0.058211658807632266,
+              "diagnostics": {
+                "raw_weight": 1627.218934887171,
+                "sample_size": 110,
+                "standard_error": 0.26,
+                "weight_source": "uncertainty.point.sample_size",
+                "raw_score": 0.617747874769249,
+                "direction_mode": "Agreement"
+              }
+            },
+            {
+              "index": 3,
+              "method_ref": "s3.z.a1",
+              "kind": "ZScore",
+              "score": 0.16151331846754213,
+              "weight": 0.19336092529695567,
+              "contribution": 0.031230364706665827,
+              "diagnostics": {
+                "raw_weight": 2066.1157024366507,
+                "sample_size": 100,
+                "standard_error": 0.22,
+                "weight_source": "uncertainty.point.sample_size",
+                "raw_score": 0.8384866815324579,
+                "direction_mode": "Agreement"
+              }
+            },
+            {
+              "index": 4,
+              "method_ref": "s3.kl.a1",
+              "kind": "KLDivergence",
+              "score": 0.4965853037914095,
+              "weight": 0.15435304418721113,
+              "contribution": 0.07664945333883509,
+              "diagnostics": {
+                "raw_weight": 1649.3055555269218,
+                "sample_size": 95,
+                "standard_error": 0.24,
+                "weight_source": "uncertainty.point.sample_size",
+                "raw_score": 0.5034146962085905,
+                "direction_mode": "Agreement"
+              }
+            },
+            {
+              "index": 5,
+              "method_ref": "s3.abs.a1",
+              "kind": "AbsoluteDifference",
+              "score": 0.41095956594133487,
+              "weight": 0.15228603051583325,
+              "contribution": 0.06258340099971571,
+              "diagnostics": {
+                "raw_weight": 1627.218934887171,
+                "sample_size": 110,
+                "standard_error": 0.26,
+                "weight_source": "uncertainty.point.sample_size",
+                "raw_score": 0.5890404340586651,
+                "direction_mode": "Agreement"
+              }
+            }
+          ]
+        }
+      },
+      "Missing data": {
+        "scenario_index": 4,
+        "scenario_name": "Missing data",
+        "candidate": "IVW-CDF",
+        "passed": true,
+        "raw_scores": {
+          "missing": 0.52999619864064,
+          "baseline_full": 0.526117260618077,
+          "relative_delta": 0.007372763284759124
+        },
+        "score_summary": "missing=0.5300, baseline=0.5261, delta=0.007",
+        "pass_reason": "finite and <=20% delta from baseline",
+        "bounded": true,
+        "warnings": [],
+        "skipped": [],
+        "decompositions": {
+          "missing": [
+            {
+              "index": 0,
+              "method_ref": "s4.z.1",
+              "kind": "ZScore",
+              "score": 0.7286678781072347,
+              "weight": 0.000718448152004144,
+              "contribution": 0.0005235100904509236,
+              "diagnostics": {
+                "raw_weight": 1.0,
+                "sample_size": 90,
+                "standard_error": null,
+                "weight_source": "component.sample_size",
+                "raw_score": 0.7286678781072347,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 1,
+              "method_ref": "s4.d.1",
+              "kind": "EffectSize",
+              "score": 0.5762892028332067,
+              "weight": 0.000718448152004144,
+              "contribution": 0.00041403391279545864,
+              "diagnostics": {
+                "raw_weight": 1.0,
+                "sample_size": 85,
+                "standard_error": null,
+                "weight_source": "uncertainty.point.sample_size",
+                "raw_score": 0.5762892028332067,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 2,
+              "method_ref": "s4.kl.1",
+              "kind": "KLDivergence",
+              "score": 0.3296799539643607,
+              "weight": 0.000718448152004144,
+              "contribution": 0.0002368579536785062,
+              "diagnostics": {
+                "raw_weight": 1.0,
+                "sample_size": 92,
+                "standard_error": null,
+                "weight_source": "component.sample_size",
+                "raw_score": 0.3296799539643607,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 3,
+              "method_ref": "s4.abs.1",
+              "kind": "AbsoluteDifference",
+              "score": 0.5299640517645717,
+              "weight": 0.9978446555439876,
+              "contribution": 0.5288217966837151,
+              "diagnostics": {
+                "raw_weight": 1388.8888888647764,
+                "sample_size": 80,
+                "standard_error": 0.24,
+                "weight_source": "uncertainty.point.sample_size",
+                "raw_score": 0.5299640517645717,
+                "direction_mode": "Contradiction"
+              }
+            }
+          ],
+          "baseline_full": [
+            {
+              "index": 0,
+              "method_ref": "s4.z.1",
+              "kind": "ZScore",
+              "score": 0.7286678781072347,
+              "weight": 0.26767128009536556,
+              "contribution": 0.1950434636973373,
+              "diagnostics": {
+                "raw_weight": 2249.9999999437496,
+                "sample_size": 90,
+                "standard_error": 0.2,
+                "weight_source": "uncertainty.point.sample_size",
+                "raw_score": 0.7286678781072347,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 1,
+              "method_ref": "s4.d.1",
+              "kind": "EffectSize",
+              "score": 0.5762892028332067,
+              "weight": 0.22929764482901452,
+              "contribution": 0.13214175695004454,
+              "diagnostics": {
+                "raw_weight": 1927.4376416796504,
+                "sample_size": 85,
+                "standard_error": 0.21,
+                "weight_source": "uncertainty.point.sample_size",
+                "raw_score": 0.5762892028332067,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 2,
+              "method_ref": "s4.kl.1",
+              "kind": "KLDivergence",
+              "score": 0.3296799539643607,
+              "weight": 0.33780188983030496,
+              "contribution": 0.11136651148832898,
+              "diagnostics": {
+                "raw_weight": 2839.5061727518673,
+                "sample_size": 92,
+                "standard_error": 0.18,
+                "weight_source": "uncertainty.point.sample_size",
+                "raw_score": 0.3296799539643607,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 3,
+              "method_ref": "s4.abs.1",
+              "kind": "AbsoluteDifference",
+              "score": 0.5299640517645717,
+              "weight": 0.16522918524531505,
+              "contribution": 0.08756552848236615,
+              "diagnostics": {
+                "raw_weight": 1388.8888888647764,
+                "sample_size": 80,
+                "standard_error": 0.24,
+                "weight_source": "uncertainty.point.sample_size",
+                "raw_score": 0.5299640517645717,
+                "direction_mode": "Contradiction"
+              }
+            }
+          ]
+        }
+      },
+      "Scale heterogeneity": {
+        "scenario_index": 5,
+        "scenario_name": "Scale heterogeneity",
+        "candidate": "IVW-CDF",
+        "passed": true,
+        "raw_scores": {
+          "aggregate": 0.8445463933544324,
+          "s5.z.1": 0.9544997361036416,
+          "s5.bf.1": 0.9900990099009901,
+          "s5.abs.1": 0.5890404340586651
+        },
+        "score_summary": "agg=0.8445, scores=[0.9545, 0.9901, 0.589]",
+        "pass_reason": "component scores in [0.3, 0.99] with tolerance; ranking checked post-pass",
+        "bounded": true,
+        "warnings": [],
+        "skipped": [],
+        "decompositions": {
+          "heterogeneous": [
+            {
+              "index": 0,
+              "method_ref": "s5.z.1",
+              "kind": "ZScore",
+              "score": 0.9544997361036416,
+              "weight": 0.3333333333333333,
+              "contribution": 0.31816657870121384,
+              "diagnostics": {
+                "raw_weight": 2999.9999999249994,
+                "sample_size": 120,
+                "standard_error": 0.2,
+                "weight_source": "uncertainty.point.sample_size",
+                "raw_score": 0.9544997361036416,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 1,
+              "method_ref": "s5.bf.1",
+              "kind": "BayesFactor",
+              "score": 0.9900990099009901,
+              "weight": 0.3333333333333333,
+              "contribution": 0.33003300330033003,
+              "diagnostics": {
+                "raw_weight": 2999.9999999249994,
+                "sample_size": 120,
+                "standard_error": 0.2,
+                "weight_source": "uncertainty.point.sample_size",
+                "raw_score": 0.9900990099009901,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 2,
+              "method_ref": "s5.abs.1",
+              "kind": "AbsoluteDifference",
+              "score": 0.5890404340586651,
+              "weight": 0.3333333333333333,
+              "contribution": 0.19634681135288837,
+              "diagnostics": {
+                "raw_weight": 2999.9999999249994,
+                "sample_size": 120,
+                "standard_error": 0.2,
+                "weight_source": "uncertainty.point.sample_size",
+                "raw_score": 0.5890404340586651,
+                "direction_mode": "Contradiction"
+              }
+            }
+          ]
+        }
+      },
+      "Calibration decomposability": {
+        "scenario_index": 6,
+        "scenario_name": "Calibration decomposability",
+        "candidate": "IVW-CDF",
+        "passed": true,
+        "raw_scores": {
+          "aggregate": 0.8683905880900508,
+          "reconstructed": 0.868390588090051,
+          "dominant_share": 0.6570205591339194
+        },
+        "score_summary": "agg=0.8684, recon=0.8684, dom_share=0.657",
+        "pass_reason": "sum(weight*score) reconstructs aggregate and dominant component is identifiable",
+        "bounded": true,
+        "warnings": [],
+        "skipped": [],
+        "decompositions": {
+          "calibration": [
+            {
+              "index": 0,
+              "method_ref": "s6.z.strong",
+              "kind": "ZScore",
+              "score": 0.9973002039367398,
+              "weight": 0.5720950095882554,
+              "contribution": 0.5705504697335583,
+              "diagnostics": {
+                "raw_weight": 21999.999997799994,
+                "sample_size": 220,
+                "standard_error": 0.1,
+                "weight_source": "uncertainty.point.sample_size",
+                "raw_score": 0.9973002039367398,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 1,
+              "method_ref": "s6.d.mid",
+              "kind": "EffectSize",
+              "score": 0.6318797493064809,
+              "weight": 0.11236433971365475,
+              "contribution": 0.07100075080925243,
+              "diagnostics": {
+                "raw_weight": 4320.987654187625,
+                "sample_size": 140,
+                "standard_error": 0.18,
+                "weight_source": "uncertainty.point.sample_size",
+                "raw_score": 0.6318797493064809,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 2,
+              "method_ref": "s6.kl.weak",
+              "kind": "KLDivergence",
+              "score": 0.2591817793182821,
+              "weight": 0.058690302440513945,
+              "contribution": 0.01521145701526052,
+              "diagnostics": {
+                "raw_weight": 2256.9444444052615,
+                "sample_size": 130,
+                "standard_error": 0.24,
+                "weight_source": "uncertainty.point.sample_size",
+                "raw_score": 0.2591817793182821,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 3,
+              "method_ref": "s6.abs.mid",
+              "kind": "AbsoluteDifference",
+              "score": 0.5597136492671929,
+              "weight": 0.04231471964770724,
+              "contribution": 0.023684126151736408,
+              "diagnostics": {
+                "raw_weight": 1627.218934887171,
+                "sample_size": 110,
+                "standard_error": 0.26,
+                "weight_source": "uncertainty.point.sample_size",
+                "raw_score": 0.5597136492671929,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 4,
+              "method_ref": "s6.bf.strong",
+              "kind": "BayesFactor",
+              "score": 0.9230769230769231,
+              "weight": 0.16252699137020388,
+              "contribution": 0.15002491511095745,
+              "diagnostics": {
+                "raw_weight": 6249.99999975586,
+                "sample_size": 160,
+                "standard_error": 0.16,
+                "weight_source": "uncertainty.point.sample_size",
+                "raw_score": 0.9230769230769231,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 5,
+              "method_ref": "s6.custom.1",
+              "kind": "Custom",
+              "score": 0.7290879223493065,
+              "weight": 0.05200863723966468,
+              "contribution": 0.03791886926928589,
+              "diagnostics": {
+                "raw_weight": 1999.9999999679999,
+                "sample_size": 125,
+                "standard_error": 0.25,
+                "weight_source": "uncertainty.point.sample_size",
+                "raw_score": 0.7290879223493065,
+                "direction_mode": "Contradiction"
+              }
+            }
+          ]
+        }
+      },
+      "Boundary-seeking": {
+        "scenario_index": 7,
+        "scenario_name": "Boundary-seeking",
+        "candidate": "IVW-CDF",
+        "passed": true,
+        "raw_scores": {
+          "boundary": 0.6344317766875402,
+          "non_boundary": 0.7685520224813673
+        },
+        "score_summary": "boundary=0.6344, non_boundary=0.7686",
+        "pass_reason": "boundary < non_boundary for same values with lower uncertainty comparator",
+        "bounded": true,
+        "warnings": [],
+        "skipped": [],
+        "decompositions": {
+          "boundary": [
+            {
+              "index": 0,
+              "method_ref": "s7.z.boundary",
+              "kind": "ZScore",
+              "score": 0.9986257241241683,
+              "weight": 0.01665556295836854,
+              "contribution": 0.016632673619996458,
+              "diagnostics": {
+                "raw_weight": 69.44444444439621,
+                "sample_size": 100,
+                "standard_error": 1.2,
+                "weight_source": "uncertainty.point.sample_size",
+                "raw_score": 0.9986257241241683,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 1,
+              "method_ref": "s7.kl.boundary",
+              "kind": "KLDivergence",
+              "score": 0.5934303402594009,
+              "weight": 0.5996002664866938,
+              "contribution": 0.3558209901608262,
+              "diagnostics": {
+                "raw_weight": 2499.9999999374995,
+                "sample_size": 100,
+                "standard_error": 0.2,
+                "weight_source": "uncertainty.point.sample_size",
+                "raw_score": 0.5934303402594009,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 2,
+              "method_ref": "s7.d.boundary",
+              "kind": "EffectSize",
+              "score": 0.6826894921370859,
+              "weight": 0.38374417055493776,
+              "contribution": 0.2619781129067177,
+              "diagnostics": {
+                "raw_weight": 1599.9999999743998,
+                "sample_size": 100,
+                "standard_error": 0.25,
+                "weight_source": "uncertainty.point.sample_size",
+                "raw_score": 0.6826894921370859,
+                "direction_mode": "Contradiction"
+              }
+            }
+          ],
+          "non_boundary": [
+            {
+              "index": 0,
+              "method_ref": "s7.z.boundary",
+              "kind": "ZScore",
+              "score": 0.9986257241241683,
+              "weight": 0.37878787878705233,
+              "contribution": 0.37826731974317784,
+              "diagnostics": {
+                "raw_weight": 2499.9999999374995,
+                "sample_size": 100,
+                "standard_error": 0.2,
+                "weight_source": "uncertainty.point.sample_size",
+                "raw_score": 0.9986257241241683,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 1,
+              "method_ref": "s7.kl.boundary",
+              "kind": "KLDivergence",
+              "score": 0.5934303402594009,
+              "weight": 0.37878787878705233,
+              "contribution": 0.22478421979473717,
+              "diagnostics": {
+                "raw_weight": 2499.9999999374995,
+                "sample_size": 100,
+                "standard_error": 0.2,
+                "weight_source": "uncertainty.point.sample_size",
+                "raw_score": 0.5934303402594009,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 2,
+              "method_ref": "s7.d.boundary",
+              "kind": "EffectSize",
+              "score": 0.6826894921370859,
+              "weight": 0.24242424242589533,
+              "contribution": 0.16550048294345227,
+              "diagnostics": {
+                "raw_weight": 1599.9999999743998,
+                "sample_size": 100,
+                "standard_error": 0.25,
+                "weight_source": "uncertainty.point.sample_size",
+                "raw_score": 0.6826894921370859,
+                "direction_mode": "Contradiction"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "HTG-Max": {
+      "Noisy TV": {
+        "scenario_index": 1,
+        "scenario_name": "Noisy TV",
+        "candidate": "HTG-Max",
+        "passed": true,
+        "raw_scores": {
+          "base": 0.11650358113896905,
+          "doubled": 0.02381889131247231
+        },
+        "score_summary": "base=0.1165, doubled=0.0238",
+        "pass_reason": "doubled <= base",
+        "bounded": true,
+        "warnings": [],
+        "skipped": [],
+        "decompositions": {
+          "base": [
+            {
+              "index": 0,
+              "method_ref": "s1.absdiff.base",
+              "kind": "AbsoluteDifference",
+              "score": 0.6456563062257954,
+              "weight": 0.18044210211465983,
+              "contribution": 0.11650358113896905,
+              "diagnostics": {
+                "confidence": 0.18044210211465983,
+                "gated_score": 0.11650358113896905,
+                "precision": 6.791096610976364,
+                "winner_gate": 1.0,
+                "raw_score": 0.6456563062257954,
+                "direction_mode": "Contradiction",
+                "mode": "hard_max"
+              }
+            }
+          ],
+          "doubled": [
+            {
+              "index": 0,
+              "method_ref": "s1.absdiff.doubled",
+              "kind": "AbsoluteDifference",
+              "score": 0.8849332679544502,
+              "weight": 0.026916031044386425,
+              "contribution": 0.02381889131247231,
+              "diagnostics": {
+                "confidence": 0.026916031044386425,
+                "gated_score": 0.02381889131247231,
+                "precision": 5.40816778747595,
+                "winner_gate": 1.0,
+                "raw_score": 0.8849332679544502,
+                "direction_mode": "Contradiction",
+                "mode": "hard_max"
+              }
+            }
+          ]
+        }
+      },
+      "Unanimous weak signal": {
+        "scenario_index": 2,
+        "scenario_name": "Unanimous weak signal",
+        "candidate": "HTG-Max",
+        "passed": false,
+        "raw_scores": {
+          "aggregate": 0.303297715139847,
+          "max_single": 0.303297715139847,
+          "threshold": 0.45494657270977046
+        },
+        "score_summary": "agg=0.3033, max1=0.3033, target=0.4549",
+        "pass_reason": "aggregate >= 1.5 * max_single",
+        "bounded": true,
+        "warnings": [],
+        "skipped": [],
+        "decompositions": {
+          "aggregate": [
+            {
+              "index": 0,
+              "method_ref": "s2.z.1",
+              "kind": "ZScore",
+              "score": 0.23582284437790513,
+              "weight": 0.0,
+              "contribution": 0.0,
+              "diagnostics": {
+                "confidence": 0.4111778702799699,
+                "gated_score": 0.0969651349146718,
+                "precision": 7.560601162752564,
+                "winner_gate": 0.0,
+                "raw_score": 0.23582284437790513,
+                "direction_mode": "Contradiction",
+                "mode": "hard_max"
+              }
+            },
+            {
+              "index": 1,
+              "method_ref": "s2.d.1",
+              "kind": "EffectSize",
+              "score": 0.1974126513658474,
+              "weight": 0.0,
+              "contribution": 0.0,
+              "diagnostics": {
+                "confidence": 0.5304767276821589,
+                "gated_score": 0.10472281729961361,
+                "precision": 7.881372148481116,
+                "winner_gate": 0.0,
+                "raw_score": 0.1974126513658474,
+                "direction_mode": "Contradiction",
+                "mode": "hard_max"
+              }
+            },
+            {
+              "index": 2,
+              "method_ref": "s2.kl.1",
+              "kind": "KLDivergence",
+              "score": 0.09516258196404048,
+              "weight": 0.0,
+              "contribution": 0.0,
+              "diagnostics": {
+                "confidence": 0.6220684689819068,
+                "gated_score": 0.059197641666735884,
+                "precision": 8.132224747393392,
+                "winner_gate": 0.0,
+                "raw_score": 0.09516258196404048,
+                "direction_mode": "Contradiction",
+                "mode": "hard_max"
+              }
+            },
+            {
+              "index": 3,
+              "method_ref": "s2.abs.1",
+              "kind": "AbsoluteDifference",
+              "score": 0.382252125230751,
+              "weight": 0.0,
+              "contribution": 0.0,
+              "diagnostics": {
+                "confidence": 0.6773127216648894,
+                "gated_score": 0.2589042273022281,
+                "precision": 8.29429960883224,
+                "winner_gate": 0.0,
+                "raw_score": 0.382252125230751,
+                "direction_mode": "Contradiction",
+                "mode": "hard_max"
+              }
+            },
+            {
+              "index": 4,
+              "method_ref": "s2.z.2",
+              "kind": "ZScore",
+              "score": 0.26614347207205613,
+              "weight": 0.0,
+              "contribution": 0.0,
+              "diagnostics": {
+                "confidence": 0.3527125695185738,
+                "gated_score": 0.09387214789512971,
+                "precision": 7.395242018409667,
+                "winner_gate": 0.0,
+                "raw_score": 0.26614347207205613,
+                "direction_mode": "Contradiction",
+                "mode": "hard_max"
+              }
+            },
+            {
+              "index": 5,
+              "method_ref": "s2.d.2",
+              "kind": "EffectSize",
+              "score": 0.2205224951115945,
+              "weight": 0.0,
+              "contribution": 0.0,
+              "diagnostics": {
+                "confidence": 0.47086185567086464,
+                "gated_score": 0.10383563126541456,
+                "precision": 7.7222101405120025,
+                "winner_gate": 0.0,
+                "raw_score": 0.2205224951115945,
+                "direction_mode": "Contradiction",
+                "mode": "hard_max"
+              }
+            },
+            {
+              "index": 6,
+              "method_ref": "s2.kl.2",
+              "kind": "KLDivergence",
+              "score": 0.11307956328284252,
+              "weight": 0.0,
+              "contribution": 0.0,
+              "diagnostics": {
+                "confidence": 0.3958221227013417,
+                "gated_score": 0.044759392772755424,
+                "precision": 7.5180641812170865,
+                "winner_gate": 0.0,
+                "raw_score": 0.11307956328284252,
+                "direction_mode": "Contradiction",
+                "mode": "hard_max"
+              }
+            },
+            {
+              "index": 7,
+              "method_ref": "s2.custom.1",
+              "kind": "Custom",
+              "score": 0.5817593768418363,
+              "weight": 0.5213456408495586,
+              "contribution": 0.303297715139847,
+              "diagnostics": {
+                "confidence": 0.5213456408495586,
+                "gated_score": 0.303297715139847,
+                "precision": 7.856956327598623,
+                "winner_gate": 1.0,
+                "raw_score": 0.5817593768418363,
+                "direction_mode": "Contradiction",
+                "mode": "hard_max"
+              }
+            }
+          ]
+        }
+      },
+      "Mixed signal": {
+        "scenario_index": 3,
+        "scenario_name": "Mixed signal",
+        "candidate": "HTG-Max",
+        "passed": true,
+        "raw_scores": {
+          "mixed": 0.37950829341692455,
+          "all_contradiction": 0.37950829341692455,
+          "all_agreement": 0.17744998699480144
+        },
+        "score_summary": "mixed=0.3795, allC=0.3795, allA=0.1774",
+        "pass_reason": "all_agreement <= mixed <= all_contradiction",
+        "bounded": true,
+        "warnings": [],
+        "skipped": [],
+        "decompositions": {
+          "mixed": [
+            {
+              "index": 0,
+              "method_ref": "s3.z.c1",
+              "kind": "ZScore",
+              "score": 0.8663855974622838,
+              "weight": 0.43803624451807166,
+              "contribution": 0.37950829341692455,
+              "diagnostics": {
+                "confidence": 0.43803624451807166,
+                "gated_score": 0.37950829341692455,
+                "precision": 7.633909534136771,
+                "winner_gate": 1.0,
+                "raw_score": 0.8663855974622838,
+                "direction_mode": "Contradiction",
+                "mode": "hard_max"
+              }
+            },
+            {
+              "index": 1,
+              "method_ref": "s3.kl.c1",
+              "kind": "KLDivergence",
+              "score": 0.5506710358827784,
+              "weight": 0.0,
+              "contribution": 0.0,
+              "diagnostics": {
+                "confidence": 0.3573403917513822,
+                "gated_score": 0.1967770036884915,
+                "precision": 7.408715734917801,
+                "winner_gate": 0.0,
+                "raw_score": 0.5506710358827784,
+                "direction_mode": "Contradiction",
+                "mode": "hard_max"
+              }
+            },
+            {
+              "index": 2,
+              "method_ref": "s3.abs.c1",
+              "kind": "AbsoluteDifference",
+              "score": 0.617747874769249,
+              "weight": 0.0,
+              "contribution": 0.0,
+              "diagnostics": {
+                "confidence": 0.3527125695185738,
+                "gated_score": 0.21788744022449996,
+                "precision": 7.395242018409667,
+                "winner_gate": 0.0,
+                "raw_score": 0.617747874769249,
+                "direction_mode": "Contradiction",
+                "mode": "hard_max"
+              }
+            },
+            {
+              "index": 3,
+              "method_ref": "s3.z.a1",
+              "kind": "ZScore",
+              "score": 0.16151331846754213,
+              "weight": 0.0,
+              "contribution": 0.0,
+              "diagnostics": {
+                "confidence": 0.43803624451807166,
+                "gated_score": 0.07074868746117347,
+                "precision": 7.633909534136771,
+                "winner_gate": 0.0,
+                "raw_score": 0.8384866815324579,
+                "direction_mode": "Agreement",
+                "mode": "hard_max"
+              }
+            },
+            {
+              "index": 4,
+              "method_ref": "s3.kl.a1",
+              "kind": "KLDivergence",
+              "score": 0.4965853037914095,
+              "weight": 0.0,
+              "contribution": 0.0,
+              "diagnostics": {
+                "confidence": 0.3573403917513822,
+                "gated_score": 0.17744998699480144,
+                "precision": 7.408715734917801,
+                "winner_gate": 0.0,
+                "raw_score": 0.5034146962085905,
+                "direction_mode": "Agreement",
+                "mode": "hard_max"
+              }
+            },
+            {
+              "index": 5,
+              "method_ref": "s3.abs.a1",
+              "kind": "AbsoluteDifference",
+              "score": 0.41095956594133487,
+              "weight": 0.0,
+              "contribution": 0.0,
+              "diagnostics": {
+                "confidence": 0.3527125695185738,
+                "gated_score": 0.144950604471406,
+                "precision": 7.395242018409667,
+                "winner_gate": 0.0,
+                "raw_score": 0.5890404340586651,
+                "direction_mode": "Agreement",
+                "mode": "hard_max"
+              }
+            }
+          ],
+          "all_contradiction": [
+            {
+              "index": 0,
+              "method_ref": "s3.z.c1",
+              "kind": "ZScore",
+              "score": 0.8663855974622838,
+              "weight": 0.43803624451807166,
+              "contribution": 0.37950829341692455,
+              "diagnostics": {
+                "confidence": 0.43803624451807166,
+                "gated_score": 0.37950829341692455,
+                "precision": 7.633909534136771,
+                "winner_gate": 1.0,
+                "raw_score": 0.8663855974622838,
+                "direction_mode": "Contradiction",
+                "mode": "hard_max"
+              }
+            },
+            {
+              "index": 1,
+              "method_ref": "s3.kl.c1",
+              "kind": "KLDivergence",
+              "score": 0.5506710358827784,
+              "weight": 0.0,
+              "contribution": 0.0,
+              "diagnostics": {
+                "confidence": 0.3573403917513822,
+                "gated_score": 0.1967770036884915,
+                "precision": 7.408715734917801,
+                "winner_gate": 0.0,
+                "raw_score": 0.5506710358827784,
+                "direction_mode": "Contradiction",
+                "mode": "hard_max"
+              }
+            },
+            {
+              "index": 2,
+              "method_ref": "s3.abs.c1",
+              "kind": "AbsoluteDifference",
+              "score": 0.617747874769249,
+              "weight": 0.0,
+              "contribution": 0.0,
+              "diagnostics": {
+                "confidence": 0.3527125695185738,
+                "gated_score": 0.21788744022449996,
+                "precision": 7.395242018409667,
+                "winner_gate": 0.0,
+                "raw_score": 0.617747874769249,
+                "direction_mode": "Contradiction",
+                "mode": "hard_max"
+              }
+            },
+            {
+              "index": 3,
+              "method_ref": "s3.z.a1",
+              "kind": "ZScore",
+              "score": 0.8384866815324579,
+              "weight": 0.0,
+              "contribution": 0.0,
+              "diagnostics": {
+                "confidence": 0.43803624451807166,
+                "gated_score": 0.3672875570568982,
+                "precision": 7.633909534136771,
+                "winner_gate": 0.0,
+                "raw_score": 0.8384866815324579,
+                "direction_mode": "Contradiction",
+                "mode": "hard_max"
+              }
+            },
+            {
+              "index": 4,
+              "method_ref": "s3.kl.a1",
+              "kind": "KLDivergence",
+              "score": 0.5034146962085905,
+              "weight": 0.0,
+              "contribution": 0.0,
+              "diagnostics": {
+                "confidence": 0.3573403917513822,
+                "gated_score": 0.17989040475658077,
+                "precision": 7.408715734917801,
+                "winner_gate": 0.0,
+                "raw_score": 0.5034146962085905,
+                "direction_mode": "Contradiction",
+                "mode": "hard_max"
+              }
+            },
+            {
+              "index": 5,
+              "method_ref": "s3.abs.a1",
+              "kind": "AbsoluteDifference",
+              "score": 0.5890404340586651,
+              "weight": 0.0,
+              "contribution": 0.0,
+              "diagnostics": {
+                "confidence": 0.3527125695185738,
+                "gated_score": 0.20776196504716782,
+                "precision": 7.395242018409667,
+                "winner_gate": 0.0,
+                "raw_score": 0.5890404340586651,
+                "direction_mode": "Contradiction",
+                "mode": "hard_max"
+              }
+            }
+          ],
+          "all_agreement": [
+            {
+              "index": 0,
+              "method_ref": "s3.z.c1",
+              "kind": "ZScore",
+              "score": 0.13361440253771617,
+              "weight": 0.0,
+              "contribution": 0.0,
+              "diagnostics": {
+                "confidence": 0.43803624451807166,
+                "gated_score": 0.05852795110114709,
+                "precision": 7.633909534136771,
+                "winner_gate": 0.0,
+                "raw_score": 0.8663855974622838,
+                "direction_mode": "Agreement",
+                "mode": "hard_max"
+              }
+            },
+            {
+              "index": 1,
+              "method_ref": "s3.kl.c1",
+              "kind": "KLDivergence",
+              "score": 0.44932896411722156,
+              "weight": 0.0,
+              "contribution": 0.0,
+              "diagnostics": {
+                "confidence": 0.3573403917513822,
+                "gated_score": 0.16056338806289072,
+                "precision": 7.408715734917801,
+                "winner_gate": 0.0,
+                "raw_score": 0.5506710358827784,
+                "direction_mode": "Agreement",
+                "mode": "hard_max"
+              }
+            },
+            {
+              "index": 2,
+              "method_ref": "s3.abs.c1",
+              "kind": "AbsoluteDifference",
+              "score": 0.382252125230751,
+              "weight": 0.0,
+              "contribution": 0.0,
+              "diagnostics": {
+                "confidence": 0.3527125695185738,
+                "gated_score": 0.13482512929407386,
+                "precision": 7.395242018409667,
+                "winner_gate": 0.0,
+                "raw_score": 0.617747874769249,
+                "direction_mode": "Agreement",
+                "mode": "hard_max"
+              }
+            },
+            {
+              "index": 3,
+              "method_ref": "s3.z.a1",
+              "kind": "ZScore",
+              "score": 0.16151331846754213,
+              "weight": 0.0,
+              "contribution": 0.0,
+              "diagnostics": {
+                "confidence": 0.43803624451807166,
+                "gated_score": 0.07074868746117347,
+                "precision": 7.633909534136771,
+                "winner_gate": 0.0,
+                "raw_score": 0.8384866815324579,
+                "direction_mode": "Agreement",
+                "mode": "hard_max"
+              }
+            },
+            {
+              "index": 4,
+              "method_ref": "s3.kl.a1",
+              "kind": "KLDivergence",
+              "score": 0.4965853037914095,
+              "weight": 0.3573403917513822,
+              "contribution": 0.17744998699480144,
+              "diagnostics": {
+                "confidence": 0.3573403917513822,
+                "gated_score": 0.17744998699480144,
+                "precision": 7.408715734917801,
+                "winner_gate": 1.0,
+                "raw_score": 0.5034146962085905,
+                "direction_mode": "Agreement",
+                "mode": "hard_max"
+              }
+            },
+            {
+              "index": 5,
+              "method_ref": "s3.abs.a1",
+              "kind": "AbsoluteDifference",
+              "score": 0.41095956594133487,
+              "weight": 0.0,
+              "contribution": 0.0,
+              "diagnostics": {
+                "confidence": 0.3527125695185738,
+                "gated_score": 0.144950604471406,
+                "precision": 7.395242018409667,
+                "winner_gate": 0.0,
+                "raw_score": 0.5890404340586651,
+                "direction_mode": "Agreement",
+                "mode": "hard_max"
+              }
+            }
+          ]
+        }
+      },
+      "Missing data": {
+        "scenario_index": 4,
+        "scenario_name": "Missing data",
+        "candidate": "HTG-Max",
+        "passed": false,
+        "raw_scores": {
+          "missing": 0.15929727530976898,
+          "baseline_full": 0.34226318888641766,
+          "relative_delta": 0.5345766635668411
+        },
+        "score_summary": "missing=0.1593, baseline=0.3423, delta=0.535",
+        "pass_reason": "finite and <=20% delta from baseline",
+        "bounded": true,
+        "warnings": [],
+        "skipped": [],
+        "decompositions": {
+          "missing": [
+            {
+              "index": 0,
+              "method_ref": "s4.z.1",
+              "kind": "ZScore",
+              "score": 0.7286678781072347,
+              "weight": 0.0,
+              "contribution": 0.0,
+              "diagnostics": {
+                "confidence": 0.15,
+                "gated_score": 0.1093001817160852,
+                "precision": null,
+                "winner_gate": 0.0,
+                "raw_score": 0.7286678781072347,
+                "direction_mode": "Contradiction",
+                "mode": "hard_max"
+              }
+            },
+            {
+              "index": 1,
+              "method_ref": "s4.d.1",
+              "kind": "EffectSize",
+              "score": 0.5762892028332067,
+              "weight": 0.0,
+              "contribution": 0.0,
+              "diagnostics": {
+                "confidence": 0.15,
+                "gated_score": 0.08644338042498101,
+                "precision": null,
+                "winner_gate": 0.0,
+                "raw_score": 0.5762892028332067,
+                "direction_mode": "Contradiction",
+                "mode": "hard_max"
+              }
+            },
+            {
+              "index": 2,
+              "method_ref": "s4.kl.1",
+              "kind": "KLDivergence",
+              "score": 0.3296799539643607,
+              "weight": 0.0,
+              "contribution": 0.0,
+              "diagnostics": {
+                "confidence": 0.15,
+                "gated_score": 0.0494519930946541,
+                "precision": null,
+                "winner_gate": 0.0,
+                "raw_score": 0.3296799539643607,
+                "direction_mode": "Contradiction",
+                "mode": "hard_max"
+              }
+            },
+            {
+              "index": 3,
+              "method_ref": "s4.abs.1",
+              "kind": "AbsoluteDifference",
+              "score": 0.5299640517645717,
+              "weight": 0.30058128429536257,
+              "contribution": 0.15929727530976898,
+              "diagnostics": {
+                "confidence": 0.30058128429536257,
+                "gated_score": 0.15929727530976898,
+                "precision": 7.236979086861173,
+                "winner_gate": 1.0,
+                "raw_score": 0.5299640517645717,
+                "direction_mode": "Contradiction",
+                "mode": "hard_max"
+              }
+            }
+          ],
+          "baseline_full": [
+            {
+              "index": 0,
+              "method_ref": "s4.z.1",
+              "kind": "ZScore",
+              "score": 0.7286678781072347,
+              "weight": 0.4697108232291919,
+              "contribution": 0.34226318888641766,
+              "diagnostics": {
+                "confidence": 0.4697108232291919,
+                "gated_score": 0.34226318888641766,
+                "precision": 7.7191298408817435,
+                "winner_gate": 1.0,
+                "raw_score": 0.7286678781072347,
+                "direction_mode": "Contradiction",
+                "mode": "hard_max"
+              }
+            },
+            {
+              "index": 1,
+              "method_ref": "s4.d.1",
+              "kind": "EffectSize",
+              "score": 0.5762892028332067,
+              "weight": 0.0,
+              "contribution": 0.0,
+              "diagnostics": {
+                "confidence": 0.412581963861255,
+                "gated_score": 0.23776653105696155,
+                "precision": 7.564465441984008,
+                "winner_gate": 0.0,
+                "raw_score": 0.5762892028332067,
+                "direction_mode": "Contradiction",
+                "mode": "hard_max"
+              }
+            },
+            {
+              "index": 2,
+              "method_ref": "s4.kl.1",
+              "kind": "KLDivergence",
+              "score": 0.3296799539643607,
+              "weight": 0.0,
+              "contribution": 0.0,
+              "diagnostics": {
+                "confidence": 0.5566571982151446,
+                "gated_score": 0.18351871948149887,
+                "precision": 7.951737545116407,
+                "winner_gate": 0.0,
+                "raw_score": 0.3296799539643607,
+                "direction_mode": "Contradiction",
+                "mode": "hard_max"
+              }
+            },
+            {
+              "index": 3,
+              "method_ref": "s4.abs.1",
+              "kind": "AbsoluteDifference",
+              "score": 0.5299640517645717,
+              "weight": 0.0,
+              "contribution": 0.0,
+              "diagnostics": {
+                "confidence": 0.30058128429536257,
+                "gated_score": 0.15929727530976898,
+                "precision": 7.236979086861173,
+                "winner_gate": 0.0,
+                "raw_score": 0.5299640517645717,
+                "direction_mode": "Contradiction",
+                "mode": "hard_max"
+              }
+            }
+          ]
+        }
+      },
+      "Scale heterogeneity": {
+        "scenario_index": 5,
+        "scenario_name": "Scale heterogeneity",
+        "candidate": "HTG-Max",
+        "passed": true,
+        "raw_scores": {
+          "aggregate": 0.5711859158910918,
+          "s5.z.1": 0.9544997361036416,
+          "s5.bf.1": 0.9900990099009901,
+          "s5.abs.1": 0.5890404340586651
+        },
+        "score_summary": "agg=0.5712, scores=[0.9545, 0.9901, 0.589]",
+        "pass_reason": "component scores in [0.3, 0.99] with tolerance; ranking checked post-pass",
+        "bounded": true,
+        "warnings": [],
+        "skipped": [],
+        "decompositions": {
+          "heterogeneous": [
+            {
+              "index": 0,
+              "method_ref": "s5.z.1",
+              "kind": "ZScore",
+              "score": 0.9544997361036416,
+              "weight": 0.0,
+              "contribution": 0.0,
+              "diagnostics": {
+                "confidence": 0.5768977750500027,
+                "gated_score": 0.5506487740440056,
+                "precision": 8.006700845415375,
+                "winner_gate": 0.0,
+                "raw_score": 0.9544997361036416,
+                "direction_mode": "Contradiction",
+                "mode": "hard_max"
+              }
+            },
+            {
+              "index": 1,
+              "method_ref": "s5.bf.1",
+              "kind": "BayesFactor",
+              "score": 0.9900990099009901,
+              "weight": 0.5768977750500027,
+              "contribution": 0.5711859158910918,
+              "diagnostics": {
+                "confidence": 0.5768977750500027,
+                "gated_score": 0.5711859158910918,
+                "precision": 8.006700845415375,
+                "winner_gate": 1.0,
+                "raw_score": 0.9900990099009901,
+                "direction_mode": "Contradiction",
+                "mode": "hard_max"
+              }
+            },
+            {
+              "index": 2,
+              "method_ref": "s5.abs.1",
+              "kind": "AbsoluteDifference",
+              "score": 0.5890404340586651,
+              "weight": 0.0,
+              "contribution": 0.0,
+              "diagnostics": {
+                "confidence": 0.5768977750500027,
+                "gated_score": 0.33981611582293175,
+                "precision": 8.006700845415375,
+                "winner_gate": 0.0,
+                "raw_score": 0.5890404340586651,
+                "direction_mode": "Contradiction",
+                "mode": "hard_max"
+              }
+            }
+          ]
+        }
+      },
+      "Calibration decomposability": {
+        "scenario_index": 6,
+        "scenario_name": "Calibration decomposability",
+        "candidate": "HTG-Max",
+        "passed": true,
+        "raw_scores": {
+          "aggregate": 0.9617656341721981,
+          "reconstructed": 0.9617656341721981,
+          "dominant_share": 1.0
+        },
+        "score_summary": "agg=0.9618, recon=0.9618, dom_share=1.000",
+        "pass_reason": "sum(weight*score) reconstructs aggregate and dominant component is identifiable",
+        "bounded": true,
+        "warnings": [],
+        "skipped": [],
+        "decompositions": {
+          "calibration": [
+            {
+              "index": 0,
+              "method_ref": "s6.z.strong",
+              "kind": "ZScore",
+              "score": 0.9973002039367398,
+              "weight": 0.9643692344348546,
+              "contribution": 0.9617656341721981,
+              "diagnostics": {
+                "confidence": 0.9643692344348546,
+                "gated_score": 0.9617656341721981,
+                "precision": 9.998843185752886,
+                "winner_gate": 1.0,
+                "raw_score": 0.9973002039367398,
+                "direction_mode": "Contradiction",
+                "mode": "hard_max"
+              }
+            },
+            {
+              "index": 1,
+              "method_ref": "s6.d.mid",
+              "kind": "EffectSize",
+              "score": 0.6318797493064809,
+              "weight": 0.0,
+              "contribution": 0.0,
+              "diagnostics": {
+                "confidence": 0.7020765816852114,
+                "gated_score": 0.44362797442920243,
+                "precision": 8.371470680558268,
+                "winner_gate": 0.0,
+                "raw_score": 0.6318797493064809,
+                "direction_mode": "Contradiction",
+                "mode": "hard_max"
+              }
+            },
+            {
+              "index": 2,
+              "method_ref": "s6.kl.weak",
+              "kind": "KLDivergence",
+              "score": 0.2591817793182821,
+              "weight": 0.0,
+              "contribution": 0.0,
+              "diagnostics": {
+                "confidence": 0.47086185567086464,
+                "gated_score": 0.12203881356588285,
+                "precision": 7.7222101405120025,
+                "winner_gate": 0.0,
+                "raw_score": 0.2591817793182821,
+                "direction_mode": "Contradiction",
+                "mode": "hard_max"
+              }
+            },
+            {
+              "index": 3,
+              "method_ref": "s6.abs.mid",
+              "kind": "AbsoluteDifference",
+              "score": 0.5597136492671929,
+              "weight": 0.0,
+              "contribution": 0.0,
+              "diagnostics": {
+                "confidence": 0.3527125695185738,
+                "gated_score": 0.19741803942764943,
+                "precision": 7.395242018409667,
+                "winner_gate": 0.0,
+                "raw_score": 0.5597136492671929,
+                "direction_mode": "Contradiction",
+                "mode": "hard_max"
+              }
+            },
+            {
+              "index": 4,
+              "method_ref": "s6.bf.strong",
+              "kind": "BayesFactor",
+              "score": 0.9230769230769231,
+              "weight": 0.0,
+              "contribution": 0.0,
+              "diagnostics": {
+                "confidence": 0.803883438051732,
+                "gated_score": 0.7420462505092912,
+                "precision": 8.740496729892756,
+                "winner_gate": 0.0,
+                "raw_score": 0.9230769230769231,
+                "direction_mode": "Contradiction",
+                "mode": "hard_max"
+              }
+            },
+            {
+              "index": 5,
+              "method_ref": "s6.custom.1",
+              "kind": "Custom",
+              "score": 0.7290879223493065,
+              "weight": 0.0,
+              "contribution": 0.0,
+              "diagnostics": {
+                "confidence": 0.42607178204403234,
+                "gated_score": 0.3106437903421501,
+                "precision": 7.601402334567742,
+                "winner_gate": 0.0,
+                "raw_score": 0.7290879223493065,
+                "direction_mode": "Contradiction",
+                "mode": "hard_max"
+              }
+            }
+          ]
+        }
+      },
+      "Boundary-seeking": {
+        "scenario_index": 7,
+        "scenario_name": "Boundary-seeking",
+        "candidate": "HTG-Max",
+        "passed": true,
+        "raw_scores": {
+          "boundary": 0.3021546695427816,
+          "non_boundary": 0.5084664621929549
+        },
+        "score_summary": "boundary=0.3022, non_boundary=0.5085",
+        "pass_reason": "boundary < non_boundary for same values with lower uncertainty comparator",
+        "bounded": true,
+        "warnings": [],
+        "skipped": [],
+        "decompositions": {
+          "boundary": [
+            {
+              "index": 0,
+              "method_ref": "s7.z.boundary",
+              "kind": "ZScore",
+              "score": 0.9986257241241683,
+              "weight": 0.0,
+              "contribution": 0.0,
+              "diagnostics": {
+                "confidence": 0.0048797799162317015,
+                "gated_score": 0.0048730737524134565,
+                "precision": 4.254824377100322,
+                "winner_gate": 0.0,
+                "raw_score": 0.9986257241241683,
+                "direction_mode": "Contradiction",
+                "mode": "hard_max"
+              }
+            },
+            {
+              "index": 1,
+              "method_ref": "s7.kl.boundary",
+              "kind": "KLDivergence",
+              "score": 0.5934303402594009,
+              "weight": 0.5091661970143007,
+              "contribution": 0.3021546695427816,
+              "diagnostics": {
+                "confidence": 0.5091661970143007,
+                "gated_score": 0.3021546695427816,
+                "precision": 7.824445930852629,
+                "winner_gate": 1.0,
+                "raw_score": 0.5934303402594009,
+                "direction_mode": "Contradiction",
+                "mode": "hard_max"
+              }
+            },
+            {
+              "index": 2,
+              "method_ref": "s7.d.boundary",
+              "kind": "EffectSize",
+              "score": 0.6826894921370859,
+              "weight": 0.0,
+              "contribution": 0.0,
+              "diagnostics": {
+                "confidence": 0.3469610089756286,
+                "gated_score": 0.23686663500894278,
+                "precision": 7.378383712980725,
+                "winner_gate": 0.0,
+                "raw_score": 0.6826894921370859,
+                "direction_mode": "Contradiction",
+                "mode": "hard_max"
+              }
+            }
+          ],
+          "non_boundary": [
+            {
+              "index": 0,
+              "method_ref": "s7.z.boundary",
+              "kind": "ZScore",
+              "score": 0.9986257241241683,
+              "weight": 0.5091661970143007,
+              "contribution": 0.5084664621929549,
+              "diagnostics": {
+                "confidence": 0.5091661970143007,
+                "gated_score": 0.5084664621929549,
+                "precision": 7.824445930852629,
+                "winner_gate": 1.0,
+                "raw_score": 0.9986257241241683,
+                "direction_mode": "Contradiction",
+                "mode": "hard_max"
+              }
+            },
+            {
+              "index": 1,
+              "method_ref": "s7.kl.boundary",
+              "kind": "KLDivergence",
+              "score": 0.5934303402594009,
+              "weight": 0.0,
+              "contribution": 0.0,
+              "diagnostics": {
+                "confidence": 0.5091661970143007,
+                "gated_score": 0.3021546695427816,
+                "precision": 7.824445930852629,
+                "winner_gate": 0.0,
+                "raw_score": 0.5934303402594009,
+                "direction_mode": "Contradiction",
+                "mode": "hard_max"
+              }
+            },
+            {
+              "index": 2,
+              "method_ref": "s7.d.boundary",
+              "kind": "EffectSize",
+              "score": 0.6826894921370859,
+              "weight": 0.0,
+              "contribution": 0.0,
+              "diagnostics": {
+                "confidence": 0.3469610089756286,
+                "gated_score": 0.23686663500894278,
+                "precision": 7.378383712980725,
+                "winner_gate": 0.0,
+                "raw_score": 0.6826894921370859,
+                "direction_mode": "Contradiction",
+                "mode": "hard_max"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "Fisher-UP": {
+      "Noisy TV": {
+        "scenario_index": 1,
+        "scenario_name": "Noisy TV",
+        "candidate": "Fisher-UP",
+        "passed": false,
+        "raw_scores": {
+          "base": 0.5639465103125809,
+          "doubled": 0.822679142319085
+        },
+        "score_summary": "base=0.5639, doubled=0.8227",
+        "pass_reason": "doubled <= base",
+        "bounded": true,
+        "warnings": [],
+        "skipped": [],
+        "decompositions": {
+          "base": [
+            {
+              "index": 0,
+              "method_ref": "s1.absdiff.base",
+              "kind": "AbsoluteDifference",
+              "score": 0.6456563062257954,
+              "weight": 0.8734469173067452,
+              "contribution": 0.5639465103125808,
+              "diagnostics": {
+                "p_value": 0.3543436937742046,
+                "p_adj": 0.4360534896874191,
+                "log_evidence": 1.6599807207774169,
+                "reliability": 0.8,
+                "sample_size": 80,
+                "standard_error": 0.3,
+                "raw_score": 0.6456563062257954,
+                "direction_mode": "Contradiction"
+              }
+            }
+          ],
+          "doubled": [
+            {
+              "index": 0,
+              "method_ref": "s1.absdiff.doubled",
+              "kind": "AbsoluteDifference",
+              "score": 0.8849332679544502,
+              "weight": 0.9296510506614046,
+              "contribution": 0.8226791423190849,
+              "diagnostics": {
+                "p_value": 0.11506673204554985,
+                "p_adj": 0.17732085768091504,
+                "log_evidence": 3.4595888644135826,
+                "reliability": 0.8,
+                "sample_size": 80,
+                "standard_error": 0.6,
+                "raw_score": 0.8849332679544502,
+                "direction_mode": "Contradiction"
+              }
+            }
+          ]
+        }
+      },
+      "Unanimous weak signal": {
+        "scenario_index": 2,
+        "scenario_name": "Unanimous weak signal",
+        "candidate": "Fisher-UP",
+        "passed": false,
+        "raw_scores": {
+          "aggregate": 0.005584526686567615,
+          "max_single": 0.5817593768418363,
+          "threshold": 0.8726390652627545
+        },
+        "score_summary": "agg=0.0056, max1=0.5818, target=0.8726",
+        "pass_reason": "aggregate >= 1.5 * max_single",
+        "bounded": true,
+        "warnings": [],
+        "skipped": [],
+        "decompositions": {
+          "aggregate": [
+            {
+              "index": 0,
+              "method_ref": "s2.z.1",
+              "kind": "ZScore",
+              "score": 0.23582284437790513,
+              "weight": 0.0015670858425946323,
+              "contribution": 0.0003695546407850123,
+              "diagnostics": {
+                "p_value": 0.7641771556220949,
+                "p_adj": 0.7641771556220949,
+                "log_evidence": 0.5379112752178103,
+                "reliability": 1.0,
+                "sample_size": 120,
+                "standard_error": 0.25,
+                "raw_score": 0.23582284437790513,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 1,
+              "method_ref": "s2.d.1",
+              "kind": "EffectSize",
+              "score": 0.1974126513658474,
+              "weight": 0.001281345260593687,
+              "contribution": 0.0002529537652088624,
+              "diagnostics": {
+                "p_value": 0.8025873486341526,
+                "p_adj": 0.8025873486341526,
+                "log_evidence": 0.43982916850237935,
+                "reliability": 1.0,
+                "sample_size": 140,
+                "standard_error": 0.23,
+                "raw_score": 0.1974126513658474,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 2,
+              "method_ref": "s2.kl.1",
+              "kind": "KLDivergence",
+              "score": 0.09516258196404048,
+              "weight": 0.000582655882035598,
+              "contribution": 5.5447038131042906e-05,
+              "diagnostics": {
+                "p_value": 0.9048374180359595,
+                "p_adj": 0.9048374180359595,
+                "log_evidence": 0.20000000000000012,
+                "reliability": 1.0,
+                "sample_size": 150,
+                "standard_error": 0.21,
+                "raw_score": 0.09516258196404048,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 3,
+              "method_ref": "s2.abs.1",
+              "kind": "AbsoluteDifference",
+              "score": 0.382252125230751,
+              "weight": 0.002806506987954376,
+              "contribution": 0.0010727932606205142,
+              "diagnostics": {
+                "p_value": 0.617747874769249,
+                "p_adj": 0.617747874769249,
+                "log_evidence": 0.9633497487914867,
+                "reliability": 1.0,
+                "sample_size": 160,
+                "standard_error": 0.2,
+                "raw_score": 0.382252125230751,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 4,
+              "method_ref": "s2.z.2",
+              "kind": "ZScore",
+              "score": 0.26614347207205613,
+              "weight": 0.0018029804734326614,
+              "contribution": 0.00047985148327748807,
+              "diagnostics": {
+                "p_value": 0.7338565279279439,
+                "p_adj": 0.7338565279279439,
+                "log_evidence": 0.6188834710236417,
+                "reliability": 1.0,
+                "sample_size": 110,
+                "standard_error": 0.26,
+                "raw_score": 0.26614347207205613,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 5,
+              "method_ref": "s2.d.2",
+              "kind": "EffectSize",
+              "score": 0.2205224951115945,
+              "weight": 0.0014515790432674028,
+              "contribution": 0.0003201058324730289,
+              "diagnostics": {
+                "p_value": 0.7794775048884055,
+                "p_adj": 0.7794775048884055,
+                "log_evidence": 0.49826289857268363,
+                "reliability": 1.0,
+                "sample_size": 130,
+                "standard_error": 0.24,
+                "raw_score": 0.2205224951115945,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 6,
+              "method_ref": "s2.kl.2",
+              "kind": "KLDivergence",
+              "score": 0.11307956328284252,
+              "weight": 0.0006991870584427176,
+              "contribution": 7.90637672217178e-05,
+              "diagnostics": {
+                "p_value": 0.8869204367171575,
+                "p_adj": 0.8869204367171575,
+                "log_evidence": 0.24000000000000007,
+                "reliability": 1.0,
+                "sample_size": 115,
+                "standard_error": 0.25,
+                "raw_score": 0.11307956328284252,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 7,
+              "method_ref": "s2.custom.1",
+              "kind": "Custom",
+              "score": 0.5817593768418363,
+              "weight": 0.005079001759954892,
+              "contribution": 0.002954756898849948,
+              "diagnostics": {
+                "p_value": 0.4182406231581637,
+                "p_adj": 0.4182406231581637,
+                "log_evidence": 1.7433967171877232,
+                "reliability": 1.0,
+                "sample_size": 125,
+                "standard_error": 0.22,
+                "raw_score": 0.5817593768418363,
+                "direction_mode": "Contradiction"
+              }
+            }
+          ]
+        }
+      },
+      "Mixed signal": {
+        "scenario_index": 3,
+        "scenario_name": "Mixed signal",
+        "candidate": "Fisher-UP",
+        "passed": true,
+        "raw_scores": {
+          "mixed": 0.4001625920258801,
+          "all_contradiction": 0.7133542540429578,
+          "all_agreement": 0.04539771174825702
+        },
+        "score_summary": "mixed=0.4002, allC=0.7134, allA=0.0454",
+        "pass_reason": "all_agreement <= mixed <= all_contradiction",
+        "bounded": true,
+        "warnings": [],
+        "skipped": [],
+        "decompositions": {
+          "mixed": [
+            {
+              "index": 0,
+              "method_ref": "s3.z.c1",
+              "kind": "ZScore",
+              "score": 0.8663855974622838,
+              "weight": 0.24215329540315056,
+              "contribution": 0.2097981275153195,
+              "diagnostics": {
+                "p_value": 0.13361440253771617,
+                "p_adj": 0.13361440253771617,
+                "log_evidence": 4.025594440527889,
+                "reliability": 1.0,
+                "sample_size": 100,
+                "standard_error": 0.22,
+                "raw_score": 0.8663855974622838,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 1,
+              "method_ref": "s3.kl.c1",
+              "kind": "KLDivergence",
+              "score": 0.5506710358827784,
+              "weight": 0.09143320680970592,
+              "contribution": 0.050349618707985065,
+              "diagnostics": {
+                "p_value": 0.44932896411722156,
+                "p_adj": 0.46766642700990924,
+                "log_evidence": 1.52,
+                "reliability": 0.95,
+                "sample_size": 95,
+                "standard_error": 0.24,
+                "raw_score": 0.5506710358827784,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 2,
+              "method_ref": "s3.abs.c1",
+              "kind": "AbsoluteDifference",
+              "score": 0.617747874769249,
+              "weight": 0.11569607588726837,
+              "contribution": 0.07147100499850179,
+              "diagnostics": {
+                "p_value": 0.382252125230751,
+                "p_adj": 0.382252125230751,
+                "log_evidence": 1.9233497487914866,
+                "reliability": 1.0,
+                "sample_size": 110,
+                "standard_error": 0.26,
+                "raw_score": 0.617747874769249,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 3,
+              "method_ref": "s3.z.a1",
+              "kind": "ZScore",
+              "score": 0.16151331846754213,
+              "weight": 0.021192843617988257,
+              "contribution": 0.0034229265005049554,
+              "diagnostics": {
+                "p_value": 0.8384866815324579,
+                "p_adj": 0.8384866815324579,
+                "log_evidence": 0.3523131630544826,
+                "reliability": 1.0,
+                "sample_size": 100,
+                "standard_error": 0.22,
+                "raw_score": 0.8384866815324579,
+                "direction_mode": "Agreement"
+              }
+            },
+            {
+              "index": 4,
+              "method_ref": "s3.kl.a1",
+              "kind": "KLDivergence",
+              "score": 0.4965853037914095,
+              "weight": 0.07844294856470002,
+              "contribution": 0.038953615443295474,
+              "diagnostics": {
+                "p_value": 0.5034146962085905,
+                "p_adj": 0.5209902493474232,
+                "log_evidence": 1.3040479053359315,
+                "reliability": 0.95,
+                "sample_size": 95,
+                "standard_error": 0.24,
+                "raw_score": 0.5034146962085905,
+                "direction_mode": "Agreement"
+              }
+            },
+            {
+              "index": 5,
+              "method_ref": "s3.abs.a1",
+              "kind": "AbsoluteDifference",
+              "score": 0.41095956594133487,
+              "weight": 0.06367365801629447,
+              "contribution": 0.026167298860273375,
+              "diagnostics": {
+                "p_value": 0.5890404340586651,
+                "p_adj": 0.5890404340586651,
+                "log_evidence": 1.0585208980605685,
+                "reliability": 1.0,
+                "sample_size": 110,
+                "standard_error": 0.26,
+                "raw_score": 0.5890404340586651,
+                "direction_mode": "Agreement"
+              }
+            }
+          ],
+          "all_contradiction": [
+            {
+              "index": 0,
+              "method_ref": "s3.z.c1",
+              "kind": "ZScore",
+              "score": 0.8663855974622838,
+              "weight": 0.2791435624294745,
+              "contribution": 0.2418459621132106,
+              "diagnostics": {
+                "p_value": 0.13361440253771617,
+                "p_adj": 0.13361440253771617,
+                "log_evidence": 4.025594440527889,
+                "reliability": 1.0,
+                "sample_size": 100,
+                "standard_error": 0.22,
+                "raw_score": 0.8663855974622838,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 1,
+              "method_ref": "s3.kl.c1",
+              "kind": "KLDivergence",
+              "score": 0.5506710358827784,
+              "weight": 0.1054001393238117,
+              "contribution": 0.05804080390363256,
+              "diagnostics": {
+                "p_value": 0.44932896411722156,
+                "p_adj": 0.46766642700990924,
+                "log_evidence": 1.52,
+                "reliability": 0.95,
+                "sample_size": 95,
+                "standard_error": 0.24,
+                "raw_score": 0.5506710358827784,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 2,
+              "method_ref": "s3.abs.c1",
+              "kind": "AbsoluteDifference",
+              "score": 0.617747874769249,
+              "weight": 0.13336929703357955,
+              "contribution": 0.08238859980196248,
+              "diagnostics": {
+                "p_value": 0.382252125230751,
+                "p_adj": 0.382252125230751,
+                "log_evidence": 1.9233497487914866,
+                "reliability": 1.0,
+                "sample_size": 110,
+                "standard_error": 0.26,
+                "raw_score": 0.617747874769249,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 3,
+              "method_ref": "s3.z.a1",
+              "kind": "ZScore",
+              "score": 0.8384866815324579,
+              "weight": 0.2528449035323962,
+              "contribution": 0.21200708410527333,
+              "diagnostics": {
+                "p_value": 0.16151331846754213,
+                "p_adj": 0.16151331846754213,
+                "log_evidence": 3.646335344856767,
+                "reliability": 1.0,
+                "sample_size": 100,
+                "standard_error": 0.22,
+                "raw_score": 0.8384866815324579,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 4,
+              "method_ref": "s3.kl.a1",
+              "kind": "KLDivergence",
+              "score": 0.5034146962085905,
+              "weight": 0.09222512190833523,
+              "contribution": 0.0464274817282848,
+              "diagnostics": {
+                "p_value": 0.4965853037914095,
+                "p_adj": 0.514273527706632,
+                "log_evidence": 1.3299999999999998,
+                "reliability": 0.95,
+                "sample_size": 95,
+                "standard_error": 0.24,
+                "raw_score": 0.5034146962085905,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 5,
+              "method_ref": "s3.abs.a1",
+              "kind": "AbsoluteDifference",
+              "score": 0.5890404340586651,
+              "weight": 0.12332654634598333,
+              "contribution": 0.07264432239059411,
+              "diagnostics": {
+                "p_value": 0.41095956594133487,
+                "p_adj": 0.41095956594133487,
+                "log_evidence": 1.7785208980605687,
+                "reliability": 1.0,
+                "sample_size": 110,
+                "standard_error": 0.26,
+                "raw_score": 0.5890404340586651,
+                "direction_mode": "Contradiction"
+              }
+            }
+          ],
+          "all_agreement": [
+            {
+              "index": 0,
+              "method_ref": "s3.z.c1",
+              "kind": "ZScore",
+              "score": 0.13361440253771617,
+              "weight": 0.006335675254559349,
+              "contribution": 0.0008465374638109402,
+              "diagnostics": {
+                "p_value": 0.8663855974622838,
+                "p_adj": 0.8663855974622838,
+                "log_evidence": 0.2868504137223543,
+                "reliability": 1.0,
+                "sample_size": 100,
+                "standard_error": 0.22,
+                "raw_score": 0.8663855974622838,
+                "direction_mode": "Agreement"
+              }
+            },
+            {
+              "index": 1,
+              "method_ref": "s3.kl.c1",
+              "kind": "KLDivergence",
+              "score": 0.44932896411722156,
+              "weight": 0.025037280069063837,
+              "contribution": 0.011249975117745212,
+              "diagnostics": {
+                "p_value": 0.5506710358827784,
+                "p_adj": 0.5673455103023971,
+                "log_evidence": 1.1335735904590531,
+                "reliability": 0.95,
+                "sample_size": 95,
+                "standard_error": 0.24,
+                "raw_score": 0.5506710358827784,
+                "direction_mode": "Agreement"
+              }
+            },
+            {
+              "index": 2,
+              "method_ref": "s3.abs.c1",
+              "kind": "AbsoluteDifference",
+              "score": 0.382252125230751,
+              "weight": 0.021277540045006888,
+              "contribution": 0.008133384901886294,
+              "diagnostics": {
+                "p_value": 0.617747874769249,
+                "p_adj": 0.617747874769249,
+                "log_evidence": 0.9633497487914867,
+                "reliability": 1.0,
+                "sample_size": 110,
+                "standard_error": 0.26,
+                "raw_score": 0.617747874769249,
+                "direction_mode": "Agreement"
+              }
+            },
+            {
+              "index": 3,
+              "method_ref": "s3.z.a1",
+              "kind": "ZScore",
+              "score": 0.16151331846754213,
+              "weight": 0.007781553319216522,
+              "contribution": 0.0012568244994187777,
+              "diagnostics": {
+                "p_value": 0.8384866815324579,
+                "p_adj": 0.8384866815324579,
+                "log_evidence": 0.3523131630544826,
+                "reliability": 1.0,
+                "sample_size": 100,
+                "standard_error": 0.22,
+                "raw_score": 0.8384866815324579,
+                "direction_mode": "Agreement"
+              }
+            },
+            {
+              "index": 4,
+              "method_ref": "s3.kl.a1",
+              "kind": "KLDivergence",
+              "score": 0.4965853037914095,
+              "weight": 0.02880255230377223,
+              "contribution": 0.014302924185736697,
+              "diagnostics": {
+                "p_value": 0.5034146962085905,
+                "p_adj": 0.5209902493474232,
+                "log_evidence": 1.3040479053359315,
+                "reliability": 0.95,
+                "sample_size": 95,
+                "standard_error": 0.24,
+                "raw_score": 0.5034146962085905,
+                "direction_mode": "Agreement"
+              }
+            },
+            {
+              "index": 5,
+              "method_ref": "s3.abs.a1",
+              "kind": "AbsoluteDifference",
+              "score": 0.41095956594133487,
+              "weight": 0.023379588592009233,
+              "contribution": 0.0096080655796591,
+              "diagnostics": {
+                "p_value": 0.5890404340586651,
+                "p_adj": 0.5890404340586651,
+                "log_evidence": 1.0585208980605685,
+                "reliability": 1.0,
+                "sample_size": 110,
+                "standard_error": 0.26,
+                "raw_score": 0.5890404340586651,
+                "direction_mode": "Agreement"
+              }
+            }
+          ]
+        }
+      },
+      "Missing data": {
+        "scenario_index": 4,
+        "scenario_name": "Missing data",
+        "candidate": "Fisher-UP",
+        "passed": false,
+        "raw_scores": {
+          "missing": 0.06618287735710049,
+          "baseline_full": 0.3249722391109764,
+          "relative_delta": 0.7963429813630961
+        },
+        "score_summary": "missing=0.0662, baseline=0.3250, delta=0.796",
+        "pass_reason": "finite and <=20% delta from baseline",
+        "bounded": true,
+        "warnings": [],
+        "skipped": [],
+        "decompositions": {
+          "missing": [
+            {
+              "index": 0,
+              "method_ref": "s4.z.1",
+              "kind": "ZScore",
+              "score": 0.7286678781072347,
+              "weight": 0.01016907621412361,
+              "contribution": 0.007409879187256202,
+              "diagnostics": {
+                "p_value": 0.27133212189276534,
+                "p_adj": 0.8777081299458058,
+                "log_evidence": 0.26088233328527033,
+                "reliability": 0.1,
+                "sample_size": 90,
+                "standard_error": null,
+                "raw_score": 0.7286678781072347,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 1,
+              "method_ref": "s4.d.1",
+              "kind": "EffectSize",
+              "score": 0.5762892028332067,
+              "weight": 0.056902232994903934,
+              "contribution": 0.03279214249206258,
+              "diagnostics": {
+                "p_value": 0.4237107971667933,
+                "p_adj": 0.4819578977400822,
+                "log_evidence": 1.4597970356673136,
+                "reliability": 0.85,
+                "sample_size": 85,
+                "standard_error": null,
+                "raw_score": 0.5762892028332067,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 2,
+              "method_ref": "s4.kl.1",
+              "kind": "KLDivergence",
+              "score": 0.3296799539643607,
+              "weight": 0.003118364079641655,
+              "contribution": 0.0010280621262203768,
+              "diagnostics": {
+                "p_value": 0.6703200460356393,
+                "p_adj": 0.9607894391523232,
+                "log_evidence": 0.08000000000000007,
+                "reliability": 0.1,
+                "sample_size": 92,
+                "standard_error": null,
+                "raw_score": 0.3296799539643607,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 3,
+              "method_ref": "s4.abs.1",
+              "kind": "AbsoluteDifference",
+              "score": 0.5299640517645717,
+              "weight": 0.047083936105625175,
+              "contribution": 0.02495279355156133,
+              "diagnostics": {
+                "p_value": 0.47003594823542827,
+                "p_adj": 0.5466443442927771,
+                "log_evidence": 1.2079137625529817,
+                "reliability": 0.8,
+                "sample_size": 80,
+                "standard_error": 0.24,
+                "raw_score": 0.5299640517645717,
+                "direction_mode": "Contradiction"
+              }
+            }
+          ],
+          "baseline_full": [
+            {
+              "index": 0,
+              "method_ref": "s4.z.1",
+              "kind": "ZScore",
+              "score": 0.7286678781072347,
+              "weight": 0.22213427759541926,
+              "contribution": 0.1618621127103376,
+              "diagnostics": {
+                "p_value": 0.27133212189276534,
+                "p_adj": 0.3091370726046696,
+                "log_evidence": 2.3479409995674327,
+                "reliability": 0.9,
+                "sample_size": 90,
+                "standard_error": 0.2,
+                "raw_score": 0.7286678781072347,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 1,
+              "method_ref": "s4.d.1",
+              "kind": "EffectSize",
+              "score": 0.5762892028332067,
+              "weight": 0.13810864924358596,
+              "contribution": 0.07959052337695711,
+              "diagnostics": {
+                "p_value": 0.4237107971667933,
+                "p_adj": 0.4819578977400822,
+                "log_evidence": 1.4597970356673136,
+                "reliability": 0.85,
+                "sample_size": 85,
+                "standard_error": 0.21,
+                "raw_score": 0.5762892028332067,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 2,
+              "method_ref": "s4.kl.1",
+              "kind": "KLDivergence",
+              "score": 0.3296799539643607,
+              "weight": 0.06963157436253672,
+              "contribution": 0.022956134230307065,
+              "diagnostics": {
+                "p_value": 0.6703200460356393,
+                "p_adj": 0.6921171816887305,
+                "log_evidence": 0.7359999999999998,
+                "reliability": 0.92,
+                "sample_size": 92,
+                "standard_error": 0.18,
+                "raw_score": 0.3296799539643607,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 3,
+              "method_ref": "s4.abs.1",
+              "kind": "AbsoluteDifference",
+              "score": 0.5299640517645717,
+              "weight": 0.11427844698470041,
+              "contribution": 0.06056346879337463,
+              "diagnostics": {
+                "p_value": 0.47003594823542827,
+                "p_adj": 0.5466443442927771,
+                "log_evidence": 1.2079137625529817,
+                "reliability": 0.8,
+                "sample_size": 80,
+                "standard_error": 0.24,
+                "raw_score": 0.5299640517645717,
+                "direction_mode": "Contradiction"
+              }
+            }
+          ]
+        }
+      },
+      "Scale heterogeneity": {
+        "scenario_index": 5,
+        "scenario_name": "Scale heterogeneity",
+        "candidate": "Fisher-UP",
+        "passed": true,
+        "raw_scores": {
+          "aggregate": 0.991386267880196,
+          "s5.z.1": 0.9544997361036416,
+          "s5.bf.1": 0.9900990099009901,
+          "s5.abs.1": 0.5890404340586651
+        },
+        "score_summary": "agg=0.9914, scores=[0.9545, 0.9901, 0.589]",
+        "pass_reason": "component scores in [0.3, 0.99] with tolerance; ranking checked post-pass",
+        "bounded": true,
+        "warnings": [],
+        "skipped": [],
+        "decompositions": {
+          "heterogeneous": [
+            {
+              "index": 0,
+              "method_ref": "s5.z.1",
+              "kind": "ZScore",
+              "score": 0.9544997361036416,
+              "weight": 0.38089564976892915,
+              "contribution": 0.363564797187468,
+              "diagnostics": {
+                "p_value": 0.04550026389635842,
+                "p_adj": 0.04550026389635842,
+                "log_evidence": 6.180074306244173,
+                "reliability": 1.0,
+                "sample_size": 120,
+                "standard_error": 0.2,
+                "raw_score": 0.9544997361036416,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 1,
+              "method_ref": "s5.bf.1",
+              "kind": "BayesFactor",
+              "score": 0.9900990099009901,
+              "weight": 0.5688861463196504,
+              "contribution": 0.5632536102174757,
+              "diagnostics": {
+                "p_value": 0.00990099009900991,
+                "p_adj": 0.00990099009900991,
+                "log_evidence": 9.230241033682518,
+                "reliability": 1.0,
+                "sample_size": 120,
+                "standard_error": 0.2,
+                "raw_score": 0.9900990099009901,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 2,
+              "method_ref": "s5.abs.1",
+              "kind": "AbsoluteDifference",
+              "score": 0.5890404340586651,
+              "weight": 0.10961532815389333,
+              "contribution": 0.06456786047525234,
+              "diagnostics": {
+                "p_value": 0.41095956594133487,
+                "p_adj": 0.41095956594133487,
+                "log_evidence": 1.7785208980605687,
+                "reliability": 1.0,
+                "sample_size": 120,
+                "standard_error": 0.2,
+                "raw_score": 0.5890404340586651,
+                "direction_mode": "Contradiction"
+              }
+            }
+          ]
+        }
+      },
+      "Calibration decomposability": {
+        "scenario_index": 6,
+        "scenario_name": "Calibration decomposability",
+        "candidate": "Fisher-UP",
+        "passed": true,
+        "raw_scores": {
+          "aggregate": 0.978416731510555,
+          "reconstructed": 0.9784167315105549,
+          "dominant_share": 0.5678955979366419
+        },
+        "score_summary": "agg=0.9784, recon=0.9784, dom_share=0.568",
+        "pass_reason": "sum(weight*score) reconstructs aggregate and dominant component is identifiable",
+        "bounded": true,
+        "warnings": [],
+        "skipped": [],
+        "decompositions": {
+          "calibration": [
+            {
+              "index": 0,
+              "method_ref": "s6.z.strong",
+              "kind": "ZScore",
+              "score": 0.9973002039367398,
+              "weight": 0.5571427265121129,
+              "contribution": 0.5556385547724014,
+              "diagnostics": {
+                "p_value": 0.002699796063260207,
+                "p_adj": 0.002699796063260207,
+                "log_evidence": 11.829158081900795,
+                "reliability": 1.0,
+                "sample_size": 220,
+                "standard_error": 0.1,
+                "raw_score": 0.9973002039367398,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 1,
+              "method_ref": "s6.d.mid",
+              "kind": "EffectSize",
+              "score": 0.6318797493064809,
+              "weight": 0.09413656372557377,
+              "contribution": 0.05948298828748912,
+              "diagnostics": {
+                "p_value": 0.36812025069351906,
+                "p_adj": 0.36812025069351906,
+                "log_evidence": 1.9986912520027853,
+                "reliability": 1.0,
+                "sample_size": 140,
+                "standard_error": 0.18,
+                "raw_score": 0.6318797493064809,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 2,
+              "method_ref": "s6.kl.weak",
+              "kind": "KLDivergence",
+              "score": 0.2591817793182821,
+              "weight": 0.028259461374410197,
+              "contribution": 0.007324337481595901,
+              "diagnostics": {
+                "p_value": 0.7408182206817179,
+                "p_adj": 0.7408182206817179,
+                "log_evidence": 0.6,
+                "reliability": 1.0,
+                "sample_size": 130,
+                "standard_error": 0.24,
+                "raw_score": 0.2591817793182821,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 3,
+              "method_ref": "s6.abs.mid",
+              "kind": "AbsoluteDifference",
+              "score": 0.5597136492671929,
+              "weight": 0.07727361002050229,
+              "contribution": 0.04325109425662526,
+              "diagnostics": {
+                "p_value": 0.4402863507328071,
+                "p_adj": 0.4402863507328071,
+                "log_evidence": 1.6406599332528515,
+                "reliability": 1.0,
+                "sample_size": 110,
+                "standard_error": 0.26,
+                "raw_score": 0.5597136492671929,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 4,
+              "method_ref": "s6.bf.strong",
+              "kind": "BayesFactor",
+              "score": 0.9230769230769231,
+              "weight": 0.24161362431500855,
+              "contribution": 0.22302796090616175,
+              "diagnostics": {
+                "p_value": 0.07692307692307687,
+                "p_adj": 0.07692307692307687,
+                "log_evidence": 5.129898714923074,
+                "reliability": 1.0,
+                "sample_size": 160,
+                "standard_error": 0.16,
+                "raw_score": 0.9230769230769231,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 5,
+              "method_ref": "s6.custom.1",
+              "kind": "Custom",
+              "score": 0.7290879223493065,
+              "weight": 0.12301917650380449,
+              "contribution": 0.08969179580628145,
+              "diagnostics": {
+                "p_value": 0.2709120776506935,
+                "p_adj": 0.2709120776506935,
+                "log_evidence": 2.6119218949134417,
+                "reliability": 1.0,
+                "sample_size": 125,
+                "standard_error": 0.25,
+                "raw_score": 0.7290879223493065,
+                "direction_mode": "Contradiction"
+              }
+            }
+          ]
+        }
+      },
+      "Boundary-seeking": {
+        "scenario_index": 7,
+        "scenario_name": "Boundary-seeking",
+        "candidate": "Fisher-UP",
+        "passed": false,
+        "raw_scores": {
+          "boundary": 0.9916773618000806,
+          "non_boundary": 0.9916773618000806
+        },
+        "score_summary": "boundary=0.9917, non_boundary=0.9917",
+        "pass_reason": "boundary < non_boundary for same values with lower uncertainty comparator",
+        "bounded": true,
+        "warnings": [],
+        "skipped": [],
+        "decompositions": {
+          "boundary": [
+            {
+              "index": 0,
+              "method_ref": "s7.z.boundary",
+              "kind": "ZScore",
+              "score": 0.9986257241241683,
+              "weight": 0.8273700771858428,
+              "contribution": 0.8262330424483812,
+              "diagnostics": {
+                "p_value": 0.0013742758758317208,
+                "p_adj": 0.0013742758758317208,
+                "log_evidence": 13.179656644687336,
+                "reliability": 1.0,
+                "sample_size": 100,
+                "standard_error": 1.2,
+                "raw_score": 0.9986257241241683,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 1,
+              "method_ref": "s7.kl.boundary",
+              "kind": "KLDivergence",
+              "score": 0.5934303402594009,
+              "weight": 0.11299733969434127,
+              "contribution": 0.06705604974322005,
+              "diagnostics": {
+                "p_value": 0.4065696597405991,
+                "p_adj": 0.4065696597405991,
+                "log_evidence": 1.8,
+                "reliability": 1.0,
+                "sample_size": 100,
+                "standard_error": 0.2,
+                "raw_score": 0.5934303402594009,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 2,
+              "method_ref": "s7.d.boundary",
+              "kind": "EffectSize",
+              "score": 0.6826894921370859,
+              "weight": 0.14411862309537737,
+              "contribution": 0.09838826960847927,
+              "diagnostics": {
+                "p_value": 0.31731050786291415,
+                "p_adj": 0.31731050786291415,
+                "log_evidence": 2.295748928898636,
+                "reliability": 1.0,
+                "sample_size": 100,
+                "standard_error": 0.25,
+                "raw_score": 0.6826894921370859,
+                "direction_mode": "Contradiction"
+              }
+            }
+          ],
+          "non_boundary": [
+            {
+              "index": 0,
+              "method_ref": "s7.z.boundary",
+              "kind": "ZScore",
+              "score": 0.9986257241241683,
+              "weight": 0.8273700771858428,
+              "contribution": 0.8262330424483812,
+              "diagnostics": {
+                "p_value": 0.0013742758758317208,
+                "p_adj": 0.0013742758758317208,
+                "log_evidence": 13.179656644687336,
+                "reliability": 1.0,
+                "sample_size": 100,
+                "standard_error": 0.2,
+                "raw_score": 0.9986257241241683,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 1,
+              "method_ref": "s7.kl.boundary",
+              "kind": "KLDivergence",
+              "score": 0.5934303402594009,
+              "weight": 0.11299733969434127,
+              "contribution": 0.06705604974322005,
+              "diagnostics": {
+                "p_value": 0.4065696597405991,
+                "p_adj": 0.4065696597405991,
+                "log_evidence": 1.8,
+                "reliability": 1.0,
+                "sample_size": 100,
+                "standard_error": 0.2,
+                "raw_score": 0.5934303402594009,
+                "direction_mode": "Contradiction"
+              }
+            },
+            {
+              "index": 2,
+              "method_ref": "s7.d.boundary",
+              "kind": "EffectSize",
+              "score": 0.6826894921370859,
+              "weight": 0.14411862309537737,
+              "contribution": 0.09838826960847927,
+              "diagnostics": {
+                "p_value": 0.31731050786291415,
+                "p_adj": 0.31731050786291415,
+                "log_evidence": 2.295748928898636,
+                "reliability": 1.0,
+                "sample_size": 100,
+                "standard_error": 0.25,
+                "raw_score": 0.6826894921370859,
+                "direction_mode": "Contradiction"
+              }
+            }
+          ]
+        }
+      }
+    }
+  },
+  "matrix_markdown": "| Candidate | S1 Noisy TV | S2 Unanimous weak signal | S3 Mixed signal | S4 Missing data | S5 Scale heterogeneity | S6 Calibration decomposability | S7 Boundary-seeking |\n| --- | --- | --- | --- | --- | --- | --- | --- |\n| IVW-CDF | base=0.6457, doubled=0.8849 (FAIL) | agg=0.2698, max1=0.5818, target=0.8726 (FAIL) | mixed=0.5171, allC=0.6761, allA=0.3239 (PASS) | missing=0.5300, baseline=0.5261, delta=0.007 (PASS) | agg=0.8445, scores=[0.9545, 0.9901, 0.589] (PASS) | agg=0.8684, recon=0.8684, dom_share=0.657 (PASS) | boundary=0.6344, non_boundary=0.7686 (PASS) |\n| HTG-Max | base=0.1165, doubled=0.0238 (PASS) | agg=0.3033, max1=0.3033, target=0.4549 (FAIL) | mixed=0.3795, allC=0.3795, allA=0.1774 (PASS) | missing=0.1593, baseline=0.3423, delta=0.535 (FAIL) | agg=0.5712, scores=[0.9545, 0.9901, 0.589] (PASS) | agg=0.9618, recon=0.9618, dom_share=1.000 (PASS) | boundary=0.3022, non_boundary=0.5085 (PASS) |\n| Fisher-UP | base=0.5639, doubled=0.8227 (FAIL) | agg=0.0056, max1=0.5818, target=0.8726 (FAIL) | mixed=0.4002, allC=0.7134, allA=0.0454 (PASS) | missing=0.0662, baseline=0.3250, delta=0.796 (FAIL) | agg=0.9914, scores=[0.9545, 0.9901, 0.589] (PASS) | agg=0.9784, recon=0.9784, dom_share=0.568 (PASS) | boundary=0.9917, non_boundary=0.9917 (FAIL) |\n",
+  "ranking_reference": [
+    "s5.bf.1",
+    "s5.z.1",
+    "s5.abs.1"
+  ],
+  "htg_lse_exploratory": {
+    "Noisy TV": {
+      "scenario_index": 1,
+      "scenario_name": "Noisy TV",
+      "candidate": "HTG-Max-LSE",
+      "passed": true,
+      "raw_scores": {
+        "base": 0.10997309033907932,
+        "doubled": 0.02353746040631799
+      },
+      "score_summary": "base=0.1100, doubled=0.0235",
+      "pass_reason": "doubled <= base",
+      "bounded": true,
+      "warnings": [],
+      "skipped": [],
+      "decompositions": {
+        "base": [
+          {
+            "index": 0,
+            "method_ref": "s1.absdiff.base",
+            "kind": "AbsoluteDifference",
+            "score": 0.6456563062257954,
+            "weight": 0.18044210211465983,
+            "contribution": 0.11650358113896905,
+            "diagnostics": {
+              "confidence": 0.18044210211465983,
+              "gated_score": 0.11650358113896905,
+              "precision": 6.791096610976364,
+              "winner_gate": 1.0,
+              "raw_score": 0.6456563062257954,
+              "direction_mode": "Contradiction",
+              "mode": "lse_rebound"
+            }
+          }
+        ],
+        "doubled": [
+          {
+            "index": 0,
+            "method_ref": "s1.absdiff.doubled",
+            "kind": "AbsoluteDifference",
+            "score": 0.8849332679544502,
+            "weight": 0.026916031044386425,
+            "contribution": 0.02381889131247231,
+            "diagnostics": {
+              "confidence": 0.026916031044386425,
+              "gated_score": 0.02381889131247231,
+              "precision": 5.40816778747595,
+              "winner_gate": 1.0,
+              "raw_score": 0.8849332679544502,
+              "direction_mode": "Contradiction",
+              "mode": "lse_rebound"
+            }
+          }
+        ]
+      }
+    },
+    "Unanimous weak signal": {
+      "scenario_index": 2,
+      "scenario_name": "Unanimous weak signal",
+      "candidate": "HTG-Max-LSE",
+      "passed": false,
+      "raw_scores": {
+        "aggregate": 0.33239318223833303,
+        "max_single": 0.26162076303342374,
+        "threshold": 0.3924311445501356
+      },
+      "score_summary": "agg=0.3324, max1=0.2616, target=0.3924",
+      "pass_reason": "aggregate >= 1.5 * max_single",
+      "bounded": true,
+      "warnings": [],
+      "skipped": [],
+      "decompositions": {
+        "aggregate": [
+          {
+            "index": 0,
+            "method_ref": "s2.z.1",
+            "kind": "ZScore",
+            "score": 0.23582284437790513,
+            "weight": 0.03524416470906109,
+            "contribution": 0.00831137916941417,
+            "diagnostics": {
+              "confidence": 0.4111778702799699,
+              "gated_score": 0.0969651349146718,
+              "precision": 7.560601162752564,
+              "winner_gate": 0.08571513025509722,
+              "raw_score": 0.23582284437790513,
+              "direction_mode": "Contradiction",
+              "mode": "lse_rebound"
+            }
+          },
+          {
+            "index": 1,
+            "method_ref": "s2.d.1",
+            "kind": "EffectSize",
+            "score": 0.1974126513658474,
+            "weight": 0.04838121543928118,
+            "contribution": 0.00955106401617077,
+            "diagnostics": {
+              "confidence": 0.5304767276821589,
+              "gated_score": 0.10472281729961361,
+              "precision": 7.881372148481116,
+              "winner_gate": 0.09120327606203552,
+              "raw_score": 0.1974126513658474,
+              "direction_mode": "Contradiction",
+              "mode": "lse_rebound"
+            }
+          },
+          {
+            "index": 2,
+            "method_ref": "s2.kl.1",
+            "kind": "KLDivergence",
+            "score": 0.09516258196404048,
+            "weight": 0.03941649169051485,
+            "contribution": 0.0037509751212335403,
+            "diagnostics": {
+              "confidence": 0.6220684689819068,
+              "gated_score": 0.059197641666735884,
+              "precision": 8.132224747393392,
+              "winner_gate": 0.0633635904340641,
+              "raw_score": 0.09516258196404048,
+              "direction_mode": "Contradiction",
+              "mode": "lse_rebound"
+            }
+          },
+          {
+            "index": 3,
+            "method_ref": "s2.abs.1",
+            "kind": "AbsoluteDifference",
+            "score": 0.382252125230751,
+            "weight": 0.21207074210000196,
+            "contribution": 0.08106449186698825,
+            "diagnostics": {
+              "confidence": 0.6773127216648894,
+              "gated_score": 0.2589042273022281,
+              "precision": 8.29429960883224,
+              "winner_gate": 0.3131060960714202,
+              "raw_score": 0.382252125230751,
+              "direction_mode": "Contradiction",
+              "mode": "lse_rebound"
+            }
+          },
+          {
+            "index": 4,
+            "method_ref": "s2.z.2",
+            "kind": "ZScore",
+            "score": 0.26614347207205613,
+            "weight": 0.0,
+            "contribution": 0.0,
+            "diagnostics": {
+              "confidence": 0.3527125695185738,
+              "gated_score": 0.09387214789512971,
+              "precision": 7.395242018409667,
+              "winner_gate": 0.0,
+              "raw_score": 0.26614347207205613,
+              "direction_mode": "Contradiction",
+              "mode": "lse_rebound"
+            }
+          },
+          {
+            "index": 5,
+            "method_ref": "s2.d.2",
+            "kind": "EffectSize",
+            "score": 0.2205224951115945,
+            "weight": 0.0,
+            "contribution": 0.0,
+            "diagnostics": {
+              "confidence": 0.47086185567086464,
+              "gated_score": 0.10383563126541456,
+              "precision": 7.7222101405120025,
+              "winner_gate": 0.0,
+              "raw_score": 0.2205224951115945,
+              "direction_mode": "Contradiction",
+              "mode": "lse_rebound"
+            }
+          },
+          {
+            "index": 6,
+            "method_ref": "s2.kl.2",
+            "kind": "KLDivergence",
+            "score": 0.11307956328284252,
+            "weight": 0.0,
+            "contribution": 0.0,
+            "diagnostics": {
+              "confidence": 0.3958221227013417,
+              "gated_score": 0.044759392772755424,
+              "precision": 7.5180641812170865,
+              "winner_gate": 0.0,
+              "raw_score": 0.11307956328284252,
+              "direction_mode": "Contradiction",
+              "mode": "lse_rebound"
+            }
+          },
+          {
+            "index": 7,
+            "method_ref": "s2.custom.1",
+            "kind": "Custom",
+            "score": 0.5817593768418363,
+            "weight": 0.23283917095843626,
+            "contribution": 0.13545637100114968,
+            "diagnostics": {
+              "confidence": 0.5213456408495586,
+              "gated_score": 0.303297715139847,
+              "precision": 7.856956327598623,
+              "winner_gate": 0.4466119071773829,
+              "raw_score": 0.5817593768418363,
+              "direction_mode": "Contradiction",
+              "mode": "lse_rebound"
+            }
+          }
+        ]
+      }
+    },
+    "Mixed signal": {
+      "scenario_index": 3,
+      "scenario_name": "Mixed signal",
+      "candidate": "HTG-Max-LSE",
+      "passed": true,
+      "raw_scores": {
+        "mixed": 0.3499540340793966,
+        "all_contradiction": 0.3499540340793966,
+        "all_agreement": 0.2410600346802333
+      },
+      "score_summary": "mixed=0.3500, allC=0.3500, allA=0.2411",
+      "pass_reason": "all_agreement <= mixed <= all_contradiction",
+      "bounded": true,
+      "warnings": [],
+      "skipped": [],
+      "decompositions": {
+        "mixed": [
+          {
+            "index": 0,
+            "method_ref": "s3.z.c1",
+            "kind": "ZScore",
+            "score": 0.8663855974622838,
+            "weight": 0.2908100747472537,
+            "contribution": 0.2519536603579508,
+            "diagnostics": {
+              "confidence": 0.43803624451807166,
+              "gated_score": 0.37950829341692455,
+              "precision": 7.633909534136771,
+              "winner_gate": 0.6638950050062717,
+              "raw_score": 0.8663855974622838,
+              "direction_mode": "Contradiction",
+              "mode": "lse_rebound"
+            }
+          },
+          {
+            "index": 1,
+            "method_ref": "s3.kl.c1",
+            "kind": "KLDivergence",
+            "score": 0.5506710358827784,
+            "weight": 0.054993072402236644,
+            "contribution": 0.030283092146116287,
+            "diagnostics": {
+              "confidence": 0.3573403917513822,
+              "gated_score": 0.1967770036884915,
+              "precision": 7.408715734917801,
+              "winner_gate": 0.1538954836107579,
+              "raw_score": 0.5506710358827784,
+              "direction_mode": "Contradiction",
+              "mode": "lse_rebound"
+            }
+          },
+          {
+            "index": 2,
+            "method_ref": "s3.abs.c1",
+            "kind": "AbsoluteDifference",
+            "score": 0.617747874769249,
+            "weight": 0.06426758495061127,
+            "contribution": 0.03970116401979228,
+            "diagnostics": {
+              "confidence": 0.3527125695185738,
+              "gated_score": 0.21788744022449996,
+              "precision": 7.395242018409667,
+              "winner_gate": 0.18220951138297029,
+              "raw_score": 0.617747874769249,
+              "direction_mode": "Contradiction",
+              "mode": "lse_rebound"
+            }
+          },
+          {
+            "index": 3,
+            "method_ref": "s3.z.a1",
+            "kind": "ZScore",
+            "score": 0.16151331846754213,
+            "weight": 0.0,
+            "contribution": 0.0,
+            "diagnostics": {
+              "confidence": 0.43803624451807166,
+              "gated_score": 0.07074868746117347,
+              "precision": 7.633909534136771,
+              "winner_gate": 0.0,
+              "raw_score": 0.8384866815324579,
+              "direction_mode": "Agreement",
+              "mode": "lse_rebound"
+            }
+          },
+          {
+            "index": 4,
+            "method_ref": "s3.kl.a1",
+            "kind": "KLDivergence",
+            "score": 0.4965853037914095,
+            "weight": 0.0,
+            "contribution": 0.0,
+            "diagnostics": {
+              "confidence": 0.3573403917513822,
+              "gated_score": 0.17744998699480144,
+              "precision": 7.408715734917801,
+              "winner_gate": 0.0,
+              "raw_score": 0.5034146962085905,
+              "direction_mode": "Agreement",
+              "mode": "lse_rebound"
+            }
+          },
+          {
+            "index": 5,
+            "method_ref": "s3.abs.a1",
+            "kind": "AbsoluteDifference",
+            "score": 0.41095956594133487,
+            "weight": 0.0,
+            "contribution": 0.0,
+            "diagnostics": {
+              "confidence": 0.3527125695185738,
+              "gated_score": 0.144950604471406,
+              "precision": 7.395242018409667,
+              "winner_gate": 0.0,
+              "raw_score": 0.5890404340586651,
+              "direction_mode": "Agreement",
+              "mode": "lse_rebound"
+            }
+          }
+        ],
+        "all_contradiction": [
+          {
+            "index": 0,
+            "method_ref": "s3.z.c1",
+            "kind": "ZScore",
+            "score": 0.8663855974622838,
+            "weight": 0.2908100747472537,
+            "contribution": 0.2519536603579508,
+            "diagnostics": {
+              "confidence": 0.43803624451807166,
+              "gated_score": 0.37950829341692455,
+              "precision": 7.633909534136771,
+              "winner_gate": 0.6638950050062717,
+              "raw_score": 0.8663855974622838,
+              "direction_mode": "Contradiction",
+              "mode": "lse_rebound"
+            }
+          },
+          {
+            "index": 1,
+            "method_ref": "s3.kl.c1",
+            "kind": "KLDivergence",
+            "score": 0.5506710358827784,
+            "weight": 0.054993072402236644,
+            "contribution": 0.030283092146116287,
+            "diagnostics": {
+              "confidence": 0.3573403917513822,
+              "gated_score": 0.1967770036884915,
+              "precision": 7.408715734917801,
+              "winner_gate": 0.1538954836107579,
+              "raw_score": 0.5506710358827784,
+              "direction_mode": "Contradiction",
+              "mode": "lse_rebound"
+            }
+          },
+          {
+            "index": 2,
+            "method_ref": "s3.abs.c1",
+            "kind": "AbsoluteDifference",
+            "score": 0.617747874769249,
+            "weight": 0.06426758495061127,
+            "contribution": 0.03970116401979228,
+            "diagnostics": {
+              "confidence": 0.3527125695185738,
+              "gated_score": 0.21788744022449996,
+              "precision": 7.395242018409667,
+              "winner_gate": 0.18220951138297029,
+              "raw_score": 0.617747874769249,
+              "direction_mode": "Contradiction",
+              "mode": "lse_rebound"
+            }
+          },
+          {
+            "index": 3,
+            "method_ref": "s3.z.a1",
+            "kind": "ZScore",
+            "score": 0.8384866815324579,
+            "weight": 0.0,
+            "contribution": 0.0,
+            "diagnostics": {
+              "confidence": 0.43803624451807166,
+              "gated_score": 0.3672875570568982,
+              "precision": 7.633909534136771,
+              "winner_gate": 0.0,
+              "raw_score": 0.8384866815324579,
+              "direction_mode": "Contradiction",
+              "mode": "lse_rebound"
+            }
+          },
+          {
+            "index": 4,
+            "method_ref": "s3.kl.a1",
+            "kind": "KLDivergence",
+            "score": 0.5034146962085905,
+            "weight": 0.0,
+            "contribution": 0.0,
+            "diagnostics": {
+              "confidence": 0.3573403917513822,
+              "gated_score": 0.17989040475658077,
+              "precision": 7.408715734917801,
+              "winner_gate": 0.0,
+              "raw_score": 0.5034146962085905,
+              "direction_mode": "Contradiction",
+              "mode": "lse_rebound"
+            }
+          },
+          {
+            "index": 5,
+            "method_ref": "s3.abs.a1",
+            "kind": "AbsoluteDifference",
+            "score": 0.5890404340586651,
+            "weight": 0.0,
+            "contribution": 0.0,
+            "diagnostics": {
+              "confidence": 0.3527125695185738,
+              "gated_score": 0.20776196504716782,
+              "precision": 7.395242018409667,
+              "winner_gate": 0.0,
+              "raw_score": 0.5890404340586651,
+              "direction_mode": "Contradiction",
+              "mode": "lse_rebound"
+            }
+          }
+        ],
+        "all_agreement": [
+          {
+            "index": 0,
+            "method_ref": "s3.z.c1",
+            "kind": "ZScore",
+            "score": 0.13361440253771617,
+            "weight": 0.0,
+            "contribution": 0.0,
+            "diagnostics": {
+              "confidence": 0.43803624451807166,
+              "gated_score": 0.05852795110114709,
+              "precision": 7.633909534136771,
+              "winner_gate": 0.0,
+              "raw_score": 0.8663855974622838,
+              "direction_mode": "Agreement",
+              "mode": "lse_rebound"
+            }
+          },
+          {
+            "index": 1,
+            "method_ref": "s3.kl.c1",
+            "kind": "KLDivergence",
+            "score": 0.44932896411722156,
+            "weight": 0.0,
+            "contribution": 0.0,
+            "diagnostics": {
+              "confidence": 0.3573403917513822,
+              "gated_score": 0.16056338806289072,
+              "precision": 7.408715734917801,
+              "winner_gate": 0.0,
+              "raw_score": 0.5506710358827784,
+              "direction_mode": "Agreement",
+              "mode": "lse_rebound"
+            }
+          },
+          {
+            "index": 2,
+            "method_ref": "s3.abs.c1",
+            "kind": "AbsoluteDifference",
+            "score": 0.382252125230751,
+            "weight": 0.0,
+            "contribution": 0.0,
+            "diagnostics": {
+              "confidence": 0.3527125695185738,
+              "gated_score": 0.13482512929407386,
+              "precision": 7.395242018409667,
+              "winner_gate": 0.0,
+              "raw_score": 0.617747874769249,
+              "direction_mode": "Agreement",
+              "mode": "lse_rebound"
+            }
+          },
+          {
+            "index": 3,
+            "method_ref": "s3.z.a1",
+            "kind": "ZScore",
+            "score": 0.16151331846754213,
+            "weight": 0.08491326658026918,
+            "contribution": 0.013714623467298319,
+            "diagnostics": {
+              "confidence": 0.43803624451807166,
+              "gated_score": 0.07074868746117347,
+              "precision": 7.633909534136771,
+              "winner_gate": 0.1938498643501314,
+              "raw_score": 0.8384866815324579,
+              "direction_mode": "Agreement",
+              "mode": "lse_rebound"
+            }
+          },
+          {
+            "index": 4,
+            "method_ref": "s3.kl.a1",
+            "kind": "KLDivergence",
+            "score": 0.4965853037914095,
+            "weight": 0.16265442975502636,
+            "contribution": 0.08077179941291825,
+            "diagnostics": {
+              "confidence": 0.3573403917513822,
+              "gated_score": 0.17744998699480144,
+              "precision": 7.408715734917801,
+              "winner_gate": 0.45518064430900484,
+              "raw_score": 0.5034146962085905,
+              "direction_mode": "Agreement",
+              "mode": "lse_rebound"
+            }
+          },
+          {
+            "index": 5,
+            "method_ref": "s3.abs.a1",
+            "kind": "AbsoluteDifference",
+            "score": 0.41095956594133487,
+            "weight": 0.1237913511134629,
+            "contribution": 0.050873239920880095,
+            "diagnostics": {
+              "confidence": 0.3527125695185738,
+              "gated_score": 0.144950604471406,
+              "precision": 7.395242018409667,
+              "winner_gate": 0.35096949134086375,
+              "raw_score": 0.5890404340586651,
+              "direction_mode": "Agreement",
+              "mode": "lse_rebound"
+            }
+          }
+        ]
+      }
+    },
+    "Missing data": {
+      "scenario_index": 4,
+      "scenario_name": "Missing data",
+      "candidate": "HTG-Max-LSE",
+      "passed": false,
+      "raw_scores": {
+        "missing": 0.24484436967294143,
+        "baseline_full": 0.3465334323536806,
+        "relative_delta": 0.2934466149198349
+      },
+      "score_summary": "missing=0.2448, baseline=0.3465, delta=0.293",
+      "pass_reason": "finite and <=20% delta from baseline",
+      "bounded": true,
+      "warnings": [],
+      "skipped": [],
+      "decompositions": {
+        "missing": [
+          {
+            "index": 0,
+            "method_ref": "s4.z.1",
+            "kind": "ZScore",
+            "score": 0.7286678781072347,
+            "weight": 0.0380303833880035,
+            "contribution": 0.027711518766941137,
+            "diagnostics": {
+              "confidence": 0.15,
+              "gated_score": 0.1093001817160852,
+              "precision": null,
+              "winner_gate": 0.2535358892533567,
+              "raw_score": 0.7286678781072347,
+              "direction_mode": "Contradiction",
+              "mode": "lse_rebound"
+            }
+          },
+          {
+            "index": 1,
+            "method_ref": "s4.d.1",
+            "kind": "EffectSize",
+            "score": 0.5762892028332067,
+            "weight": 0.03167510346821824,
+            "contribution": 0.01825402012735883,
+            "diagnostics": {
+              "confidence": 0.15,
+              "gated_score": 0.08644338042498101,
+              "precision": null,
+              "winner_gate": 0.21116735645478826,
+              "raw_score": 0.5762892028332067,
+              "direction_mode": "Contradiction",
+              "mode": "lse_rebound"
+            }
+          },
+          {
+            "index": 2,
+            "method_ref": "s4.kl.1",
+            "kind": "KLDivergence",
+            "score": 0.3296799539643607,
+            "weight": 0.023561167081366765,
+            "contribution": 0.007767644478731605,
+            "diagnostics": {
+              "confidence": 0.15,
+              "gated_score": 0.0494519930946541,
+              "precision": null,
+              "winner_gate": 0.15707444720911176,
+              "raw_score": 0.3296799539643607,
+              "direction_mode": "Contradiction",
+              "mode": "lse_rebound"
+            }
+          },
+          {
+            "index": 3,
+            "method_ref": "s4.abs.1",
+            "kind": "AbsoluteDifference",
+            "score": 0.5299640517645717,
+            "weight": 0.11368654681208598,
+            "contribution": 0.06024978297965574,
+            "diagnostics": {
+              "confidence": 0.30058128429536257,
+              "gated_score": 0.15929727530976898,
+              "precision": 7.236979086861173,
+              "winner_gate": 0.3782223070827433,
+              "raw_score": 0.5299640517645717,
+              "direction_mode": "Contradiction",
+              "mode": "lse_rebound"
+            }
+          }
+        ],
+        "baseline_full": [
+          {
+            "index": 0,
+            "method_ref": "s4.z.1",
+            "kind": "ZScore",
+            "score": 0.7286678781072347,
+            "weight": 0.24141356437797257,
+            "contribution": 0.17591030970160157,
+            "diagnostics": {
+              "confidence": 0.4697108232291919,
+              "gated_score": 0.34226318888641766,
+              "precision": 7.7191298408817435,
+              "winner_gate": 0.513962106979546,
+              "raw_score": 0.7286678781072347,
+              "direction_mode": "Contradiction",
+              "mode": "lse_rebound"
+            }
+          },
+          {
+            "index": 1,
+            "method_ref": "s4.d.1",
+            "kind": "EffectSize",
+            "score": 0.5762892028332067,
+            "weight": 0.09191423238992157,
+            "contribution": 0.05296917971301401,
+            "diagnostics": {
+              "confidence": 0.412581963861255,
+              "gated_score": 0.23776653105696155,
+              "precision": 7.564465441984008,
+              "winner_gate": 0.22277811547969392,
+              "raw_score": 0.5762892028332067,
+              "direction_mode": "Contradiction",
+              "mode": "lse_rebound"
+            }
+          },
+          {
+            "index": 2,
+            "method_ref": "s4.kl.1",
+            "kind": "KLDivergence",
+            "score": 0.3296799539643607,
+            "weight": 0.08034968036082897,
+            "contribution": 0.02648967892240919,
+            "diagnostics": {
+              "confidence": 0.5566571982151446,
+              "gated_score": 0.18351871948149887,
+              "precision": 7.951737545116407,
+              "winner_gate": 0.14434319832467937,
+              "raw_score": 0.3296799539643607,
+              "direction_mode": "Contradiction",
+              "mode": "lse_rebound"
+            }
+          },
+          {
+            "index": 3,
+            "method_ref": "s4.abs.1",
+            "kind": "AbsoluteDifference",
+            "score": 0.5299640517645717,
+            "weight": 0.035744098104780776,
+            "contribution": 0.01894308705827997,
+            "diagnostics": {
+              "confidence": 0.30058128429536257,
+              "gated_score": 0.15929727530976898,
+              "precision": 7.236979086861173,
+              "winner_gate": 0.11891657921608077,
+              "raw_score": 0.5299640517645717,
+              "direction_mode": "Contradiction",
+              "mode": "lse_rebound"
+            }
+          }
+        ]
+      }
+    },
+    "Scale heterogeneity": {
+      "scenario_index": 5,
+      "scenario_name": "Scale heterogeneity",
+      "candidate": "HTG-Max-LSE",
+      "passed": true,
+      "raw_scores": {
+        "aggregate": 0.4822057695531873,
+        "s5.z.1": 0.9544997361036416,
+        "s5.bf.1": 0.9900990099009901,
+        "s5.abs.1": 0.5890404340586651
+      },
+      "score_summary": "agg=0.4822, scores=[0.9545, 0.9901, 0.589]",
+      "pass_reason": "component scores in [0.3, 0.99] with tolerance; ranking checked post-pass",
+      "bounded": true,
+      "warnings": [],
+      "skipped": [],
+      "decompositions": {
+        "heterogeneous": [
+          {
+            "index": 0,
+            "method_ref": "s5.z.1",
+            "kind": "ZScore",
+            "score": 0.9544997361036416,
+            "weight": 0.24406545403802168,
+            "contribution": 0.23296041147130717,
+            "diagnostics": {
+              "confidence": 0.5768977750500027,
+              "gated_score": 0.5506487740440056,
+              "precision": 8.006700845415375,
+              "winner_gate": 0.4230653411982171,
+              "raw_score": 0.9544997361036416,
+              "direction_mode": "Contradiction",
+              "mode": "lse_rebound"
+            }
+          },
+          {
+            "index": 1,
+            "method_ref": "s5.bf.1",
+            "kind": "BayesFactor",
+            "score": 0.9900990099009901,
+            "weight": 0.287646868958595,
+            "contribution": 0.28479888015702476,
+            "diagnostics": {
+              "confidence": 0.5768977750500027,
+              "gated_score": 0.5711859158910918,
+              "precision": 8.006700845415375,
+              "winner_gate": 0.49860977351431657,
+              "raw_score": 0.9900990099009901,
+              "direction_mode": "Contradiction",
+              "mode": "lse_rebound"
+            }
+          },
+          {
+            "index": 2,
+            "method_ref": "s5.abs.1",
+            "kind": "AbsoluteDifference",
+            "score": 0.5890404340586651,
+            "weight": 0.04518545205338603,
+            "contribution": 0.02661605829066351,
+            "diagnostics": {
+              "confidence": 0.5768977750500027,
+              "gated_score": 0.33981611582293175,
+              "precision": 8.006700845415375,
+              "winner_gate": 0.07832488528746635,
+              "raw_score": 0.5890404340586651,
+              "direction_mode": "Contradiction",
+              "mode": "lse_rebound"
+            }
+          }
+        ],
+        "_ranking": [
+          {
+            "ranked_method_ref": "s5.bf.1"
+          },
+          {
+            "ranked_method_ref": "s5.z.1"
+          },
+          {
+            "ranked_method_ref": "s5.abs.1"
+          }
+        ]
+      }
+    },
+    "Calibration decomposability": {
+      "scenario_index": 6,
+      "scenario_name": "Calibration decomposability",
+      "candidate": "HTG-Max-LSE",
+      "passed": false,
+      "raw_scores": {
+        "aggregate": 0.6262841841350903,
+        "reconstructed": 0.9180294351838759,
+        "dominant_share": 1.2827608462282927
+      },
+      "score_summary": "agg=0.6263, recon=0.9180, dom_share=1.283",
+      "pass_reason": "sum(weight*score) reconstructs aggregate and dominant component is identifiable",
+      "bounded": true,
+      "warnings": [],
+      "skipped": [],
+      "decompositions": {
+        "calibration": [
+          {
+            "index": 0,
+            "method_ref": "s6.z.strong",
+            "kind": "ZScore",
+            "score": 0.9973002039367398,
+            "weight": 0.8055476443795889,
+            "contribution": 0.8033728300205244,
+            "diagnostics": {
+              "confidence": 0.9643692344348546,
+              "gated_score": 0.9617656341721981,
+              "precision": 9.998843185752886,
+              "winner_gate": 0.8353103931728606,
+              "raw_score": 0.9973002039367398,
+              "direction_mode": "Contradiction",
+              "mode": "lse_rebound"
+            }
+          },
+          {
+            "index": 1,
+            "method_ref": "s6.d.mid",
+            "kind": "EffectSize",
+            "score": 0.6318797493064809,
+            "weight": 0.009290471601832178,
+            "contribution": 0.005870460866704697,
+            "diagnostics": {
+              "confidence": 0.7020765816852114,
+              "gated_score": 0.44362797442920243,
+              "precision": 8.371470680558268,
+              "winner_gate": 0.013232846450357359,
+              "raw_score": 0.6318797493064809,
+              "direction_mode": "Contradiction",
+              "mode": "lse_rebound"
+            }
+          },
+          {
+            "index": 2,
+            "method_ref": "s6.kl.weak",
+            "kind": "KLDivergence",
+            "score": 0.2591817793182821,
+            "weight": 0.0004755887785378916,
+            "contribution": 0.00012326394584525916,
+            "diagnostics": {
+              "confidence": 0.47086185567086464,
+              "gated_score": 0.12203881356588285,
+              "precision": 7.7222101405120025,
+              "winner_gate": 0.0010100388740563668,
+              "raw_score": 0.2591817793182821,
+              "direction_mode": "Contradiction",
+              "mode": "lse_rebound"
+            }
+          },
+          {
+            "index": 3,
+            "method_ref": "s6.abs.mid",
+            "kind": "AbsoluteDifference",
+            "score": 0.5597136492671929,
+            "weight": 0.0006511083735410777,
+            "contribution": 0.0003644342438231032,
+            "diagnostics": {
+              "confidence": 0.3527125695185738,
+              "gated_score": 0.19741803942764943,
+              "precision": 7.395242018409667,
+              "winner_gate": 0.0018460027507094282,
+              "raw_score": 0.5597136492671929,
+              "direction_mode": "Contradiction",
+              "mode": "lse_rebound"
+            }
+          },
+          {
+            "index": 4,
+            "method_ref": "s6.bf.strong",
+            "kind": "BayesFactor",
+            "score": 0.9230769230769231,
+            "weight": 0.11578642345721,
+            "contribution": 0.10687977549896309,
+            "diagnostics": {
+              "confidence": 0.803883438051732,
+              "gated_score": 0.7420462505092912,
+              "precision": 8.740496729892756,
+              "winner_gate": 0.1440338461728065,
+              "raw_score": 0.9230769230769231,
+              "direction_mode": "Contradiction",
+              "mode": "lse_rebound"
+            }
+          },
+          {
+            "index": 5,
+            "method_ref": "s6.custom.1",
+            "kind": "Custom",
+            "score": 0.7290879223493065,
+            "weight": 0.0019458155381919338,
+            "contribution": 0.0014186706080153548,
+            "diagnostics": {
+              "confidence": 0.42607178204403234,
+              "gated_score": 0.3106437903421501,
+              "precision": 7.601402334567742,
+              "winner_gate": 0.004566872579209772,
+              "raw_score": 0.7290879223493065,
+              "direction_mode": "Contradiction",
+              "mode": "lse_rebound"
+            }
+          }
+        ]
+      }
+    },
+    "Boundary-seeking": {
+      "scenario_index": 7,
+      "scenario_name": "Boundary-seeking",
+      "candidate": "HTG-Max-LSE",
+      "passed": true,
+      "raw_scores": {
+        "boundary": 0.3074947702162716,
+        "non_boundary": 0.41831123434023143
+      },
+      "score_summary": "boundary=0.3075, non_boundary=0.4183",
+      "pass_reason": "boundary < non_boundary for same values with lower uncertainty comparator",
+      "bounded": true,
+      "warnings": [],
+      "skipped": [],
+      "decompositions": {
+        "boundary": [
+          {
+            "index": 0,
+            "method_ref": "s7.z.boundary",
+            "kind": "ZScore",
+            "score": 0.9986257241241683,
+            "weight": 0.00026835858164139375,
+            "contribution": 0.0002679897829165716,
+            "diagnostics": {
+              "confidence": 0.0048797799162317015,
+              "gated_score": 0.0048730737524134565,
+              "precision": 4.254824377100322,
+              "winner_gate": 0.05499399281282086,
+              "raw_score": 0.9986257241241683,
+              "direction_mode": "Contradiction",
+              "mode": "lse_rebound"
+            }
+          },
+          {
+            "index": 1,
+            "method_ref": "s7.kl.boundary",
+            "kind": "KLDivergence",
+            "score": 0.5934303402594009,
+            "weight": 0.30202081082164617,
+            "contribution": 0.17922831253130964,
+            "diagnostics": {
+              "confidence": 0.5091661970143007,
+              "gated_score": 0.3021546695427816,
+              "precision": 7.824445930852629,
+              "winner_gate": 0.5931674423649209,
+              "raw_score": 0.5934303402594009,
+              "direction_mode": "Contradiction",
+              "mode": "lse_rebound"
+            }
+          },
+          {
+            "index": 2,
+            "method_ref": "s7.d.boundary",
+            "kind": "EffectSize",
+            "score": 0.6826894921370859,
+            "weight": 0.12207426344726786,
+            "contribution": 0.08333881691582412,
+            "diagnostics": {
+              "confidence": 0.3469610089756286,
+              "gated_score": 0.23686663500894278,
+              "precision": 7.378383712980725,
+              "winner_gate": 0.35183856482225834,
+              "raw_score": 0.6826894921370859,
+              "direction_mode": "Contradiction",
+              "mode": "lse_rebound"
+            }
+          }
+        ],
+        "non_boundary": [
+          {
+            "index": 0,
+            "method_ref": "s7.z.boundary",
+            "kind": "ZScore",
+            "score": 0.9986257241241683,
+            "weight": 0.3899225961243571,
+            "contribution": 0.3893867349070617,
+            "diagnostics": {
+              "confidence": 0.5091661970143007,
+              "gated_score": 0.5084664621929549,
+              "precision": 7.824445930852629,
+              "winner_gate": 0.7658061324785973,
+              "raw_score": 0.9986257241241683,
+              "direction_mode": "Contradiction",
+              "mode": "lse_rebound"
+            }
+          },
+          {
+            "index": 1,
+            "method_ref": "s7.kl.boundary",
+            "kind": "KLDivergence",
+            "score": 0.5934303402594009,
+            "weight": 0.07484758956062519,
+            "contribution": 0.04441683054055779,
+            "diagnostics": {
+              "confidence": 0.5091661970143007,
+              "gated_score": 0.3021546695427816,
+              "precision": 7.824445930852629,
+              "winner_gate": 0.14700031148871218,
+              "raw_score": 0.5934303402594009,
+              "direction_mode": "Contradiction",
+              "mode": "lse_rebound"
+            }
+          },
+          {
+            "index": 2,
+            "method_ref": "s7.d.boundary",
+            "kind": "EffectSize",
+            "score": 0.6826894921370859,
+            "weight": 0.030252764177275297,
+            "contribution": 0.020653244211927095,
+            "diagnostics": {
+              "confidence": 0.3469610089756286,
+              "gated_score": 0.23686663500894278,
+              "precision": 7.378383712980725,
+              "winner_gate": 0.08719355603269048,
+              "raw_score": 0.6826894921370859,
+              "direction_mode": "Contradiction",
+              "mode": "lse_rebound"
+            }
+          }
+        ]
+      }
+    }
+  }
+}

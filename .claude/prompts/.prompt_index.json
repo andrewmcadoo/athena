@@ -71,6 +71,14 @@
       "slug": "wdk40-uncertainty-schema",
       "goal": "Investigate WDK#40 by surveying external UQ/V&V frameworks, tracing 6 consumers against 3 candidate schemas, assessing cross-adapter feasibility, steel-manning/stress-testing candidates, specifying the recommended UncertaintySummary schema, and writing the Step 14 FINDINGS.md entry",
       "framework": "RISEN"
+    },
+    {
+      "sequence": 10,
+      "filename": "prompt_010_2026-02-21_wdk41-aggregation-experiment.md",
+      "created": "2026-02-21T21:42:15.817403",
+      "slug": "wdk41-aggregation-experiment",
+      "goal": "Define and stress-test three candidate aggregation functions for ATHENA adversarial-reward track",
+      "framework": "RISEN"
     }
   ]
 }
