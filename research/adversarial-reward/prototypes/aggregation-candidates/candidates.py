@@ -20,6 +20,9 @@ from normalization import (
 class IVWCDFConfig:
     eps: float = 1e-12
     w_default: float = 1.0
+    multiplicity_bonus_enabled: bool = False
+    multiplicity_threshold: float = 0.1
+    multiplicity_scale: float = 0.5
     normalization: NormalizationConfig = field(default_factory=NormalizationConfig)
 
 
@@ -31,6 +34,7 @@ class HTGMaxConfig:
     eps: float = 1e-12
     lse_beta: float = 8.0
     mode: str = "hard_max"
+    soft_sum_boost: float = 2.0
     normalization: NormalizationConfig = field(default_factory=NormalizationConfig)
 
 
@@ -39,6 +43,9 @@ class FisherUPConfig:
     n_ref: float = 100.0
     r_floor: float = 0.1
     p_eps: float = 1e-12
+    se_reliability_enabled: bool = False
+    se_reliability_k: float = 3.0
+    se_reliability_x0: float = 2.0
     normalization: NormalizationConfig = field(default_factory=NormalizationConfig)
 
 
@@ -47,9 +54,11 @@ def chi_square_cdf_even_df(x: float, n_terms: int) -> float:
     if n_terms <= 0:
         return 0.0
     half_x = max(0.0, x) / 2.0
-    series = 0.0
-    for k in range(n_terms):
-        series += (half_x**k) / math.factorial(k)
+    term = 1.0
+    series = term
+    for k in range(1, n_terms):
+        term *= half_x / k
+        series += term
     cdf = 1.0 - math.exp(-half_x) * series
     return bounded_unit_interval(cdf, 1e-12)
 
@@ -89,6 +98,11 @@ def aggregate_ivw_cdf(
         )
 
     aggregate = numerator / denominator if denominator > 0.0 else 0.0
+    if cfg.multiplicity_bonus_enabled and len(staged) > 1:
+        concordant = sum(1 for entry in staged if float(entry["score"]) > cfg.multiplicity_threshold)
+        concordance = concordant / len(staged)
+        bonus = 1.0 + cfg.multiplicity_scale * concordance * math.log(len(staged))
+        aggregate = aggregate * bonus
     aggregate = bounded_unit_interval(aggregate, cfg.normalization.clip_eps)
     contributions: list[ComponentContribution] = []
     for entry in staged:
@@ -188,6 +202,10 @@ def aggregate_htg_max(
         for scaled_value, entry in zip(scaled, winners):
             comp_idx = int(entry["idx"])
             winner_weight_map[comp_idx] = scaled_value / softmax_den if softmax_den > 0.0 else 0.0
+    elif cfg.mode == "soft_sum":
+        raw_sum = sum(float(entry["gated_score"]) for entry in winners)
+        aggregate = raw_sum / len(winners) * cfg.soft_sum_boost
+        winner_weight_map = {int(entry["idx"]): 1.0 / len(winners) for entry in winners}
     else:
         # Primary variant for this session: hard max across type-level winners.
         overall_winner = max(winners, key=lambda entry: float(entry["gated_score"]))
@@ -226,8 +244,17 @@ def aggregate_htg_max(
             )
         )
 
+    if cfg.mode == "hard_max":
+        candidate_name = "HTG-Max"
+    elif cfg.mode == "lse_rebound":
+        candidate_name = "HTG-Max-LSE"
+    elif cfg.mode == "soft_sum":
+        candidate_name = "HTG-Max-SoftSum"
+    else:
+        candidate_name = "HTG-Max"
+
     return AggregateResult(
-        candidate="HTG-Max" if cfg.mode == "hard_max" else "HTG-Max-LSE",
+        candidate=candidate_name,
         aggregate_score=aggregate,
         contributions=contributions,
         skipped=skipped,
@@ -257,6 +284,14 @@ def aggregate_fisher_up(
             reliability = min(1.0, n_i / cfg.n_ref)
         else:
             reliability = cfg.r_floor
+        if (
+            cfg.se_reliability_enabled
+            and snapshot.standard_error is not None
+            and snapshot.standard_error > 0
+        ):
+            snr = abs(component.value) / snapshot.standard_error
+            se_factor = sigmoid(snr, cfg.se_reliability_k, cfg.se_reliability_x0)
+            reliability = reliability * se_factor
 
         p_adj = p_value ** reliability if reliability > 0.0 else 1.0
         p_adj = min(1.0, max(cfg.p_eps, p_adj))

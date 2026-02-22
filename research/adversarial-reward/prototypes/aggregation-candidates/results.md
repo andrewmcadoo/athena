@@ -1,6 +1,6 @@
 # Aggregation Candidate Evaluation (Session 1 Prototype)
 
-Generated: 2026-02-22T06:06:12.233377+00:00
+Generated: 2026-02-22T06:50:11.543669+00:00
 
 ## 3x7 Matrix (Primary Candidates)
 

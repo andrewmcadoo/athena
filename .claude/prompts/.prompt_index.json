@@ -79,6 +79,14 @@
       "slug": "wdk41-aggregation-experiment",
       "goal": "Define and stress-test three candidate aggregation functions for ATHENA adversarial-reward track",
       "framework": "RISEN"
+    },
+    {
+      "sequence": 11,
+      "filename": "prompt_011_2026-02-21_session2-aggregation-fixes-sweep.md",
+      "created": "2026-02-21T22:36:02.666414",
+      "slug": "session2-aggregation-fixes-sweep",
+      "goal": "Implement Session 2 of adversarial reward aggregation research \u2014 structural fixes, parameter sweep, calibration, and correlation analysis",
+      "framework": "RISEN"
     }
   ]
 }

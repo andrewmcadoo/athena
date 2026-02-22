@@ -30,6 +30,67 @@ IN PROGRESS
 
 ## Investigation Log
 
+### 2026-02-22 — WDK#41 Session 2: Structural Fixes + Two-Stage Sweep + Calibration + Correlation Robustness
+
+**Scope**
+
+- Implement Session 2 structural knobs in normalization and candidate aggregators while preserving Session 1 default behavior.
+- Run a two-stage sweep using all seven scenarios for every candidate-config combination.
+- Execute stretch analyses: deterministic 50-cycle calibration simulation and Fisher-UP correlation robustness with Brown-style correction.
+- Update research artifacts and verify backward compatibility (`python evaluate.py`) remains exactly Session 1 with defaults.
+
+**Method**
+
+- Structural changes in `research/adversarial-reward/prototypes/aggregation-candidates/`:
+  - `normalization.py`: added optional SE dampening (`se_dampen_enabled`, `se_dampen_k`, `se_dampen_x0`) applied at final score stage using raw `component.value / standard_error`.
+  - `candidates.py`:
+    - `IVW-CDF`: multiplicity bonus (`multiplicity_bonus_enabled`, threshold, scale).
+    - `HTG-Max`: `soft_sum` mode with `soft_sum_boost=2.0` (configurable, default unchanged).
+    - `Fisher-UP`: optional SE-aware reliability factor (`se_reliability_*`).
+  - `candidates.py`: stabilized `chi_square_cdf_even_df` with recurrence-series evaluation to avoid overflow under large term counts.
+- New prototype runners:
+  - `sweep.py`: Stage 1 normalization sweep (81 normalization configs x 3 candidates = 243 candidate-configs) + Stage 2 candidate sweeps with best Stage 1 normalization (480 candidate-configs including Fisher isolation).
+  - `calibration_sim.py`: deterministic 50-cycle patterns A/B/C with stdlib Spearman and Pearson implementations.
+  - `correlation_test.py`: S2-like correlated weak signals at rho `{0.0,0.3,0.5,0.7,0.9}`, Cholesky generation, Brown-style corrected df (capped terms at 1000).
+- Compatibility and execution checks:
+  - `python evaluate.py` (before and after Session 2 changes) confirmed exact Session 1 matrix.
+  - `python sweep.py`, `python calibration_sim.py`, and `python correlation_test.py` completed and wrote artifacts.
+
+**Findings**
+
+- Backward compatibility held exactly with default flags disabled:
+  - `IVW-CDF`: 5/7 (S1 FAIL, S2 FAIL)
+  - `HTG-Max`: 5/7 (S2 FAIL, S4 FAIL)
+  - `Fisher-UP`: 3/7 (S1 FAIL, S2 FAIL, S4 FAIL, S7 FAIL)
+- Stage 1 normalization sweep selected `N061` (`abs_diff_k=2000`, `abs_diff_x0=5e-4`, `se_dampen_k=8`, `se_dampen_x0=1`) with `10/21` passes (top by pass-count then avg-pass-score).
+- Stage 2 best results (no 7/7 found):
+  - `IVW-CDF`: best `2/7` (fails S1,S2,S4,S5,S6) despite multiplicity bonus sweep.
+  - `HTG-Max`: best `5/7` (fails S5,S6), strongest overall in Session 2 sweep.
+  - `Fisher-UP` main sweep (`se_dampen=True`): best `4/7` (fails S1,S2,S5).
+  - `Fisher-UP` isolation (`se_dampen=False`, SE-reliability on): best `5/7` (fails S1,S2), indicating overlap/tension between normalization-level dampening and Fisher reliability scaling.
+- S2 sensitivity frontier on 6/7-with-only-S2-fail configs was empty for all three candidates (no qualifying configs), so no feasible multiplier frontier from 1.0 to 2.0 could be established under that criterion subset.
+- Calibration simulation (Pattern A/B/C) with best configs:
+  - IVW: failed all three patterns (`rho=-0.8728`, `step_ratio=2.9533`, `r=0.0000`).
+  - HTG: passed A and C, failed B (`step_ratio=1.0036`).
+  - Fisher: passed A and C, failed B on smoothness (step jump too sharp; `max_delta=0.9996`).
+- Fisher correlation robustness results:
+  - Inflation ratios were near 1.0 across all rhos (`1.0000`, `1.0000`, `1.0000`, `1.0025`, `1.0000` for rho `0.0..0.9`).
+  - No flag at rho=0.5 (`inflation_ratio > 1.5` condition not met).
+  - In this setup both corrected and uncorrected aggregates were at floor-level (~`1e-12`), limiting interpretability of inflation magnitude.
+
+**Implications**
+
+- Session 2 did not produce a 7/7 candidate within the constrained single-candidate families.
+- HTG remains the best single-family performer in overall pass count, but improved S2 compounding still trades off against other scenario gates.
+- Fisher behaves better on missing-data/boundary than Session 1 under isolation, but Noisy-TV (S1) and weak-signal compounding (S2) remain unresolved.
+- Correlation-inflation risk was not observed in the tested S2-like regime, but this result is confounded by aggregate floor saturation.
+
+**Open Threads**
+
+- Session 3 should focus on cross-family designs (explicitly out of scope for Session 2) because single-family tuning did not reach 7/7.
+- Revisit S2 fixture regime for Fisher correlation stress where aggregates are not floor-saturated; otherwise inflation diagnostics are weak.
+- Investigate why Session 2 normalization winner degrades IVW/HTG S5-S6 behavior despite helping S1 suppression.
+
 ### 2026-02-22 — WDK#41 Session 1: Candidate Aggregation Prototype + Adversarial Stress Test
 
 **Scope**
@@ -101,27 +162,33 @@ IN PROGRESS
 
 - All three candidates are bounded in practice for Session 1 fixtures: no NaN and no out-of-range scores in the full 3x7 matrix.  
   Evidence: Investigation Log entry `2026-02-22 — WDK#41 Session 1` (`results.json`, boundedness check).
-- No candidate satisfies all seven stress scenarios in Session 1.  
-  Evidence: same log entry; pass totals `IVW 5/7`, `HTG 5/7`, `Fisher 3/7`.
-- `HTG-Max` currently dominates Noisy-TV resistance among tested options (passes S1 and S7), while `IVW-CDF` and `Fisher-UP` inflate or fail to decrease under the S1 value+uncertainty doubling stressor.  
-  Evidence: same log entry, S1 and S7 rows in matrix.
+- Session 2 structural flags are backward-compatible: with defaults, `evaluate.py` exactly reproduces Session 1 pass/fail outputs (`5/7`, `5/7`, `3/7`).  
+  Evidence: Investigation Log entry `2026-02-22 — WDK#41 Session 2` (`evaluate.py` rerun before/after modifications).
+- No candidate satisfies all seven stress scenarios after Session 2 sweeps; best pass counts are `IVW 2/7`, `HTG 5/7`, `Fisher 4/7` in main Stage 2 runs, with Fisher isolation at `5/7`.  
+  Evidence: same Session 2 log entry (`sweep_summary.md`, `sweep_results.json`).
+- `HTG-Max` remains the strongest single-family performer by aggregate pass count in Session 2 sweeps, but still fails two gates in best settings (S5,S6).  
+  Evidence: same Session 2 log entry, Stage 2 top-table.
 - Calibration decomposability is workable for all primary candidates after normalized decomposition weights in IVW (`sum(w_i*u_i) ~= aggregate`).  
   Evidence: same log entry, S6 reconstruction values.
-- CDF normalization handles scale heterogeneity stably across disparate units/kinds (`BF`, `Z`, `AbsDiff`) without collapse to 0/1 in this fixture.  
-  Evidence: same log entry, S5 row and ranking stability.
+- S2 criterion-sensitivity frontier (for configs at 6/7 failing only S2) yielded no qualifying configs for any candidate in Session 2.  
+  Evidence: same Session 2 log entry (`sweep_summary.md`, S2 frontier table).
+- Calibration pattern B is unstable across all best-per-candidate configs (either insufficient step response or excessive jump/smoothness failure).  
+  Evidence: same Session 2 log entry (`calibration_summary.md`).
+- Fisher correlation inflation flag did not trigger at rho=0.5 (`inflation_ratio` did not exceed 1.5), but the test aggregates were floor-saturated.  
+  Evidence: same Session 2 log entry (`correlation_results.json`).
 
 ### What We Suspect
 
 - A hybrid that combines HTG-style uncertainty gating with non-max compounding may better satisfy both Noisy-TV resistance and weak-signal accumulation than any single candidate tested so far.  
-  Evidence basis: HTG passes S1/S7 but fails S2; IVW/Fisher behavior suggests tradeoff in current forms (same log entry).
-- Missing-data behavior is likely dominated by fallback uncertainty-floor choices (`c_floor`, `r_floor`, `w_default`) more than by normalization transforms themselves.  
-  Evidence basis: S4 deltas diverge strongly by candidate despite shared normalization pipeline (same log entry).
+  Evidence basis: Session 1 + Session 2 sweep outcomes show persistent tradeoff patterns across isolated families (`2026-02-22 — WDK#41 Session 1`, `2026-02-22 — WDK#41 Session 2`).
+- Joint use of normalization-level SE dampening and Fisher SE-reliability scaling may be over-attenuating evidence in some regimes.  
+  Evidence basis: Fisher isolation (`se_dampen=False`) improved from 4/7 to 5/7 vs. main sweep (Session 2).
 
 ### What We Don't Know
 
-- Whether a tuned parameter region exists where one candidate can pass all seven scenarios simultaneously.
-- Which fallback policy for `NoUncertainty` best preserves Noisy-TV resistance without suppressing genuine weak-signal compounding.
-- Whether S2’s compounding criterion should remain fixed or be parameterized by expected bounded-aggregator behavior.
+- Whether any non-hybrid single-family configuration can ever satisfy all seven scenarios under current fixtures and criteria.
+- Which mechanism can resolve S2 compounding without regressing S5/S6 performance in HTG and S1 in IVW/Fisher.
+- Whether Fisher correlation inflation remains near-neutral when evaluated in a non-floor-saturated weak-signal regime.
 - Which candidate/variant should be promoted to a formal `AggregateScore` definition for architecture integration (Session 3 decision).
 
 ## Prototype Index
@@ -135,10 +202,18 @@ IN PROGRESS
 | `research/adversarial-reward/prototypes/aggregation-candidates/evaluate.py` | Matrix runner and artifact generator for candidate-by-scenario evaluation | Complete (Session 1) | 3x7 matrix, pass/fail adjudication, decomposition capture, exploratory variant execution |
 | `research/adversarial-reward/prototypes/aggregation-candidates/results.json` | Raw machine-readable Session 1 outputs | Complete (Session 1) | Full per-cell scores, pass/fail, warnings/skips, and decompositions |
 | `research/adversarial-reward/prototypes/aggregation-candidates/results.md` | Human-readable Session 1 matrix summary | Complete (Session 1) | Compact 3x7 evidence table for research log integration |
+| `research/adversarial-reward/prototypes/aggregation-candidates/sweep.py` | Session 2 two-stage parameter sweep driver (normalization + candidate sweeps + S2 sensitivity) | Complete (Session 2) | Exhaustive scenario evaluation over 723 candidate-configs (243 Stage 1 + 480 Stage 2) |
+| `research/adversarial-reward/prototypes/aggregation-candidates/sweep_results.json` | Full Session 2 sweep records for all evaluated configs and scenarios | Complete (Session 2) | Machine-readable pass/fail matrices, raw scores, and config metadata |
+| `research/adversarial-reward/prototypes/aggregation-candidates/sweep_summary.md` | Human-readable Session 2 sweep rankings and frontier summary | Complete (Session 2) | Top-5 per candidate, no-7/7 finding, Fisher isolation comparison |
+| `research/adversarial-reward/prototypes/aggregation-candidates/calibration_sim.py` | Deterministic 50-cycle calibration stress simulation for patterns A/B/C | Complete (Session 2 Stretch) | Pattern metrics (Spearman/step-ratio/Pearson) + smoothness diagnostics per candidate |
+| `research/adversarial-reward/prototypes/aggregation-candidates/calibration_results.json` | Raw cycle-level calibration outputs | Complete (Session 2 Stretch) | Per-cycle scores and pass/fail stats for each pattern/candidate |
+| `research/adversarial-reward/prototypes/aggregation-candidates/calibration_summary.md` | Human-readable calibration summary | Complete (Session 2 Stretch) | Pattern-by-candidate pass matrix and smoothness outcomes |
+| `research/adversarial-reward/prototypes/aggregation-candidates/correlation_test.py` | Fisher-UP correlation robustness probe with Cholesky generation + Brown-style correction | Complete (Session 2 Stretch) | Inflation-ratio diagnostics across rho levels with overflow-safe corrected CDF terms |
+| `research/adversarial-reward/prototypes/aggregation-candidates/correlation_results.json` | Correlation robustness outputs | Complete (Session 2 Stretch) | Inflation ratios at rho `{0.0,0.3,0.5,0.7,0.9}` and rho=0.5 flag status |
 
 ## Next Steps
 
-0. **WDK#41 Step 0 (inserted): Session 2 parameter sweeps + fallback-policy ablations** — Run sensitivity analysis over `IVW(w_default)`, `HTG(alpha,tau,c_floor)`, and `Fisher(n_ref,r_floor)`; evaluate missing-uncertainty policies and identify any configuration that can satisfy all seven scenarios. Scope: 1-2 sessions.
+0. **WDK#41 Step 0 (updated): Session 3 bridge from sweep outcomes** — Design and evaluate cross-family/hybrid candidates explicitly targeting the unresolved `(S1,S2)` and `(S5,S6)` tradeoffs identified in Session 2. Scope: 1-2 sessions.
 
 1. **Survey formalizations in active learning and Bayesian experimental design** — Review how information gain is formalized in discriminative active learning, Bayesian optimization (expected improvement, knowledge gradient), and optimal experimental design. Identify which formalizations handle bounded search spaces. Scope: 2-3 sessions.
 

@@ -20,6 +20,9 @@ class NormalizationConfig:
     )
     custom_sigmoids: dict[str, SigmoidParams] = field(default_factory=dict)
     clip_eps: float = 1e-12
+    se_dampen_enabled: bool = False
+    se_dampen_k: float = 5.0
+    se_dampen_x0: float = 2.0
 
 
 @dataclass(frozen=True)
@@ -32,6 +35,11 @@ class UncertaintySnapshot:
 
 def sigmoid(x: float, k: float, x0: float) -> float:
     return 1.0 / (1.0 + math.exp(-k * (x - x0)))
+
+
+def se_dampen(raw_score: float, value: float, se: float, config: NormalizationConfig) -> float:
+    snr = abs(value) / se
+    return raw_score * sigmoid(snr, config.se_dampen_k, config.se_dampen_x0)
 
 
 def normal_cdf(z: float) -> float:
@@ -164,6 +172,11 @@ def normalize_component(
         adjusted_score = bounded_raw
 
     final_score = bounded_unit_interval(adjusted_score, config.clip_eps)
+    if config.se_dampen_enabled:
+        snapshot = extract_uncertainty_snapshot(component)
+        if snapshot.standard_error is not None and snapshot.standard_error > 0:
+            final_score = se_dampen(final_score, component.value, snapshot.standard_error, config)
+
     return final_score, warnings, {
         "raw_score": bounded_raw,
         "direction_mode": direction_mode,

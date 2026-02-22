@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-02-22T06:06:12.233377+00:00",
+  "generated_at_utc": "2026-02-22T06:50:11.543669+00:00",
   "candidate_order": [
     "IVW-CDF",
     "HTG-Max",
@@ -3506,8 +3506,8 @@
         "passed": false,
         "raw_scores": {
           "missing": 0.06618287735710049,
-          "baseline_full": 0.3249722391109764,
-          "relative_delta": 0.7963429813630961
+          "baseline_full": 0.3249722391109765,
+          "relative_delta": 0.7963429813630962
         },
         "score_summary": "missing=0.0662, baseline=0.3250, delta=0.796",
         "pass_reason": "finite and <=20% delta from baseline",
@@ -3595,8 +3595,8 @@
               "method_ref": "s4.z.1",
               "kind": "ZScore",
               "score": 0.7286678781072347,
-              "weight": 0.22213427759541926,
-              "contribution": 0.1618621127103376,
+              "weight": 0.22213427759541934,
+              "contribution": 0.16186211271033765,
               "diagnostics": {
                 "p_value": 0.27133212189276534,
                 "p_adj": 0.3091370726046696,
@@ -3613,8 +3613,8 @@
               "method_ref": "s4.d.1",
               "kind": "EffectSize",
               "score": 0.5762892028332067,
-              "weight": 0.13810864924358596,
-              "contribution": 0.07959052337695711,
+              "weight": 0.138108649243586,
+              "contribution": 0.07959052337695714,
               "diagnostics": {
                 "p_value": 0.4237107971667933,
                 "p_adj": 0.4819578977400822,
@@ -3631,8 +3631,8 @@
               "method_ref": "s4.kl.1",
               "kind": "KLDivergence",
               "score": 0.3296799539643607,
-              "weight": 0.06963157436253672,
-              "contribution": 0.022956134230307065,
+              "weight": 0.06963157436253677,
+              "contribution": 0.02295613423030708,
               "diagnostics": {
                 "p_value": 0.6703200460356393,
                 "p_adj": 0.6921171816887305,
@@ -3649,8 +3649,8 @@
               "method_ref": "s4.abs.1",
               "kind": "AbsoluteDifference",
               "score": 0.5299640517645717,
-              "weight": 0.11427844698470041,
-              "contribution": 0.06056346879337463,
+              "weight": 0.11427844698470047,
+              "contribution": 0.06056346879337467,
               "diagnostics": {
                 "p_value": 0.47003594823542827,
                 "p_adj": 0.5466443442927771,
