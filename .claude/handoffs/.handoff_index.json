@@ -90,6 +90,13 @@
       "created": "2026-02-21T21:15:49.862727",
       "slug": "wdk41-reward-aggregation-experiment",
       "directive": "Plan an experiment to answer WDK#41: How do you collapse a multi-metric comparison into one reward number?"
+    },
+    {
+      "sequence": 14,
+      "filename": "handoff_014_2026-02-21_plan-session3-hybrid-aggregation.md",
+      "created": "2026-02-21T23:03:58.398432",
+      "slug": "plan-session3-hybrid-aggregation",
+      "directive": "Plan Session 3 for adversarial reward aggregation \u2014 design hybrid candidate combining HTG gating + Fisher compounding"
     }
   ]
 }
