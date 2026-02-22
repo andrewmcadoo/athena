@@ -30,6 +30,50 @@ IN PROGRESS
 
 ## Investigation Log
 
+### 2026-02-22 -- WDK#41 Session 5: Hybrid Stretch Analyses (Calibration + Correlation)
+
+**Scope**
+
+- Execute post-ceiling stretch validation on the hybrid candidate using the approved BF normalization family (`log_scaled`, `c=0.083647`, `bf_max_target=10000`).
+- Re-run Session 2 stretch protocols against the hybrid for direct comparability:
+  - calibration patterns A/B/C (50 cycles each)
+  - correlation robustness at rho `{0.0, 0.3, 0.5, 0.7, 0.9}` with Brown-style diagnostic correction.
+- Enforce a baseline pre-gate against all seven fixtures before any stretch interpretation.
+
+**Method**
+
+- Added `research/adversarial-reward/prototypes/aggregation-candidates/stretch_test.py` as a standalone four-phase harness:
+  - **Phase 0**: baseline re-verification via `evaluate_fixture(...)` + `margin_from_cell(...)`; strict pass/label checks, margin comparison to `ceiling_analysis.json` baseline with tolerance `1e-6` (floating-point drift from rounded `c`).
+  - **Phase 1**: calibration simulation on S6 fixture using imported `run_pattern_a/b/c` and helper metrics (`spearman_rho`, `pearson_r`, `rank_values`).
+  - **Phase 2**: correlation robustness on S6 fixture, 400 samples/rho, `random.seed(42)` set at Phase 2 start; per-sample log evidence extracted as `sum(contribution.diagnostics["log_evidence"])`.
+  - **Phase 3**: deterministic artifact generation to `stretch_results.json` + `stretch_summary.md`.
+- Executed `python stretch_test.py` and confirmed deterministic JSON behavior across two runs (timestamp excluded).
+
+**Findings**
+
+- Phase 0 gate passed (`7/7` scenarios). All margins remained consistent with post-ceiling baseline directionality and matched labels exactly.
+- Phase 1 calibration (hybrid):
+  - Pattern A: `spearman_rho=-1.0000`, `max_delta=0.0493` -> **PASS**
+  - Pattern B: `step_ratio=1.0290`, `max_delta=0.0282` -> **FAIL** (`non-responsive but smooth`)
+  - Pattern C: `pearson_r=-0.9341`, `max_delta~1.25e-7` -> **PASS**
+- Key question result (Pattern B): hybrid did **not** recover sudden regime-change responsiveness; it remains smoother than Session 2 Fisher but under threshold on step response.
+- Phase 2 correlation (hybrid on S6) resolved Session 2 floor pathology:
+  - `floor_saturated=False` at all rho levels (`floor_count=0/400` everywhere)
+  - rho=0.5 pass criterion satisfied: `inflation_ratio=1.0035 <= 1.5` and not floor-saturated
+  - inflation ratios across rho stayed near 1 (`~1.003-1.048`).
+
+**Implications**
+
+- Post-ceiling hybrid is robust on baseline suite and correlation robustness under non-floor-saturated conditions.
+- The prior Session 2 correlation ambiguity (all-floor aggregates) is removed in this S6-based probe, making inflation diagnostics interpretable.
+- Hybrid still inherits Pattern B regime-change under-response (low step ratio), so calibration responsiveness remains an unresolved risk despite smoothness.
+
+**Open Threads**
+
+- Investigate whether targeted hybrid adjustments can lift Pattern B `step_ratio` above 3.0 without reintroducing Fisher-like non-smooth jumps.
+- Evaluate Pattern B behavior under additional fixture families (beyond S6) to distinguish structural under-response from fixture-specific dynamics.
+- Keep S6-based correlation probe as the default correlation harness for non-floor-saturated diagnostics in follow-up sessions.
+
 ### 2026-02-22 -- WDK#41 Session 4.1: BF Ceiling Analysis for Hybrid S5 Saturation
 
 **Scope**
@@ -399,6 +443,9 @@ IN PROGRESS
 | `research/adversarial-reward/prototypes/aggregation-candidates/perturbation_test.py` | Session 4 targeted robustness sweep harness for Hybrid under fixture perturbations | Complete (Session 4) | 70-run robustness map, exact tipping-point detection, and baseline sanity reproduction |
 | `research/adversarial-reward/prototypes/aggregation-candidates/perturbation_results.json` | Raw Session 4 perturbation outputs | Complete (Session 4) | Per-axis/per-point pass status, margins, raw scores, and tipping metadata |
 | `research/adversarial-reward/prototypes/aggregation-candidates/perturbation_summary.md` | Human-readable Session 4 robustness summary | Complete (Session 4) | Scenario-by-axis pass rates, S2 grid, S5 frontier, and S6 transition boundaries |
+| `research/adversarial-reward/prototypes/aggregation-candidates/stretch_test.py` | Session 5 post-ceiling hybrid stretch harness (Phase 0 gate, calibration patterns, correlation robustness, artifact emission) | Complete (Session 5 Stretch) | Deterministic 4-phase execution with strict baseline gate and S6 non-floor-saturated correlation diagnostics |
+| `research/adversarial-reward/prototypes/aggregation-candidates/stretch_results.json` | Session 5 machine-readable stretch outputs | Complete (Session 5 Stretch) | Verified Phase 0 `7/7`, Pattern B under-response classification, and rho=0.5 inflation pass with floor_saturated=False |
+| `research/adversarial-reward/prototypes/aggregation-candidates/stretch_summary.md` | Session 5 human-readable stretch summary | Complete (Session 5 Stretch) | Side-by-side Session 2 comparison tables and explicit verdict on calibration vs correlation stretch behavior |
 
 ## Next Steps
 

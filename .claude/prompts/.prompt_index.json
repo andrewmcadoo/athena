@@ -111,6 +111,14 @@
       "slug": "s5-ceiling-analysis",
       "goal": "Implement ceiling analysis for ATHENA hybrid aggregation BF normalization saturation, testing alternative normalizations with full 7-scenario evaluation",
       "framework": "RISEN"
+    },
+    {
+      "sequence": 15,
+      "filename": "prompt_015_2026-02-22_session5-hybrid-stretch.md",
+      "created": "2026-02-22T14:06:44.712479",
+      "slug": "session5-hybrid-stretch",
+      "goal": "Implement stretch test script for post-ceiling hybrid aggregation candidate with calibration simulation, correlation robustness, and output generation",
+      "framework": "RISEN"
     }
   ]
 }
