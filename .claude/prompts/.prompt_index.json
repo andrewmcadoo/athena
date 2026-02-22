@@ -39,6 +39,14 @@
       "slug": "gromacs-adapter-review-fixes",
       "goal": "Address 3 warnings and 1 coverage gap from GROMACS adapter code review",
       "framework": "RTF"
+    },
+    {
+      "sequence": 6,
+      "filename": "prompt_006_2026-02-21_vasp-adapter-litmus-test.md",
+      "created": "2026-02-21T16:04:30.769153",
+      "slug": "vasp-adapter-litmus-test",
+      "goal": "Implement VASP adapter for ATHENA trace-semantics IR prototype with hidden confounder litmus test",
+      "framework": "RISEN"
     }
   ]
 }
