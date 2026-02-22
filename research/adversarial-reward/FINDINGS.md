@@ -30,6 +30,69 @@ IN PROGRESS
 
 ## Investigation Log
 
+### 2026-02-22 -- WDK#41 Session 4: Hybrid Robustness Under Targeted Fixture Perturbation
+
+**Scope**
+
+- Determine whether Session 3's `Hybrid` `7/7` result is structurally robust or narrowly tuned by running targeted perturbations around known weak margins.
+- Stress the two pre-identified likely failure points:
+  - S2 custom-sigmoid sensitivity (`s2.custom.1`)
+  - S5 upper-bound ceiling pressure near component score `0.991`
+- Probe secondary axes (S6 joint compression, S7 boundary SE, S4 missing-uncertainty count, S1 SE scaling, S2 non-custom SE scaling) under fixed baseline Hybrid config.
+
+**Method**
+
+- Added `research/adversarial-reward/prototypes/aggregation-candidates/perturbation_test.py` as a dedicated Session 4 sweep harness.
+- Reused existing prototype modules only (`candidates.py`, `evaluate.py`, `scenarios.py`, `normalization.py`, `models.py`) with private scenario helpers (`_metric`, `_summary`, `_no_uncertainty`) for fixture variants.
+- Enforced baseline sanity checks before sweeps:
+  - S2 margin `((aggregate/max_single)/1.5)-1 = +0.072804`
+  - S4 relative delta `= 0.071993`
+- Executed `python perturbation_test.py` producing:
+  - `perturbation_results.json` (full structured run output)
+  - `perturbation_summary.md` (pass-rate matrix, critical grids, tipping points)
+- Total perturbation evaluations: `70` (S3 direction-asymmetry axis intentionally dropped as lowest-priority per session constraints).
+
+**Findings**
+
+- Top-level robustness map (pass counts):
+  - `s2_custom_sigmoid` (S2): `20/24` pass (83.3%)
+  - `s2_non_custom_se_scale` (S2): `5/5` pass (100.0%)
+  - `s5_bayes_factor` (S5): `4/9` pass (44.4%)
+  - `s6_joint_compress` (S6): `11/16` pass (68.8%)
+  - `s7_boundary_se` (S7): `7/7` pass (100.0%)
+  - `s4_missing_count` (S4): `4/4` pass (100.0%)
+  - `s1_se_mult` (S1): `3/5` pass (60.0%)
+- S2 critical-axis tipping behavior:
+  - Exact PASS->FAIL transition at `x0=-0.2` between `k=1.5` (PASS) and `k=2.0` (FAIL).
+  - Failing combinations were only `{k in [2.0, 2.2, 2.5, 3.0], x0=-0.2}`.
+- S5 critical-axis tipping behavior:
+  - Exact PASS->FAIL transition between `BF=110` (PASS, margin `+0.000009`) and `BF=120` (FAIL, margin `-0.000736`).
+  - All `BF >= 120` failed due to upper-bound pressure (`0.991 - max(component_score) < 0`).
+- S6 joint compression tipping behavior:
+  - Failures concentrated in high-compression/high-BF corners:
+    - `d_mid=3.0,bf_strong=500`
+    - `d_mid=3.0,bf_strong=1000`
+    - `d_mid=4.0,bf_strong=100`
+    - `d_mid=4.0,bf_strong=500`
+    - `d_mid=4.0,bf_strong=1000`
+- Expected-robust axes held (S2 non-custom SE scale, S4 missing count, S7 boundary SE), but S1 showed an additional fragility under extreme SE inflation:
+  - S1 failed at `SE mult = 5.0` and `10.0`.
+
+**Implications**
+
+- Session 3's `7/7` is not a pure one-point fluke, but it is not globally robust either; fragility is concentrated in specific high-leverage parameter regions.
+- The dominant structural risks are now empirically localized:
+  - S2 custom sigmoid over-aggressiveness when `x0` is shifted negative
+  - S5 BayesFactor ceiling overshoot once BF crosses ~`120`
+  - S6 decomposition stress when both mid-effect and BF-strong terms are jointly amplified
+- Candidate recommendation should include explicit operating constraints and guardrails, not just baseline pass/fail status.
+
+**Open Threads**
+
+- Determine whether S1 failure under large SE multipliers reflects realistic DSL uncertainty regimes or only pathological scaling.
+- Test whether small constraint adjustments (without changing core hybrid architecture) can widen S5/S6 safety margins while retaining S2 compounding.
+- Extend perturbation map to correlated weak-signal regimes where Fisher-like aggregation is not floor-saturated.
+
 ### 2026-02-21 -- WDK#41 Session 3: HTG-Gated Fisher Product Hybrid (n_terms=1)
 
 **Scope**
@@ -225,6 +288,17 @@ IN PROGRESS
   Evidence: same Session 3 log entry (`results.json` S2 raw scores).
 - Hybrid meets S4 and S6 integrity gates with margin: S4 relative delta `0.0719926034986539` (`<=0.20`), S6 reconstruction error `1.1102230246251565e-16` (`<=1e-8`).  
   Evidence: same Session 3 log entry (`results.json` S4/S6 raw scores and decomposition).
+- Session 4 perturbation sweeps (70 runs) show localized but real fragility around three axes:
+  - S2 custom sigmoid: `20/24` pass with failures only at `x0=-0.2` and `k>=2.0`
+  - S5 BayesFactor: `4/9` pass with transition at `BF 110->120`
+  - S6 joint compression: `11/16` pass with failures concentrated at high `d_mid` and high `bf_strong`.  
+  Evidence: Investigation Log entry `2026-02-22 -- WDK#41 Session 4` (`perturbation_results.json`, `perturbation_summary.md`).
+- S2 sensitivity to `s2.custom.1` is now verified, not conjectural: moving to `x0=-0.2` introduces immediate failures for `k>=2.0`, while non-custom SE scaling remained `5/5` pass.  
+  Evidence: same Session 4 log entry (`perturbation_summary.md` S2 grid and axis pass rates).
+- S5 upper-bound margin is confirmed as a tight failure boundary: PASS at `BF=110` (margin `+0.000009`), FAIL at `BF=120` (margin `-0.000736`).  
+  Evidence: same Session 4 log entry (`perturbation_summary.md` S5 sweep table).
+- S7 boundary behavior and S4 missing-uncertainty behavior remained robust across sampled perturbations (`7/7` and `4/4` respectively).  
+  Evidence: same Session 4 log entry (`perturbation_results.json` axis stats).
 - All three candidates are bounded in practice for Session 1 fixtures: no NaN and no out-of-range scores in the full 3x7 matrix.  
   Evidence: Investigation Log entry `2026-02-22 — WDK#41 Session 1` (`results.json`, boundedness check).
 - Session 2 structural flags are backward-compatible: with defaults, `evaluate.py` exactly reproduces Session 1 pass/fail outputs (`5/7`, `5/7`, `3/7`).  
@@ -246,12 +320,14 @@ IN PROGRESS
 
 - Joint use of normalization-level SE dampening and Fisher SE-reliability scaling may be over-attenuating evidence in some regimes.  
   Evidence basis: Fisher isolation (`se_dampen=False`) improved from 4/7 to 5/7 vs. main sweep (Session 2).
-- The S2 pass margin may be sensitive to fixture-level score concentration in `s2.custom.1`, because that component sets the max-single threshold and dominates the target denominator.  
-  Evidence basis: Session 3 S2 decomposition (`s2.custom.1` score `0.5818`; max non-custom `0.3823`).
+- The newly observed S1 failures under extreme SE multipliers (`5x`, `10x`) may indicate an additional high-uncertainty corner case in the current hybrid gating pipeline, rather than a broad Noisy-TV regression.  
+  Evidence basis: Session 4 perturbation axis `s1_se_mult` (`3/5` pass; failures only at highest multipliers).
 
 ### What We Don't Know
 
 - Whether the hybrid remains `7/7` outside the current fixed fixture set (especially under correlated weak signals and non-floor-saturated Fisher regimes).
+- Whether S1 extreme-SE failures occur in realistic simulator uncertainty ranges or only under adversarially inflated scaling.
+- Whether small targeted guardrails around S2 custom sigmoid and S5 BF ceiling can eliminate observed failures without degrading baseline S2 compounding.
 - Whether any non-hybrid single-family configuration can match hybrid performance under current criteria.
 - Whether Fisher correlation inflation remains near-neutral when evaluated in a non-floor-saturated weak-signal regime.
 - Which candidate/variant should be promoted to a formal `AggregateScore` definition for architecture integration (Session 3 decision).
@@ -275,6 +351,9 @@ IN PROGRESS
 | `research/adversarial-reward/prototypes/aggregation-candidates/calibration_summary.md` | Human-readable calibration summary | Complete (Session 2 Stretch) | Pattern-by-candidate pass matrix and smoothness outcomes |
 | `research/adversarial-reward/prototypes/aggregation-candidates/correlation_test.py` | Fisher-UP correlation robustness probe with Cholesky generation + Brown-style correction | Complete (Session 2 Stretch) | Inflation-ratio diagnostics across rho levels with overflow-safe corrected CDF terms |
 | `research/adversarial-reward/prototypes/aggregation-candidates/correlation_results.json` | Correlation robustness outputs | Complete (Session 2 Stretch) | Inflation ratios at rho `{0.0,0.3,0.5,0.7,0.9}` and rho=0.5 flag status |
+| `research/adversarial-reward/prototypes/aggregation-candidates/perturbation_test.py` | Session 4 targeted robustness sweep harness for Hybrid under fixture perturbations | Complete (Session 4) | 70-run robustness map, exact tipping-point detection, and baseline sanity reproduction |
+| `research/adversarial-reward/prototypes/aggregation-candidates/perturbation_results.json` | Raw Session 4 perturbation outputs | Complete (Session 4) | Per-axis/per-point pass status, margins, raw scores, and tipping metadata |
+| `research/adversarial-reward/prototypes/aggregation-candidates/perturbation_summary.md` | Human-readable Session 4 robustness summary | Complete (Session 4) | Scenario-by-axis pass rates, S2 grid, S5 frontier, and S6 transition boundaries |
 
 ## Next Steps
 
