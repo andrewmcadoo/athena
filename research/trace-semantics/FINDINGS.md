@@ -17,7 +17,7 @@ What intermediate representation (IR) can translate raw DSL trace logs from stru
 
 ## Status
 
-IN PROGRESS — Steps 1-7 and all synthesis steps (1d, 2c, 3b) complete. Step 5a (candidate IR schemas) complete: Hybrid LEL+DGR recommended (94/100). Step 5b (LEL prototype) complete. Step 5c (open thread resolution) complete: 5/5 threads resolved/narrowed/deferred with evidence. Step 6 (Hybrid LEL+DGR Phase 2 prototype) complete: `by_id` index implemented, `CausalOverlay` + R14 confounder query implemented. Step 7 (R17+R18 query implementation) complete: `compare_predictions` + `implicate_causal_nodes` implemented with depth-aware BFS helper. Step 9 complete: GROMACS adapter implemented on existing LEL types (`src/gromacs_adapter.rs`). Step 10 complete: VASP adapter implemented on existing LEL types (`src/vasp_adapter.rs`) with first adapter-level use of `ConvergencePoint` and `StateSnapshot`. Step 11 complete: hidden confounder prototype litmus validated end-to-end on VASP-derived traces. Crate now passes 92/92 tests with strict clippy clean.
+IN PROGRESS — Steps 1-7 and all synthesis steps (1d, 2c, 3b) complete. Step 5a (candidate IR schemas) complete: Hybrid LEL+DGR recommended (94/100). Step 5b (LEL prototype) complete. Step 5c (open thread resolution) complete: 5/5 threads resolved/narrowed/deferred with evidence. Step 6 (Hybrid LEL+DGR Phase 2 prototype) complete: `by_id` index implemented, `CausalOverlay` + R14 confounder query implemented. Step 7 (R17+R18 query implementation) complete: `compare_predictions` + `implicate_causal_nodes` implemented with depth-aware BFS helper. Step 9 complete: GROMACS adapter implemented on existing LEL types (`src/gromacs_adapter.rs`). Step 10 complete: VASP adapter implemented on existing LEL types (`src/vasp_adapter.rs`) with first adapter-level use of `ConvergencePoint` and `StateSnapshot`. Step 11 complete: hidden confounder prototype litmus validated end-to-end on VASP-derived traces. Step 12 complete: R17 quantitative comparison formalization narrowed with a trace-semantics-to-adversarial-reward interface contract. Step 13 complete (NARROWED): convergence trajectory representation recommends a hybrid raw-plus-summary design (Option D) with ComparisonProfileV1-compatible outputs and explicit WDK#40 hook. Crate remains at 92/92 tests with strict clippy clean (no prototype code changes in Step 13).
 
 ## Key Definitions
 
@@ -27,6 +27,220 @@ IN PROGRESS — Steps 1-7 and all synthesis steps (1d, 2c, 3b) complete. Step 5a
 - **Theory-implementation separation**: The API-enforced structural distinction in DSL frameworks between what the user specifies (theory) and how the framework executes it (implementation).
 
 ## Investigation Log
+
+### 2026-02-22: Step 13 — Convergence Trajectory Representation (WDK#13)
+
+**Scope:** Resolve/narrow What We Don't Know #13 ("How convergence trajectories should be represented in the IR") with explicit evidence from the current prototype, steel-man/stress-test of Options A/B/C, hybrid Option D analysis, external library survey (pymatgen/ASE/Custodian), and downstream consumer trace against Step 12 `ComparisonProfileV1`.
+
+**Method:**  
+1. Empirical code inventory of convergence event usage and indexing across adapters/types (`event_kinds.rs`, `vasp_adapter.rs`, `gromacs_adapter.rs`, `adapter.rs`, `lel.rs`, tests).  
+2. Steel-man then stress-test for Option A (Raw Time Series), Option B (Classified Patterns), Option C (Derived Features), with explicit mechanism + conditions for failure.  
+3. Hybrid Option D design pass: evaluate candidate `ConvergenceSummary` fields against consumer needs and five design tensions (cross-framework asymmetry, silent-failure detection, R17 interface, WDK#40, adapter burden).  
+4. Scoped external survey focused on representation choices: pymatgen, ASE, Custodian docs.  
+5. Consumer trace mapping from convergence evidence to LFI Stage 1/2/3, Bayesian Surprise Evaluator, and Step 12 `ComparisonProfileV1`.
+
+**Findings:**
+
+1. **[PROVEN] `ConvergencePoint` is currently a VASP-only raw trajectory event in the prototype.**  
+Mechanism: VASP `parse_oszicar` emits one `ConvergencePoint` per `DAV:`/`RMM:` SCF line (`metric_name: "dE"`, `converged: None`) and back-patches the most recent one to `Some(true)` when an `F=` line is parsed.  
+Conditions: this behavior appears only in OSZICAR parsing path, not in shared adapter logic.  
+Evidence: `prototypes/lel-ir-prototype/src/event_kinds.rs:95-101`; `prototypes/lel-ir-prototype/src/vasp_adapter.rs:175-276`, especially `:184-216` and `:219-240`.
+
+2. **[PROVEN] GROMACS and OpenMM adapter paths do not emit `ConvergencePoint`; convergence-like signals are represented asymmetrically.**  
+Mechanism: GROMACS emits `EnergyRecord`, `NumericalStatus`, and terminal `ExecutionStatus`; OpenMM mock emits `ParameterRecord`/`ResourceStatus`/`EnergyRecord`/`ExecutionStatus` only.  
+Conditions: asymmetry is structural in current prototype paths, not a temporary index omission.  
+Evidence: `prototypes/lel-ir-prototype/src/gromacs_adapter.rs:429-530`; `prototypes/lel-ir-prototype/src/adapter.rs:82-197`; repo grep on `ConvergencePoint` usage is adapter-local to VASP.
+
+3. **[PROVEN] Current indexes do not provide first-class convergence queryability by variable or DAG node.**  
+Mechanism: `by_variable` indexes only `ParameterRecord` and `ObservableMeasurement`; `parse_oszicar` does not set `dag_node_ref` for convergence events, so `by_dag_node` has no convergence anchors.  
+Conditions: impacts Stage 2/3 graph-linked queries and any consumer wanting direct convergence lookups without full stream scan.  
+Evidence: `prototypes/lel-ir-prototype/src/lel.rs:130-141`; `prototypes/lel-ir-prototype/src/lel.rs:145-149`; `prototypes/lel-ir-prototype/src/vasp_adapter.rs:190-211`.
+
+4. **[PROVEN + CONJECTURE] Cardinality can become large enough that raw-only representation is expensive for every downstream consumer to re-interpret.**  
+Mechanism: sample fixture has six SCF convergence events (`2` ionic steps x `3` SCF points each); realistic runs can be much larger.  
+Conditions: estimate of ~1500 events assumes ~50 ionic steps x ~30 SCF iterations and is a back-of-envelope bound, not yet benchmarked in this repo.  
+Evidence: sample data and assertion at `prototypes/lel-ir-prototype/src/tests/mod.rs:3071-3079` and `:3377-3385`.
+
+5. **[PROVEN REASONING] Option A (Raw Time Series) steel-man + stress-test.**  
+Steel-man: maximally preserves information; prevents anti-pattern of irreversible lossy compression; already matches implemented VASP path; supports post-hoc detection of silent-failure trajectories not anticipated at parse time.  
+Stress-test: (i) cardinality growth and repeated scan cost, (ii) no convergence-specific index support today, (iii) cross-framework asymmetry leaves GROMACS/OpenMM with no equivalent raw convergence stream, (iv) every consumer must duplicate feature/pattern extraction logic.  
+Evidence: Findings 1-4 above; `prototypes/lel-ir-prototype/src/lel.rs:130-141`.
+
+6. **[CONJECTURE WITH BOUNDED MECHANISM] Option B (Classified Patterns) steel-man + stress-test.**  
+Steel-man: strong compression (order-of-magnitude plausible), direct routing signal for LFI Stage 2 and BSE, and normalization layer across frameworks.  
+Stress-test: taxonomy is domain-loaded and incomplete by construction; pattern-first storage is lossy for unseen failure modes; detection logic placement creates either adapter bloat or a new summarization component; confidence scoring is mandatory to avoid false certainty.  
+Evidence: architecture need for calibrated/invalidation-aware downstream signals (`ARCHITECTURE.md:198-202`, `:206`, `:113`, `:168`); no primary pattern-first convergence representation found in scoped external survey (Finding 8).
+
+7. **[PROVEN + INFERENCE] Option C (Derived Features Only) steel-man + stress-test.**  
+Steel-man: smallest storage and easiest immediate consumer integration; aligns with common library APIs that expose convergence booleans/counters.  
+Stress-test: loses trajectory shape (e.g., oscillation, two-plateau, late divergence), making silent-failure mechanisms harder to falsify; feature set hard-codes assumptions and can violate AP5-style anti-loss constraints if raw trace is discarded.  
+Evidence: prototype only stores per-point convergence in VASP today (`prototypes/lel-ir-prototype/src/event_kinds.rs:95-101`; `prototypes/lel-ir-prototype/src/vasp_adapter.rs:184-240`); anti-pattern context from candidate schema work (Step 5a) and current WDK#13 framing.
+
+8. **[PROVEN FROM EXTERNAL SOURCES] Ecosystem pattern is layered raw + derived, not classified-pattern-primary.**  
+`pymatgen`: the VASP parser exposes derived convergence booleans on `Vasprun` (`converged`, `converged_electronic`, `converged_ionic`), but also keeps step-level trajectories via OSZICAR/Vasprun structures (`electronic_steps`, `ionic_steps`). Mechanistically this is dual representation: lightweight decision flags plus recoverable trajectory detail for diagnosis. This matches Option D's layered direction rather than Option C-only collapse.  
+`ASE`: optimizer APIs return a boolean convergence result (`run(...)->bool`) and keep explicit trajectory-writing hooks (`self.attach(self._traj_write_image, ...)` when a trajectory is configured). The representation split is again derived decision signal plus optional full path history for audit/restart.  
+
+`Custodian`: convergence handling is rule-based on raw artifacts, not on a precomputed global pattern class. `NonConvergingErrorHandler` monitors OSZICAR behavior over recent ionic steps, while `UnconvergedErrorHandler` checks convergence from `vasprun.xml`. This is derived-feature operational logic anchored to raw trace files, with no evidence that classified patterns are the canonical store.  
+Inference boundary: scoped survey did not identify a mainstream package where convergence-pattern taxonomy is the primary persisted representation.  
+Evidence: pymatgen docs (`https://pymatgen.org/pymatgen.io.vasp.html`), especially `Vasprun.converged*` and OSZICAR step lists; ASE optimizer docs/source (`https://ase-lib.org/_modules/ase/optimize/optimize.html`); Custodian handler docs (`https://materialsproject.github.io/custodian/custodian.vasp.handlers.html`).
+
+9. **[PROVEN + CONSTRAINED DESIGN INFERENCE] Consumer trace requires multi-resolution convergence data, not a single abstraction.**  
+LFI Stage 1: implementation audit needs fast, derived checks (`converged`, `iteration_count`, and `iteration_count/max_iterations` when available) to decide whether execution satisfied solver-budget and numerical-completion conditions.  
+LFI Stage 2: methodological audit needs pattern-level interpretation plus parameter linkage (e.g., convergence behavior versus algorithmic choices) to test whether methodology was adequate versus merely executed.  
+LFI Stage 3: theoretical evaluation needs final residual/state summaries (`final_residual`, `converged`) for prediction-observation comparison under R17.  
+BSE: requires predicted-vs-observed divergence on convergence outcomes and must honor LFI invalidation semantics, so summary outputs need validity/provenance/uncertainty hooks.  
+ComparisonProfileV1 (Step 12 Candidate B): convergence evidence should map to multiple `MetricComponent` entries (status, residual, rate/pattern metrics), not one collapsed scalar, with optional `uncertainty` for WDK#40 compatibility.  
+Conditions: this mapping is constrained by architecture roles and Step 12 contract shape (`metrics: Vec<MetricComponent>`, optional `uncertainty`).  
+Evidence: LFI stages in `ARCHITECTURE.md:198-202`; BSE role and invalidation in `ARCHITECTURE.md:113` and `:168`; Step 12 contract block in this file (`ComparisonProfileV1`/`MetricComponent`); current prototype comparison types at `prototypes/lel-ir-prototype/src/common.rs:134-150` and `prototypes/lel-ir-prototype/src/overlay.rs:230-277`.
+
+10. **[RECOMMENDATION, NARROWED] Option D (Hybrid: raw events + boundary summary) is the strongest representation under current evidence.**  
+Mechanism: keep adapters raw (preserve discovery and silent-failure analyzability), compute `ConvergenceSummary` at Stage 1->2 boundary alongside/after `CausalOverlay::from_log` to supply derived/pattern features once for all consumers.  
+Conditions: summary must retain provenance pointers to raw events and represent uncertainty explicitly when available.  
+Evidence: overlay boundary location and construction point (`prototypes/lel-ir-prototype/src/overlay.rs:54-84`); Step 12 multi-metric contract and WDK#40 uncertainty requirement (`research/trace-semantics/FINDINGS.md` Step 12 contract block; WDK#40 item).
+
+Proposed `ConvergenceSummary` field decisions (candidate list evaluated against consumer trace):
+
+| Field | Decision | Rationale |
+| :--- | :--- | :--- |
+| `metric_name`, `scope` | Keep | Needed for cross-framework normalization and metric routing. |
+| `iteration_count` | Keep | Stage 1 budget/limit checks. |
+| `max_iterations` | Keep as `Option<u64>` | Required for ratio checks, but unavailable in some traces without parameter join. |
+| `converged` | Keep | Direct Stage 1/3 signal. |
+| `final_residual` | Keep as `Option<Value>` | Stage 3 and BSE need final observed error magnitude when defined. |
+| `convergence_rate` | Keep as optional + method reference | Useful but method-dependent; must remain auditable. |
+| `pattern`, `pattern_confidence` | Keep as optional | Stage 2/BSE utility with explicit uncertainty; taxonomy remains open. |
+| `first_event_id`, `last_event_id`, `event_count` | Keep | Provenance/audit bridge to raw trajectory. |
+| `uncertainty: Option<UncertaintySummary>` | Keep (hook only) | Required compatibility path to WDK#40 and Candidate B metric components. |
+| `parameter_refs: Vec<EventId>` | **Add** | Required for Stage 2 parameter cross-reference without adapter-side pattern logic. |
+
+Option D vs five design tensions:
+- **Cross-framework asymmetry:** mitigated by allowing raw-rich VASP and summary-only derivation for GROMACS/OpenMM from existing events.
+- **Silent failure detection:** preserved because raw trajectory remains canonical, summaries are derived views.
+- **R17 interface:** satisfied by mapping summary outputs to multiple `MetricComponent` entries (Step 12 Candidate B).
+- **WDK#40 connection:** explicit `uncertainty` hook retained without forcing immediate schema commitment.
+- **Adapter burden:** minimized by keeping classification/feature derivation out of adapter parsing path.
+
+**Implications:**  
+- **WDK#13 is NARROWED:** representation direction is now explicit (Option D hybrid), while taxonomy and cross-framework derivation details remain open.  
+- **ComparisonProfileV1 compatibility is demonstrable:** convergence can populate multiple metric components with provenance + uncertainty hooks instead of forcing scalar collapse.  
+- **Novel vs existing boundary is explicit:** raw+derived layering is existing practice (pymatgen/ASE/Custodian); convergence-pattern taxonomy and confidence calibration are novel ATHENA-specific research tasks.
+
+**Open Threads:**  
+- Define minimal `ConvergencePattern` taxonomy + confidence calibration rules with domain expert input (do not overfit VASP-first motifs).  
+- Specify GROMACS/OpenMM summary derivation rules from `EnergyRecord`/`NumericalStatus` without synthetic artifacts.  
+- Decide whether convergence-related events need `dag_node_ref` population strategy for stronger Stage 2/3 graph attribution.  
+- Connect summary-level uncertainty fields to WDK#40 `UncertaintySummary` without coupling to a single inference family.  
+- Fix summary computation timing contract (during `from_log` vs post-pass) with explicit performance and determinism criteria.
+
+---
+
+### 2026-02-22: Step 12 — R17 Quantitative Comparison Formalization and Interface Contract
+
+**Scope:** Resolve/narrow What We Don't Know #28 ("How to formalize the quantitative prediction-observation comparison method (R17)") and define the bridge contract from trace-semantics output to the not-yet-started adversarial-reward track without modifying `research/adversarial-reward/FINDINGS.md`.
+
+**Method:**  
+1. Literature-grounded survey across five domains: computational V&V, Bayesian experimental design, hypothesis testing, replication effect-size practice, and active learning uncertainty.  
+2. Type-level mapping from formalization requirements to prototype artifacts: `ComparisonOutcome` and `DivergenceMeasure` (`prototypes/lel-ir-prototype/src/common.rs:134-150`), and `compare_predictions`/`is_falsified` behavior (`prototypes/lel-ir-prototype/src/overlay.rs:230-277`).  
+3. Steel-man + stress-test of three candidate formalizations (A/B/C) under ATHENA non-negotiables (DSL-only, warm-started priors, bounded adversarial design).  
+4. Downstream compatibility scoring for adversarial reward, Bayesian Surprise Evaluator, IR simplicity, Stage 2->3 tractability, and adapter burden.
+
+**Findings:**
+
+1. **The five literature domains impose conflicting input contracts; no single scalar formalization satisfies all of them without loss.**  
+Mechanism: each domain optimizes a different objective class, so the required sufficient statistics differ.  
+Conditions: conflict appears when one comparison output must support both binary falsification decisions and continuous information-gain optimization.
+
+| Domain | Canonical Formalization | Required Input | Compute Cost | Reward Composability |
+| :--- | :--- | :--- | :--- | :--- |
+| Computational V&V | ASME V&V 10/20 validation metrics; Oberkampf-Roy validation perspective | Point estimates + uncertainty/tolerance bands (often CIs or validation intervals) | Low-Moderate | Adequate after normalization; not intrinsically EIG-native |
+| Bayesian Experimental Design | Lindley information gain; Knowledge Gradient | Prior + predictive/posterior distributions over outcomes | Moderate-High (integration / Monte Carlo) | Strong (direct expected gain objective) |
+| Hypothesis Testing | Neyman-Pearson tests; Bayes factors | NP: test statistic + null distribution; BF: model priors + marginal likelihoods | NP Low; BF Moderate-High | NP Weak for reward shaping (binary thresholding); BF Strong (continuous evidence) |
+| Scientific Replication | Cohen's d, Hedges' g, Cliff's delta | Point estimates + variance/sample size (or ordinal ranks for Cliff) | Low | Adequate as standardized evidence, weak as standalone EIG surrogate |
+| Active Learning | Uncertainty sampling; Query-by-Committee disagreement | Predictive uncertainty or committee/posterior disagreement distributions | Moderate | Strong for acquisition scoring; needs calibration guardrails |
+
+Citations: ASME V&V 10/20; Oberkampf & Roy (2010); Lindley (1956); Frazier et al. (2008); Neyman & Pearson (1933); Kass & Raftery (1995); Cohen (1988); Hedges (1981); Cliff (1993); Settles (2009); Seung et al. (1992).
+
+2. **Current prototype output is structurally scalar-first, which is sufficient for yes/no falsification routing but insufficient for calibrated information-gain reward.**  
+Mechanism: `ComparisonOutcome` stores at most one `Option<DivergenceMeasure>` and `compare_predictions` collapses outcome to `is_falsified: bool`; neither path carries uncertainty, sample-size, or model-form metadata.  
+Conditions: insufficiency appears when reward must compare predicted vs actual surprise across cycles or penalize noisy/high-variance comparisons.  
+Evidence: `common.rs:134-150`, `overlay.rs:230-277`, ARCHITECTURE.md §4.5 and §5.4.
+
+3. **Q(a) — The adversarial reward interface needs both a scalar and a metric profile; a posterior distribution is optional but not always required.**  
+Mechanism: the optimizer needs one scalar for ranking candidate experiments, while calibration/noise control requires access to component metrics and uncertainty drivers (e.g., variance, sample size, model family).  
+Conditions: scalar-only is acceptable only when reward is heuristic and non-Bayesian; exact EIG requires posterior-compatible terms.
+
+4. **Q(b) — The Bayesian Surprise Evaluator needs a comparison output that is (i) calibratable and (ii) invalidatable.**  
+Mechanism: §5.4 compares predicted vs actual surprise over time, so comparison output must preserve a consistent functional form and metadata needed to explain calibration drift; §4.5 requires invalidation when LFI marks implementation artifact.  
+Conditions: without validity flags and normalized scale metadata, predicted-vs-actual divergence cannot be diagnosed as model misspecification vs noise-seeking.  
+Evidence: ARCHITECTURE.md §4.5, §5.1 (dual-path analysis), §5.4.
+
+5. **Q(c) — `DivergenceMeasure` should remain an enum for metric identity, but it needs a metadata wrapper for uncertainty, support, and provenance.**  
+Mechanism: enum-only encoding preserves metric type but loses distributional semantics required by BED/active-learning style reward and by calibration feedback.  
+Conditions: this gap is material when using Bayes factors/KL/effect sizes in one comparison family and when adapters emit heterogeneous observable types.  
+Evidence: current enum variants in `common.rs:142-150`; calibration requirement in ARCHITECTURE.md §5.4.
+
+6. **Candidate evaluation (steel-man + stress-test) recommends Candidate B (Multi-Metric Divergence Profile) with optional distribution hooks.**
+
+| Candidate | (a) Adversarial Reward | (b) Bayesian Surprise Evaluator | (c) IR Simplicity | (d) Stage 2->3 Tractability | (e) Adapter Burden |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| A. Typed Scalar Divergence | **Adequate**: easy scalar optimization, weak anti-gaming controls | **Weak**: no posterior/uncertainty context for calibration | **Strong**: minimal type change | **Strong**: cheapest runtime | **Strong**: point values usually available |
+| B. Multi-Metric Profile | **Strong**: scalarized reward + component-level controls | **Adequate-Strong**: supports calibrated surrogate surprise; can upgrade to exact forms | **Adequate**: moderate type expansion | **Adequate**: bounded extra cost per metric vector | **Adequate**: needs uncertainty + sample metadata where available |
+| C. Distribution-Aware Posterior | **Strong**: direct EIG compatibility | **Strong**: direct KL-style surprise semantics | **Weak**: substantial core-type expansion | **Weak-Adequate**: expensive unless heavily approximated | **Weak**: many adapters cannot natively emit full posteriors |
+
+7. **Recommended formalization: Candidate B as default contract, with an optional posterior payload field to preserve a migration path to Candidate C.**  
+Mechanism: B satisfies bounded-adversarial needs by providing one deterministic scalar for optimization plus auditable metric components for calibration and Noisy-TV resistance; optional posterior summary prevents architectural dead-end for future exact EIG.  
+Conditions: this recommendation holds when DSL adapters provide at least point estimates + uncertainty surrogates; if a domain provides robust posterior models, C-style fields can be populated without changing consumer interfaces.
+
+8. **Bridge contract (trace-semantics -> adversarial-reward) is now specified as an interface assumption set, not an integration.**  
+Mechanism: trace-semantics emits a typed comparison profile with guarantees; adversarial-reward may assume these guarantees once that track starts.
+
+Proposed interface contract (conceptual, no prototype change in this step):
+
+```text
+ComparisonProfileV1 {
+  comparison_event_id: EventId
+  prediction_id: SpecElementId
+  dag_node: Option<String>
+  metrics: Vec<MetricComponent>
+  aggregate: AggregateScore
+  reward_validity: RewardValidity
+  provenance: ProvenanceAnchor
+}
+
+MetricComponent {
+  kind: DivergenceKind              // AbsoluteDifference|ZScore|BayesFactor|KLDivergence|EffectSize|Custom
+  value: f64
+  direction: Option<EffectDirection>
+  uncertainty: Option<UncertaintySummary>
+  sample_size: Option<u32>
+  units: Option<Unit>
+  method_ref: String                // metric/test definition id
+}
+```
+
+Guarantees adversarial-reward can assume:
+- **G1 Determinism:** identical IR inputs produce identical `metrics` and `aggregate`.
+- **G2 Monotonicity Declaration:** `aggregate` includes explicit monotonic convention (higher = more contradiction evidence) and bounded support metadata.
+- **G3 Validity Gating:** `reward_validity=false` when LFI classifies implementation artifact (surprise invalidation compatibility).
+- **G4 Auditability:** each metric has trace/spec/DAG provenance sufficient for post-hoc calibration debugging.
+- **G5 Partial Distribution Support:** when posterior metadata exists, it is attached via `uncertainty`; when absent, omission is explicit (no silent fallback).
+
+9. **Proven vs conjectural boundary is now explicit.**  
+Proven in repository: current type/behavior limitations and calibration/invalidation dependencies (`common.rs`, `overlay.rs`, ARCHITECTURE §4.5/§5.4).  
+Existing technique: all listed metric families and acquisition criteria are established in literature.  
+Novel research still required: (i) canonical aggregation from profile -> bounded reward scalar under Noisy-TV constraints, and (ii) uncertainty schema that is expressive enough for BED but feasible across DSL adapters.
+
+**Implications:**  
+- **R17 formalization is narrowed (not fully closed):** Candidate B is the recommended default for ATHENA's current architecture, with Candidate C compatibility hooks retained.  
+- **Adversarial-reward bridge is now concrete:** the reward track can consume `ComparisonProfileV1` assumptions without requiring immediate prototype refactors.  
+- **Type gap documented, not implemented:** current `ComparisonOutcome`/`DivergenceMeasure` shape does not encode the contract; this is recorded as follow-up design work, not code change, per scope.
+
+**Open Threads:**  
+- Define minimal `UncertaintySummary` schema that supports both scalar metrics and trajectory-aware convergence evidence (follow-up connection to What We Don't Know #13).  
+- Define machine-checkable contradiction-chain construction from multi-metric profiles to edge-level update directives (follow-up connection to What We Don't Know #9).  
+- Specify and benchmark the profile aggregation function used for bounded adversarial reward calibration under §5.4 feedback constraints.
+
+---
 
 ### 2026-02-22: Step 11 — Hidden Confounder Prototype Litmus Test
 
@@ -937,7 +1151,7 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 
 45. **BoundaryClassification enum resolves the boundary parameter representation question.** Three variants (PrimaryLayer, DualAnnotated, ContextDependent) handle the full spectrum from unambiguous parameters to context-dependent ones like VASP ALGO. Primary layer determines LFI routing; secondary annotations provide diagnostic context. Avoids both a fourth "boundary" layer and entity duplication. [Candidate IR schemas log 2026-02-20; candidate-ir-schemas.md §1, §8 OQ4]
 
-46. **R17 comparison is structurally resolved as a pluggable container.** ComparisonResult + DivergenceMeasure enum (6 variants: AbsoluteDifference, ZScore, BayesFactor, KLDivergence, EffectSize, Custom) provides the IR's structural slot. The comparison method is pluggable — the IR stores results, the LFI supplies logic. The R17 formalization research is now scoped to LFI logic, not IR structure. [Candidate IR schemas log 2026-02-20; candidate-ir-schemas.md §3, §8 OQ1]
+46. **R17 has a baseline pluggable structural slot in the prototype, but that slot is not sufficient for reward-calibrated comparison semantics.** `ComparisonResult` + `DivergenceMeasure` (6 variants) supports Stage 3 falsification routing and query execution; Step 12 shows additional uncertainty/aggregation metadata is needed for adversarial-reward and Bayesian surprise calibration. [Candidate IR schemas log 2026-02-20; candidate-ir-schemas.md §3, §8 OQ1; Step 12 log 2026-02-22]
 
 47. **The causal reasoning substrate question has a per-stage answer.** Stage 1: sequential search sufficient (filter-and-inspect on implementation-tagged events). Stages 2-3: graph traversal required (transitive causal ancestry for R14 confounders, structural path finding for R18 causal implications). This per-stage resolution directly motivates the Hybrid design. [Candidate IR schemas log 2026-02-20; candidate-ir-schemas.md §8 OQ3]
 
@@ -962,6 +1176,22 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 56. **`ConvergencePoint` and `StateSnapshot` are now exercised by a concrete adapter path.** Step 10 VASP parsing emits `ConvergencePoint` from OSZICAR SCF trajectories and `StateSnapshot` from OUTCAR force snapshots, closing prior coverage gaps for these variants. [Step 10 log 2026-02-22; `lel-ir-prototype/src/vasp_adapter.rs`, `lel-ir-prototype/src/tests/mod.rs`]
 
 57. **Hidden confounder detection is now validated end-to-end on VASP-derived LEL data.** Step 11 litmus tests demonstrate positive detection of planted `PREC` confounders and correct controlled-variable exclusion behavior. [Step 11 log 2026-02-22; `lel-ir-prototype/src/tests/mod.rs`]
+
+58. **R17 formalization is narrowed to a recommended default: Multi-Metric Divergence Profile (Candidate B) with optional posterior hooks.** This satisfies ATHENA's bounded-adversarial requirements by combining scalar optimization with component-level calibration visibility, while preserving migration compatibility toward distribution-aware reward models. [Step 12 log 2026-02-22; ARCHITECTURE.md §5.4]
+
+59. **A trace-semantics -> adversarial-reward interface contract is now specified at the findings level.** The reward track can assume deterministic comparison profiles with monotonic aggregate semantics, explicit validity gating, and provenance-backed metric components, without requiring immediate prototype integration. [Step 12 log 2026-02-22; ARCHITECTURE.md §4.5, §5.4]
+
+60. **Current prototype comparison types are insufficient for calibrated information-gain reward in their present form.** `ComparisonOutcome` + scalar `DivergenceMeasure` + `is_falsified` do not encode uncertainty/support metadata required by Bayesian design and active-learning style reward calibration. [Step 12 log 2026-02-22; `lel-ir-prototype/src/common.rs:134-150`; `lel-ir-prototype/src/overlay.rs:230-277`]
+
+61. **Convergence evidence is currently represented asymmetrically across adapters: raw trajectory points are VASP-only.** `ConvergencePoint` emission is implemented in `parse_oszicar` (with `converged` back-patching), while GROMACS and OpenMM paths expose convergence only indirectly through other event kinds (`EnergyRecord`, `NumericalStatus`, `ExecutionStatus`). [Step 13 log 2026-02-22; `lel-ir-prototype/src/vasp_adapter.rs:175-276`; `lel-ir-prototype/src/gromacs_adapter.rs:429-530`; `lel-ir-prototype/src/adapter.rs:82-197`]
+
+62. **Current indexing does not make convergence trajectories first-class query targets.** `EventIndexes.by_variable` indexes only `ParameterRecord` and `ObservableMeasurement`, and VASP convergence events are emitted without `dag_node_ref`, so convergence lookups require stream scans or post-hoc derivation. [Step 13 log 2026-02-22; `lel-ir-prototype/src/lel.rs:130-141`; `lel-ir-prototype/src/vasp_adapter.rs:190-211`]
+
+63. **External ecosystem practice converges on layered representation (raw trajectory + derived convergence indicators), not pattern-only primacy.** Pymatgen exposes both convergence booleans and ionic/electronic step data; ASE exposes optimizer convergence booleans plus trajectory persistence; Custodian handlers evaluate derived convergence features from raw VASP artifacts. [Step 13 log 2026-02-22; `https://pymatgen.org/pymatgen.io.vasp.html`; `https://ase.gitlab.io/ase/ase/optimize.html`; `https://materialsproject.github.io/custodian/custodian.vasp.handlers.html`]
+
+64. **WDK#13 is narrowed to a concrete direction: hybrid Option D (raw canonical events + Stage 1->2 `ConvergenceSummary` derivation).** This preserves silent-failure analyzability and enables consumer-specific features/patterns without forcing adapters to classify patterns at parse time. [Step 13 log 2026-02-22; `lel-ir-prototype/src/overlay.rs:54-84`; ARCHITECTURE.md §5.3, §5.4]
+
+65. **Convergence summaries can map cleanly to Step 12 Candidate B (`ComparisonProfileV1`) as multi-component metrics.** The required shape is `metrics: Vec<MetricComponent>` with optional uncertainty/provenance hooks, allowing Stage 3 and Bayesian-surprise consumers to avoid scalar collapse. [Step 12 log 2026-02-22; Step 13 log 2026-02-22; `FINDINGS.md` Step 12 contract block]
 
 ### What We Suspect
 
@@ -1049,7 +1279,7 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 
 12. ~~**Whether a single IR schema can accommodate both DFT codes (VASP) and MD codes (OpenMM, GROMACS)** or whether structural differences require fundamentally different IR designs with a common interface.~~ RESOLVED: Step 10 VASP adapter maps INCAR/OSZICAR/OUTCAR into existing LEL/EventKind structures with no schema changes, alongside existing OpenMM/GROMACS paths. See What We Know #55. [Step 10 log 2026-02-22; `lel-ir-prototype/src/vasp_adapter.rs`, `lel-ir-prototype/src/tests/mod.rs`]
 
-13. **How convergence trajectories should be represented in the IR** (raw time series, classified patterns, or derived features). [VASP log 2026-02-20]
+13. ~~**How convergence trajectories should be represented in the IR** (raw time series, classified patterns, or derived features).~~ NARROWED: Step 13 recommends Option D (hybrid raw canonical trajectory + Stage 1->2 summary derivation with derived features, optional pattern classification, and provenance anchors). Remaining uncertainty is implementation detail: pattern taxonomy/confidence, cross-framework derivation rules (especially GROMACS/OpenMM), and summary timing/index strategy. See What We Know #61-#65 and WDK items #42-#44. [Step 13 log 2026-02-22]
 
 **Requirements and Baseline**
 
@@ -1085,7 +1315,7 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 
 **Coverage Matrix**
 
-28. **How to formalize the quantitative prediction-observation comparison method (R17).** This is the single unresolved research element blocking Stage 3 feasibility. Must define effect size measures, divergence metrics, and tolerance thresholds for scientific predictions. Related to the DRAT propositional-to-statistical adaptation gap. [Coverage matrix log 2026-02-20; requirements-coverage-matrix.md §4, §6.3]
+28. ~~**How to formalize the quantitative prediction-observation comparison method (R17).**~~ NARROWED: Step 12 evaluated three candidate formalizations and recommends Candidate B (Multi-Metric Divergence Profile) plus optional posterior hooks, with a concrete trace-semantics -> adversarial-reward interface contract and explicit downstream scoring. Remaining uncertainty is implementation detail (uncertainty schema + aggregation calibration), not baseline formalization direction. [Step 12 log 2026-02-22]
 
 29. ~~**Whether the LEL→DGR incremental implementation path is viable.**~~ RESOLVED: Yes. The Hybrid candidate demonstrates viability by construction. See What We Know #42. [Candidate IR schemas log 2026-02-20; candidate-ir-schemas.md §4, §8 OQ2]
 
@@ -1111,6 +1341,16 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 
 39. **Whether `EventKind::ComparisonResult.prediction_id: String` should be harmonized with `PredictionRecord.id: SpecElementId` in production.** Prototype resolves the mismatch at query time via parse-at-query-time conversion, but production semantics and type-level guarantees remain ADR-scoped work. [Step 7 log 2026-02-21; `lel-ir-prototype/src/overlay.rs`]
 
+40. **What minimal `UncertaintySummary` schema should accompany each divergence metric** so one comparison profile can support both V&V/effect-size reporting and Bayesian/active-learning reward calibration without adapter-specific branching. [Step 12 log 2026-02-22]
+
+41. **How to standardize profile aggregation into a bounded, monotonic reward scalar** that remains calibratable under ARCHITECTURE.md §5.4 feedback and robust against Noisy-TV style reward hacking. [Step 12 log 2026-02-22; ARCHITECTURE.md §5.4; VISION.md §6.2]
+
+42. **What minimal cross-framework `ConvergencePattern` taxonomy should be adopted, and how pattern confidence should be calibrated.** Step 13 narrowed representation direction to hybrid raw+summary, but taxonomy boundaries (e.g., monotonic/oscillatory/stalled/two-plateau/divergent) and confidence semantics remain open and require domain expert input. [Step 13 log 2026-02-22]
+
+43. **How to derive convergence summaries for GROMACS/OpenMM when no native `ConvergencePoint` stream exists.** The current prototype has VASP-native convergence trajectories; equivalent summary derivation for other adapters must be specified from existing events (`EnergyRecord`, `NumericalStatus`, `ExecutionStatus`) without introducing synthetic certainty. [Step 13 log 2026-02-22; `lel-ir-prototype/src/gromacs_adapter.rs`; `lel-ir-prototype/src/adapter.rs`]
+
+44. **Where convergence summary computation should occur and how it should attach graph/query anchors.** Step 13 recommends Stage 1->2 boundary derivation, but exact timing (`CausalOverlay::from_log` vs post-pass), index strategy, and `dag_node_ref`/`parameter_refs` anchoring rules remain unresolved and may affect determinism/performance. [Step 13 log 2026-02-22; `lel-ir-prototype/src/overlay.rs:54-84`; `lel-ir-prototype/src/lel.rs:130-149`]
+
 ## Prototype Index
 
 | Filename | Purpose | Status | Demonstrated |
@@ -1135,6 +1375,10 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 5. **Draft candidate IR schemas and prototype** — **Steps 5a, 5b, 5c COMPLETE.** Three candidates (LEL, DGR, Hybrid LEL+DGR) evaluated against R1-R29, 9 anti-patterns, streaming constraints, and 7-criterion weighted framework. Recommendation: Hybrid (94/100). Step 5 outputs remain valid and are now extended by Step 6 implementation details below. See `dsl-evaluation/candidate-ir-schemas.md`, `prototypes/codex-prompt-5b-lel-prototype.md`, and investigation logs above. (Beads: athena-axc, athena-9uv)
 
 6. **Hybrid LEL+DGR Phase 2 prototype (CausalOverlay + R14 query)** — **COMPLETE.** `by_id` index added; `src/overlay.rs` implemented with O(n) construction and BFS traversal; R14 confounder detection query implemented and tested. Baseline Step 6 crate state was 29/29 tests passing with strict clippy clean; subsequent Step 7 query expansion now validates 44/44 tests with strict clippy clean. Benchmark uses real overlay path and reports 251.82ms at 10^6 events. (Tracking updates: #37 closed, #38 narrowed/validated)
+
+7. **R17 quantitative comparison formalization and bridge contract (Step 12)** — **COMPLETE (NARROWED).** Literature survey + prototype mapping + candidate scoring completed. Recommendation: Candidate B (Multi-Metric Divergence Profile) with optional posterior hooks. Trace-semantics now defines a contract (`ComparisonProfileV1` assumptions) that adversarial-reward can consume once that track starts. Remaining work moved to What We Don't Know #40 and #41.
+
+8. **Convergence trajectory representation (Step 13)** — **COMPLETE (NARROWED).** Empirical adapter inventory + A/B/C steel-man stress tests + external survey + consumer trace completed. Recommendation: Option D hybrid (raw canonical trajectory + Stage 1->2 summary). Remaining work moved to What We Don't Know #42, #43, and #44, with WDK#40 linkage retained for uncertainty schema coupling.
 
 **Synthesis steps needed before Step 5:**
 

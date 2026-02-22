@@ -62,6 +62,13 @@
       "created": "2026-02-21T15:26:05.924715",
       "slug": "vasp-adapter-litmus-test",
       "directive": "VASP adapter first, then hidden confounder litmus test"
+    },
+    {
+      "sequence": 10,
+      "filename": "handoff_010_2026-02-21_trace-semantics-open-threads.md",
+      "created": "2026-02-21T16:39:27.319293",
+      "slug": "trace-semantics-open-threads",
+      "directive": "continue researching open threads in trace-semantics"
     }
   ]
 }

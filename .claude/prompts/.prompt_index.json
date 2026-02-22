@@ -47,6 +47,22 @@
       "slug": "vasp-adapter-litmus-test",
       "goal": "Implement VASP adapter for ATHENA trace-semantics IR prototype with hidden confounder litmus test",
       "framework": "RISEN"
+    },
+    {
+      "sequence": 7,
+      "filename": "prompt_007_2026-02-21_r17-comparison-formalization.md",
+      "created": "2026-02-21T17:06:14.445164",
+      "slug": "r17-comparison-formalization",
+      "goal": "Investigate and formalize the R17 prediction-observation comparison mechanism for ATHENA's trace-semantics IR",
+      "framework": "RISEN"
+    },
+    {
+      "sequence": 8,
+      "filename": "prompt_008_2026-02-21_wdk13-convergence-representation.md",
+      "created": "2026-02-21T18:23:08.802861",
+      "slug": "wdk13-convergence-representation",
+      "goal": "Investigate how convergence trajectories should be represented in ATHENA's IR (raw time series, classified patterns, derived features, or a hybrid), by cataloging current adapter usage, steel-manning each option, tracing downstream consumers (LFI/BSE/ComparisonProfileV1), and documenting the recommendation as a Step 13 entry in trace-semantics FINDINGS.md.",
+      "framework": "RISEN"
     }
   ]
 }
