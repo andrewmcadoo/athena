@@ -95,6 +95,14 @@
       "slug": "hybrid-aggregation-candidate",
       "goal": "Implement hybrid aggregation candidate (HTG-gated product combination) targeting 7/7 stress-test passes",
       "framework": "RISEN"
+    },
+    {
+      "sequence": 13,
+      "filename": "prompt_013_2026-02-22_hybrid-robustness-perturbation.md",
+      "created": "2026-02-22T01:20:06.587186",
+      "slug": "hybrid-robustness-perturbation",
+      "goal": "Implement a perturbation robustness test for the hybrid aggregation candidate that systematically varies fixture parameters across all 7 scenarios, producing a robustness map with pass/fail regions, margins, and tipping points",
+      "framework": "RISEN"
     }
   ]
 }

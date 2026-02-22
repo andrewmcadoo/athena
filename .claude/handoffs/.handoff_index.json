@@ -104,6 +104,13 @@
       "created": "2026-02-22T00:18:01.467925",
       "slug": "plan-session4-fixture-robustness",
       "directive": "Plan Session 4: Hybrid fixture perturbation robustness testing for WDK#41"
+    },
+    {
+      "sequence": 16,
+      "filename": "handoff_016_2026-02-22_plan-s41-ceiling-analysis.md",
+      "created": "2026-02-22T12:01:20.676020",
+      "slug": "plan-s41-ceiling-analysis",
+      "directive": "Plan athena-rfp: S5 ceiling analysis \u2014 operating regime bounds and architectural options for WDK#41"
     }
   ]
 }
