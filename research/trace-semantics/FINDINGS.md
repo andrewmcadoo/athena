@@ -28,6 +28,349 @@ IN PROGRESS — Steps 1-7 and all synthesis steps (1d, 2c, 3b) complete. Step 5a
 
 ## Investigation Log
 
+### 2026-02-21: WDK#26 — INCAR Classification Table Completeness
+**Date:** 2026-02-21
+**Scope:** Validate completeness of the INCAR parameter classification table; assess ambiguous parameters; propose classification strategy
+**Method:** (1) Enumerated all INCAR parameters currently classified in `vasp_adapter.rs:12-96`, (2) cross-referenced against the ambiguous parameter catalog in `cross-framework-synthesis.md §2.3` and `vasp-trace-analysis.md §2.3`, (3) assessed each ambiguous parameter for conditions under which it shifts between theory-affecting and implementation-only, (4) identified additional ambiguous parameters not yet cataloged, (5) evaluated classification strategies against ATHENA's adapter contract requirements.
+
+**Findings:**
+
+**1. Current prototype classification coverage**
+
+The `classify_incar_parameter()` function in `vasp_adapter.rs:12-96` explicitly classifies 16 parameters across four layers:
+- **Theory (PrimaryLayer):** GGA, METAGGA, ISMEAR [PROVEN, `vasp_adapter.rs:19-23`]
+- **Theory (DualAnnotated):** ENCUT (secondary: Implementation), PREC (secondary: Implementation), SIGMA (secondary: Methodology) [PROVEN, `vasp_adapter.rs:24-51`]
+- **Methodology (PrimaryLayer):** IBRION, NSW, ISIF, POTIM, EDIFF, EDIFFG [PROVEN, `vasp_adapter.rs:52-66`]
+- **Implementation (PrimaryLayer):** NCORE, KPAR, NPAR, NSIM, NELM [PROVEN, `vasp_adapter.rs:67-70`]
+- **Implementation (DualAnnotated):** ALGO (secondary: Methodology), LREAL (secondary: Theory) [PROVEN, `vasp_adapter.rs:72-87`]
+- **Fallback:** All unrecognized parameters default to `Implementation` with `ContextDependent` classification and a note "VASP parameter not in classification table" [PROVEN, `vasp_adapter.rs:88-95`]
+
+This covers 16 of approximately 50-80 commonly used parameters (`vasp-trace-analysis.md §2.4`), meaning roughly 65-80% of commonly used parameters fall through to the ContextDependent fallback. [PROVEN by enumeration]
+
+**2. The six identified ambiguous parameters and their conditional behavior**
+
+The cross-framework synthesis (`cross-framework-synthesis.md §2.3`) and VASP trace analysis (`vasp-trace-analysis.md §2.3`) identify six parameters with non-trivial theory-implementation coupling:
+
+**(a) PREC (Accurate / Normal / Low / SinglePrec / High)**
+- **When theory-affecting:** Always. PREC sets the ENCUT default (if ENCUT is not explicitly specified), FFT grid density (NGX/NGY/NGZ), and augmentation grid density. These directly determine the numerical accuracy of DFT energies, forces, and stress tensors. Switching from PREC=Normal to PREC=Accurate changes the physics for systems sensitive to basis set completeness or wrap-around errors. [PROVEN, `vasp-trace-analysis.md §2.3`, `cross-framework-synthesis.md:144`]
+- **When implementation-only:** Never purely implementation. Even when ENCUT is explicitly set, PREC still controls the FFT grid and augmentation grid independently. [CONJECTURE — the interaction between explicit ENCUT and PREC-controlled grids is documented in VASP Wiki but the precise override behavior requires version-specific testing]
+- **Interaction:** PREC sets the default ENCUT. If a user sets ENCUT explicitly, PREC's ENCUT-setting role is overridden but its grid-density role persists. This partial override creates a subtle trap: a user who believes they have controlled for basis set by setting ENCUT explicitly may still have PREC-dependent results via the FFT grid. [CONJECTURE — based on documented VASP behavior, but the magnitude of the FFT-grid-only effect is system-dependent]
+- **Current classification:** DualAnnotated(Theory, Implementation) — ADEQUATE. [PROVEN, `vasp_adapter.rs:33-41`]
+
+**(b) ALGO (Normal / Fast / Very_Fast / All / Damped / Conjugate / Subrot / Exact / Nothing / CHI / GW0 / scGW / GW / BSE)**
+- **When theory-affecting:** For systems with multiple SCF minima (magnetically frustrated systems, strongly correlated materials with competing ground states, systems near metal-insulator transitions). Different algorithms traverse the SCF energy landscape differently and can converge to different local minima, yielding physically distinct solutions. Estimated 10-20% of systems exhibit this behavior (`cross-framework-synthesis.md:499`). [CONJECTURE — the 10-20% estimate is from community reports, not systematic study]
+- **When implementation-only:** For well-behaved systems (single SCF minimum, non-magnetic insulators, simple metals with adequate smearing). All algorithms converge to the same solution; the choice affects only speed and stability. Estimated 80-90% of standard calculations. [CONJECTURE — same source as above]
+- **Detection conditions for ambiguity:** ISPIN=2 with non-trivial MAGMOM values, LDAU=.TRUE., small band gap systems (ISMEAR=0 with small SIGMA), systems where SCF convergence is difficult (NELM approached or reached). [CONJECTURE — these are domain heuristics, not formally validated thresholds]
+- **Current classification:** DualAnnotated(Implementation, Methodology) — QUESTIONABLE. For pathological systems where ALGO affects solution identity, the secondary layer should be Theory, not Methodology. The current classification does not distinguish "ALGO as solver strategy" from "ALGO as theory-relevant SCF landscape navigator." [PROVEN that the current code uses Methodology as secondary, `vasp_adapter.rs:72-78`; CONJECTURE that Theory would be more appropriate for pathological cases]
+
+**(c) LREAL (Auto / .TRUE. / .FALSE. / On)**
+- **When theory-affecting:** For small unit cells (typically fewer than ~20 atoms, though the threshold is element-dependent due to PAW radius variation). Real-space projection introduces controlled approximation errors that can shift forces by several meV/Angstrom. For precision-sensitive properties (phonons, elastic constants, precise relaxation), LREAL=.FALSE. may be required regardless of cell size. [PROVEN for the general mechanism, `vasp-trace-analysis.md §2.3`; CONJECTURE for the ~20 atom threshold — this is a widely cited community heuristic, not a formally derived bound]
+- **When implementation-only:** For large cells (typically >~100 atoms), where the real-space projection error is below the convergence threshold of the calculation. [CONJECTURE — same heuristic source]
+- **Interaction:** LREAL=Auto lets VASP choose based on cell size. The automatic decision threshold may differ between VASP versions. [CONJECTURE — version-dependent behavior documented but specific threshold changes are not publicly cataloged]
+- **Current classification:** DualAnnotated(Implementation, Theory) — ADEQUATE but the primary/secondary ordering is debatable. For small cells, Theory should arguably be primary. The classification should ideally be context-dependent on cell size. [PROVEN for current code, `vasp_adapter.rs:80-87`; CONJECTURE for the context-dependency recommendation]
+
+**(d) ADDGRID (.TRUE. / .FALSE.)**
+- **When theory-affecting:** Always, in principle — ADDGRID adds a finer support grid for augmentation charges, improving the accuracy of PAW augmentation integrals. The effect is largest for elements with hard pseudopotentials or small PAW radii. [PROVEN, `cross-framework-synthesis.md:146`]
+- **When implementation-only:** Never purely implementation. However, for many systems the accuracy improvement is below the convergence threshold, making it practically irrelevant. [CONJECTURE — system-dependent]
+- **Current classification:** NOT CLASSIFIED in `vasp_adapter.rs`. Falls through to the ContextDependent fallback. [PROVEN, `vasp_adapter.rs:88-95`] This is a gap — ADDGRID should be DualAnnotated(Theory, Implementation) based on the cross-framework synthesis assessment. [CONJECTURE for the recommended classification]
+
+**(e) ENCUT (explicit setting)**
+- **When theory-affecting:** Always. ENCUT determines basis set completeness — it is the single most important convergence parameter in plane-wave DFT. An unconverged ENCUT means the physics is wrong. [PROVEN, `vasp-trace-analysis.md §5.4`]
+- **When implementation-only:** Never purely implementation. However, the practical ENCUT value is often a compromise between theory requirements (convergence) and computational budget (memory/time). [PROVEN for the general mechanism, `vasp-trace-analysis.md §2.3`; `cross-framework-synthesis.md:148`]
+- **Interaction with PREC:** If ENCUT is not explicitly set, PREC determines it. If ENCUT IS explicitly set, it overrides the PREC default. This interaction means the classification of ENCUT depends on whether it was user-specified or PREC-derived. [CONJECTURE — the adapter cannot currently distinguish user-specified from PREC-derived ENCUT because vasprun.xml reports the resolved value, not the origin]
+- **Current classification:** DualAnnotated(Theory, Implementation) — ADEQUATE. [PROVEN, `vasp_adapter.rs:24-32`]
+
+**(f) NBANDS**
+- **When theory-affecting:** When NBANDS is too low, unoccupied states needed for the physics (partial occupancy in metals, conduction band states for optical properties, states needed by hybrid functionals or GW) are missing. The calculation completes but produces incorrect results. [PROVEN, `cross-framework-synthesis.md:179`]
+- **When implementation-only:** When NBANDS is set above the minimum required for physical correctness, the excess bands are purely computational overhead (more memory, larger eigenvalue problem). [CONJECTURE — domain reasoning]
+- **Current classification:** NOT CLASSIFIED in `vasp_adapter.rs`. Falls through to ContextDependent fallback. [PROVEN, `vasp_adapter.rs:88-95`] This is a gap — NBANDS should be DualAnnotated(Theory, Implementation). [CONJECTURE for the recommended classification]
+
+**3. Additional ambiguous parameters NOT yet identified**
+
+Beyond the six parameters above, the following VASP parameters exhibit theory-implementation ambiguity but are not discussed in any existing ATHENA analysis document:
+
+**(g) ISYM (0 / 1 / 2 / 3 / -1)** — Controls symmetry usage. ISYM=0 disables symmetry entirely. For most calculations, symmetry is purely an implementation optimization. However, for symmetry-broken states (Jahn-Teller distortions, magnetic ordering that breaks crystal symmetry), enforcing symmetry can prevent the system from finding the correct lower-symmetry ground state. Usually implementation, but theory-affecting when the ground state has lower symmetry than the initial structure. [CONJECTURE — domain knowledge, not yet documented in ATHENA sources]
+
+**(h) SYMPREC (default: 1e-5)** — Symmetry detection precision. Too tight: symmetry is lost, increasing computation but not affecting physics. Too loose: non-equivalent atoms are treated as equivalent, introducing errors. Usually implementation (detection threshold), but theory-affecting when the chosen precision incorrectly merges or splits symmetry-inequivalent sites. [CONJECTURE — domain knowledge]
+
+**(i) LASPH (.TRUE. / .FALSE.)** — Controls aspherical contributions within PAW spheres. For f-electron systems, transition metals with partially filled d-shells, and systems with GGA+U or meta-GGA functionals, LASPH=.TRUE. is required for correct physics. Theory-affecting for d/f-electron systems, implementation-irrelevant for s/p-electron systems. [CONJECTURE — widely documented in VASP community but not yet in ATHENA sources]
+
+**(j) LMAXMIX (default: depends on elements)** — Maximum l-quantum number for charge density mixer. For d-electron systems, LMAXMIX=4 is required; for f-electron systems, LMAXMIX=6. Incorrect LMAXMIX can cause SCF convergence failure or convergence to wrong electronic state. Usually implementation, but theory-affecting when incorrect values cause convergence to wrong state. [CONJECTURE — VASP Wiki recommendation]
+
+**(k) ENAUG (default: derived from POTCAR)** — Cutoff for augmentation charge grid. Similar to ADDGRID but more explicit. If set too low, PAW augmentation errors increase. Ambiguous: theory (accuracy) vs implementation (memory). [CONJECTURE — domain knowledge]
+
+**(l) NGX / NGY / NGZ (FFT grid dimensions)** — Explicit FFT grid sizes. Usually auto-determined by PREC and ENCUT. When explicitly set, they override the automatic grid. Too small: aliasing errors affect physics. Ambiguous in the same way as PREC but at a lower level. [CONJECTURE — domain knowledge]
+
+**4. Completeness assessment**
+
+- The existing ATHENA analysis identifies 6 ambiguous parameters (PREC, ALGO, LREAL, ADDGRID, ENCUT, NBANDS). [PROVEN, `cross-framework-synthesis.md §2.3`]
+- The prototype `classify_incar_parameter()` explicitly handles 4 of these 6 as DualAnnotated (PREC, ALGO, LREAL, ENCUT). [PROVEN, `vasp_adapter.rs:12-96`]
+- 2 identified ambiguous parameters (ADDGRID, NBANDS) fall through to the ContextDependent fallback — these are gaps. [PROVEN by code enumeration]
+- 6 additional ambiguous parameters not yet identified in ATHENA sources (ISYM, SYMPREC, LASPH, LMAXMIX, ENAUG, NGX/NGY/NGZ). [CONJECTURE — requires domain expert validation]
+- The total ambiguous parameter count is therefore approximately 12 (6 known + 6 newly identified), out of approximately 50-80 commonly used parameters. [CONJECTURE for the total; PROVEN for the known-6 count]
+- Beyond the ambiguous set, many clearly-theory and clearly-implementation parameters are also missing from the explicit table. Notable gaps: ISPIN, MAGMOM, LDAU/LDAUU/LDAUJ (all pure theory), LWAVE/LCHARG/LELF (all pure implementation), LPLANE/ISTART/ICHARG (all pure implementation). [PROVEN by comparing `vasp-trace-analysis.md` tables against `vasp_adapter.rs`]
+
+**5. Classification strategy assessment**
+
+Four candidate strategies evaluated:
+
+**Strategy A (Static lookup table, current approach):** Necessary but insufficient — cannot handle context-dependent parameters. [CONJECTURE]
+
+**Strategy B (Static table with context-dependent flags) — RECOMMENDED:** Extend the static table to return a `ContextDependency` descriptor alongside the primary classification. The descriptor specifies what input-specification properties determine whether the parameter is theory-affecting in this particular calculation (e.g., for LREAL: cell_atom_count; for ALGO: spin_polarization AND correlation_correction; for LASPH: element_l_character). Keeps the table static and testable; pushes context resolution to a separate module with access to POSCAR/POTCAR/KPOINTS metadata. [CONJECTURE]
+
+**Strategy C (Version-aware lookup):** Useful as an enhancement to Strategy B but not standalone. Version detection from `vasprun.xml <generator>` is reliable but version-specific behavioral differences are not comprehensively documented. [CONJECTURE]
+
+**Strategy D (Decision tree):** Over-engineered for the prototype stage. Strategy B provides equivalent expressive power with better separation of concerns. [CONJECTURE]
+
+**6. Parameter interaction analysis**
+
+- **PREC -> ENCUT (default):** PREC sets ENCUT when not explicitly specified. Adapter cannot distinguish user-specified from PREC-derived ENCUT in vasprun.xml. [CONJECTURE]
+- **PREC -> NGX/NGY/NGZ:** PREC controls FFT grid dimensions when not explicitly set. [PROVEN from VASP documentation]
+- **ALGO + ISPIN + MAGMOM:** ALGO's theory-relevance depends on competing magnetic states, indicated by ISPIN=2 and specific MAGMOM patterns. [CONJECTURE]
+- **LREAL + cell size (from POSCAR):** LREAL's accuracy impact depends on atom count and cell volume from POSCAR, not INCAR. Cross-file context dependency. [PROVEN, `vasp-trace-analysis.md §2.3`]
+
+**Implications:**
+
+- The INCAR classification table in the prototype is a valid starting point but covers only ~20% of commonly used parameters explicitly and misses 2 of 6 identified ambiguous parameters (ADDGRID, NBANDS).
+- An additional 6 ambiguous parameters (ISYM, SYMPREC, LASPH, LMAXMIX, ENAUG, NGX/NGY/NGZ) should be added to the ATHENA ambiguous-parameter catalog and to the adapter classification table.
+- The classification strategy should evolve from flat static lookup (Strategy A, current) to static table with context-dependent flags (Strategy B), separating static "what conditions matter" knowledge from dynamic "what conditions hold" evaluation.
+- The ALGO secondary layer should be reconsidered: for pathological systems, Theory (not Methodology) is the more accurate secondary layer.
+- Parameter interactions (PREC->ENCUT, PREC->NGX, ALGO+ISPIN+MAGMOM, LREAL+cell_size) create compound ambiguities requiring cross-parameter and cross-file context.
+- The 70-80% confidence estimate for standard VASP calculations from Decision Gate 1 remains plausible: the additional ambiguous parameters primarily affect the same ~20-30% of pathological/precision-sensitive calculations already identified.
+
+**Open Threads:**
+
+1. Empirical validation of the ~20 atom threshold for LREAL across element types and cell sizes.
+2. VASP version-specific default changes catalog between VASP 5.x and 6.x for Strategy C implementation.
+3. vasprun.xml origin tracking for ENCUT: can the adapter distinguish user-specified from PREC-derived ENCUT?
+4. Domain expert review of the 6 newly identified ambiguous parameters (ISYM, SYMPREC, LASPH, LMAXMIX, ENAUG, NGX/NGY/NGZ).
+5. Automation potential for classification table construction via LLM-assisted VASP Wiki documentation analysis.
+6. NELMIN ambiguity: currently classified as pure Implementation, but may warrant DualAnnotated classification.
+
+---
+
+### 2026-02-21: WDK#25 — VASP Closed-Source Observability Ceiling
+**Date:** 2026-02-21
+**Scope:** Enumerate VASP failure modes and classify by observability from external outputs; estimate frequency across DFT workflow types; identify which failure modes hit the closed-source ceiling and what partial mitigations exist
+**Method:** Systematic cross-referencing of the VASP failure mode taxonomy (16 modes from cross-framework-synthesis.md §3.3), the VASP trace completeness assessment (vasp-trace-analysis.md §7, cross-framework-synthesis.md §4.3), and the three-stage audit mapping (vasp-trace-analysis.md §6.2). Each failure mode is classified into one of three observability tiers: (A) fully observable from external outputs, (B) partially observable with heuristic mitigations, (C) hits the closed-source ceiling. Frequency estimates draw on domain knowledge of DFT workflow distributions across four canonical workflow types, anchored to documented custodian error handler patterns and Materials Project operational experience.
+
+**Findings:**
+
+**1. Failure Mode Observability Classification**
+
+Each of the 16 VASP failure modes from cross-framework-synthesis.md §3.3 is classified by whether fault isolation is achievable from vasprun.xml + OUTCAR + stdout alone.
+
+**Tier A — Fully observable (fault isolation possible from external outputs):**
+
+- V-I1 (memory crash): Non-zero exit code + stdout/stderr crash message. [PROVEN, `vasp-trace-analysis.md §5.3`]
+- V-I2 (segfault): Non-zero exit code + stderr SIGSEGV message. [PROVEN, `vasp-trace-analysis.md §5.3`]
+- V-I3 (MPI error): Non-zero exit code + MPI error in stderr. [PROVEN, `vasp-trace-analysis.md §5.3`]
+- V-I4 (binary/compilation issue): Crash before any output produced. [PROVEN, `vasp-trace-analysis.md §5.3`]
+- V-M1 (insufficient NELM): SCF step count = NELM with dE > EDIFF, detectable from vasprun.xml `<scstep>` count per `<calculation>` block. [PROVEN] pymatgen `Vasprun.converged_electronic` implements this check. [`vasp-trace-analysis.md §5.1`]
+- V-M2 (insufficient NSW): Ionic step count = NSW with forces > EDIFFG, detectable from vasprun.xml `<calculation>` count + final forces. [PROVEN] pymatgen `Vasprun.converged_ionic` implements this check. [`vasp-trace-analysis.md §5.2`]
+- V-M5 (SIGMA too large): Entropy contribution (TOTEN - TOTEN_free) observable from vasprun.xml energy decomposition. [PROVEN] Standard practice: check entropy term exceeds 1 meV/atom. [`vasp-trace-analysis.md §3.1`; `cross-framework-synthesis.md §3.3`]
+
+**Tier B — Partially observable (heuristic mitigations, not definitive):**
+
+- V-M3 (inappropriate ALGO): SCF convergence trajectory shape (oscillation, slow decay, divergence) observable from OSZICAR/vasprun.xml. [PROVEN] However, distinguishing "wrong ALGO" from "the functional cannot describe this system" requires domain knowledge about system pathology. Signal ambiguous in ~10-20% of cases per `cross-framework-synthesis.md §6.3`. [CONJECTURE for the 10-20% estimate]
+- V-M4 (wrong ISMEAR): ISMEAR value observable from vasprun.xml `<incar>`; system metallic/insulating character partially inferrable from eigenvalues/DOS. [PROVEN for parameter visibility] [CONJECTURE: automated determination requires electronic structure analysis which can itself be wrong]
+- V-T1 (ENCUT too low): ENCUT and POTCAR ENMAX values both present in vasprun.xml. Cross-check (ENCUT >= 1.3 * max(ENMAX)) implementable. [PROVEN] But 1.3x heuristic catches gross inadequacy, not marginal underconvergence. True convergence requires multiple ENCUT values. [`vasp-trace-analysis.md §5.4`; `cross-framework-synthesis.md §6.3`]
+- V-T2 (k-point mesh inadequate): K-point specification visible in vasprun.xml `<kpoints>`; cell dimensions visible in `<structure>`. Heuristic check implementable. [PROVEN for data availability] [CONJECTURE: "adequate" depends on system type, geometry, and target property]
+- V-A1 (SCF non-convergence, ambiguous origin): SCF convergence trajectory fully observable. [PROVEN] Root cause (ALGO vs functional vs PREC/LREAL) NOT determinable from trace alone. Custodian handles via sequential fixes (increase NELM -> switch ALGO -> increase ENCUT -> switch mixing). [CONJECTURE for custodian cascade effectiveness]
+- V-A3 (symmetry error): OUTCAR warnings sometimes present. [PROVEN] Whether this is methodology error vs implementation issue requires comparing input geometry against expected symmetry. [`vasp-trace-analysis.md §5.6`]
+
+**Tier C — Hits the closed-source ceiling (fault isolation NOT possible from external outputs):**
+
+- V-T3 (wrong pseudopotential): POTCAR identity partially present in vasprun.xml. [PROVEN] Whether the chosen POTCAR variant is appropriate requires domain knowledge about semi-core states; VASP provides no signal when a suboptimal variant is used. [CONJECTURE: rule-based lookup is partial mitigation] [`vasp-trace-analysis.md §5.6`; `cross-framework-synthesis.md §3.3`]
+- V-T4 (inappropriate XC functional): No signal whatsoever. [PROVEN] The functional choice is visible in `<incar>`, but whether it is appropriate is pure domain knowledge. No heuristic can reliably determine "this functional is wrong for this system." [`vasp-trace-analysis.md §6.3`]
+- V-T5 (missing/incorrect DFT+U): LDAU parameters visible in vasprun.xml. [PROVEN] Whether the U value is correct requires comparison against experimental data not in the trace. [CONJECTURE: known-systems lookup covers obvious cases]
+- V-A2 (PREC-induced inaccuracy): PREC value visible in vasprun.xml. [PROVEN] Whether PREC matters for the specific system requires running both and comparing. [CONJECTURE: conservative rule (flag PREC != Accurate) catches ~5-10% per `cross-framework-synthesis.md §6.3`]
+- Internal numerical issues (FFT aliasing, PAW reconstruction errors, non-deterministic MPI reductions): No external signal. [PROVEN] Fundamentally hidden by closed-source nature. [`vasp-trace-analysis.md §7.1, §7.4`]
+
+**2. Frequency Distribution Across DFT Workflow Types**
+
+[CONJECTURE — frequency estimates based on domain knowledge of DFT practice, anchored to published Materials Project workflow statistics and custodian error handler activation patterns. No primary data source available for exact frequencies.]
+
+- **Bulk metals (~30% of workflows):** ~85-90% Tier A/B observable. Metals are relatively well-behaved for ATHENA. Dominant failures: V-M1 (5-10%), V-M5 (5%), V-I1/I2/I3 (2-5%). Ceiling failures: V-T4 (<2%), V-T3 (1-3%).
+- **Surfaces/interfaces (~20%):** ~75-85% Tier A/B observable. More vulnerable to silent theory failures. Dominant: V-M2 (10-15%), V-M1 (10%), V-T2 (5-10%). Ceiling: V-T4 (5%), V-A2 (3-5%).
+- **Molecules/clusters (~15%):** ~75-80% Tier A/B observable. Niche VASP use case, more prone to methodology errors. Dominant: V-M4 (10%), V-T2 (5%), V-M1 (5-10%). Ceiling: V-T4 (5-10%), V-T3 (3-5%).
+- **Strongly correlated systems (~15%):** ~50-65% Tier A/B observable. **This is where the closed-source ceiling hits hardest.** Dominant: V-A1 (20-30%), V-T5 (10-20%), V-T4 (15-20%), V-M3 (10-15%). Ceiling: V-T4 (15-20%), V-T5 (10-20%), V-A2 (5-10%), internal solver instabilities (5%).
+- **Other workflows (phonons, band structure, NEB, AIMD; ~20%):** ~70-80% Tier A/B on average, with significant variation by sub-type.
+
+**3. Aggregate Closed-Source Ceiling Impact**
+
+[CONJECTURE — aggregated from per-workflow estimates, weighted by approximate workflow frequencies]
+
+- **Weighted average: ~70-80% of VASP failure instances allow fault isolation from external outputs alone** (Tier A + Tier B with effective heuristics). Aligns with `cross-framework-synthesis.md §6.3` estimate.
+- **~15-25% of failures are partially degraded** — ATHENA can detect the symptom but cannot definitively isolate the root cause layer without additional calculations or domain expert judgment.
+- **~5-10% of failures are at or near the hard ceiling** — fault isolation fundamentally impossible from external outputs.
+- **The ceiling impact is NOT uniformly distributed.** Concentrates heavily on strongly correlated systems (~35-50% unobservable) and is minimal for simple bulk metals (~10-15%).
+
+**4. Partial Mitigations for Ceiling Failures**
+
+| Mitigation | Failures Addressed | Effectiveness |
+|:---|:---|:---|
+| Custodian error handler cascade | V-A1, V-M3 | [CONJECTURE] Resolves ~60-70% of V-A1 operationally, but finds a fix, not a diagnosis |
+| POTCAR best-practice lookup | V-T3 | [CONJECTURE] Catches ~70-80% for standard applications; fails for novel elements/pressures |
+| ENCUT vs. ENMAX cross-check | V-T1 | [PROVEN] Catches gross underconvergence; does not catch marginal cases |
+| K-mesh density heuristic | V-T2 | [CONJECTURE] Effective for standard cases; fails for unusual geometries |
+| Conservative PREC rule | V-A2 | [CONJECTURE] Overly conservative — false positives in ~40-50% of cases |
+| Known-system DFT+U table | V-T5 | [CONJECTURE] Effective for well-studied systems; fails for novel compounds |
+| Companion open-source DFT code | V-T4, V-A2, internal issues | [CONJECTURE] Only mitigation for hard-ceiling failures; adds significant cost |
+
+**5. The Key Question Answered**
+
+[CONJECTURE — synthesized from the above analysis]
+
+**For routine DFT workflows (bulk metals, simple surfaces, standard materials): degradation is infrequent (~10-20% of failure instances).** Most failures are implementation crashes (Tier A), methodology errors detectable from convergence metrics (Tier A/B), or theory errors catchable by rule-based cross-checks (Tier B).
+
+**For challenging DFT workflows (strongly correlated systems, novel materials, high-accuracy requirements): degradation is frequent (~35-50% of failure instances).** The dominant failure modes — SCF non-convergence with ambiguous root cause, functional inadequacy, PREC/ALGO sensitivity — are precisely where internal solver state would be needed for definitive diagnosis.
+
+**The degradation is asymmetric in a problematic way for ATHENA's value proposition.** The workflows where fault isolation matters most (challenging systems where researchers struggle to determine why their calculation failed) are exactly the workflows where the closed-source ceiling bites hardest. Easy systems rarely need sophisticated fault isolation; hard systems need it but the ceiling prevents it.
+
+**However, the ceiling does NOT invalidate ATHENA's approach for VASP.** Even 70-80% fault isolation coverage significantly exceeds the current state of practice, where most researchers perform no systematic fault isolation at all.
+
+**Implications:**
+
+1. ATHENA's VASP support should be marketed with honest scope boundaries. Standard workflows: useful fault isolation. Strongly correlated / pathological systems: symptom detection and heuristic classification, not guaranteed correct layer assignment.
+2. The differential-diagnosis approach (custodian-style cascade) is more appropriate than single-pass classification for ceiling-hitting failures.
+3. Supporting at least one open-source DFT code (Quantum ESPRESSO or GPAW) is a functional requirement for validating VASP fault classifications, not merely a generalizability test.
+4. WDK#25 should be NARROWED, not RESOLVED. The qualitative analysis bounds the ceiling impact but frequency estimates need empirical validation.
+
+**Open Threads:**
+
+1. Empirical validation of frequency estimates against real VASP failure corpora (e.g., Materials Project job logs, custodian error statistics).
+2. VASP 6 REPORT file analysis (WDK#7): may partially close the ceiling for SCF solver internals.
+3. Custodian error handler coverage quantification: diagnostic accuracy across the 16 failure modes.
+4. Whether differential-diagnosis cascades can be formalized as ATHENA fault-isolation strategies (connects to adversarial-reward track).
+5. Cross-validation protocol design for companion open-source DFT code.
+
+---
+
+### 2026-02-21: WDK#39 — prediction_id Type Harmonization
+**Date:** 2026-02-21
+**Scope:** Document String vs SpecElementId type mismatch in prediction tracking; evaluate harmonization options
+**Method:** Traced `prediction_id` through its full lifecycle across `event_kinds.rs`, `common.rs`, `overlay.rs`, and all three adapter files (`adapter.rs`, `gromacs_adapter.rs`, `vasp_adapter.rs`). Examined the parse-at-query-time workaround in `compare_predictions`, reviewed test cases for failure mode coverage, and cross-referenced the Step 12 ComparisonProfileV1 interface contract to assess forward-compatibility constraints.
+
+**Findings:**
+
+1. **The type mismatch is precisely located.** `EventKind::ComparisonResult.prediction_id` is `String` (`event_kinds.rs:88`), while `PredictionRecord.id` is `SpecElementId(u64)` (`common.rs:13,104`). The `PredictionComparison` output struct uses `Option<SpecElementId>` (`overlay.rs:36`), meaning the conversion from `String` to typed ID happens at query time in `compare_predictions`. [PROVEN: `event_kinds.rs:88`, `common.rs:13,104`, `overlay.rs:36,261`]
+
+2. **The parse-at-query-time workaround has four identifiable failure modes.**
+   (a) **Silent mismatch on non-numeric strings.** If `prediction_id` is a non-numeric string (e.g., `"pred-energy-1"`), the `parse::<u64>()` at `overlay.rs:261` returns `None`, the prediction is unresolvable, and the comparison emits `prediction_id: None, variable: "unknown"`. No error is raised — the mismatch is silently absorbed. [PROVEN: `overlay.rs:261-264`; test `test_compare_predictions_unresolvable_prediction_id` at `tests/mod.rs:1476` validates this behavior]
+   (b) **Numeric but non-existent ID.** If the string parses to a valid `u64` but no `PredictionRecord` exists with that ID, the join against `predictions_by_id` at `overlay.rs:263` produces `None`, and the comparison falls back to `variable: "unknown"` while still carrying `prediction_id: Some(SpecElementId(n))`. This creates a partial-success state where the ID looks resolved but carries no semantic meaning. [PROVEN: `overlay.rs:262-264`; no test currently covers this specific case]
+   (c) **Leading-zero and whitespace sensitivity.** `String::parse::<u64>()` rejects leading/trailing whitespace; leading zeros do not cause mismatch. Adapter-side whitespace in the prediction_id string would cause silent fallback. [CONJECTURE: inferred from Rust stdlib `str::parse` behavior; no adapter currently emits whitespace]
+   (d) **Overflow on large numeric strings.** If an adapter emits a prediction_id string exceeding `u64::MAX`, the parse silently returns `None`. [CONJECTURE: no adapter currently emits such values]
+
+3. **No existing adapter currently emits `ComparisonResult` events.** All three adapter implementations produce only Stage 1/Stage 2 event types. The only code constructing `ComparisonResult` events is in test helpers (`tests/mod.rs:1380,1441,1505,1589,1607,1671`). [PROVEN: exhaustive search across all three adapter files]
+
+4. **ComparisonResult events are architecturally "derived" (R17), not adapter-emitted.** Per `event_kinds.rs:86` "(derived)" annotation and FINDINGS.md finding #51, ComparisonResult events are generated by the IR's comparison logic, not parsed from DSL traces. Adapter impact of changing the field type is zero. [PROVEN: `event_kinds.rs:86`; FINDINGS.md #51]
+
+5. **The Step 12 ComparisonProfileV1 interface contract already specifies `prediction_id: SpecElementId`.** The current `EventKind::ComparisonResult.prediction_id: String` is already inconsistent with the forward design intent. [PROVEN: FINDINGS.md lines 327, 324-333]
+
+6. **Evaluation of harmonization options:**
+
+   **(a) Change `ComparisonResult.prediction_id` to `SpecElementId` — RECOMMENDED.** Eliminates parse-at-query-time workaround. Aligns with `PredictionRecord`, `ContractTerm`, `InterventionRecord`, and `ControlledVariable` — all use `SpecElementId` for their `id` field (`common.rs:96,104,113,121`). Aligns with ComparisonProfileV1 forward design. Zero adapter impact since no adapter constructs `ComparisonResult` (finding #3). Only breakage: 6 test construction sites. Risk: LOW. [PROVEN for adapter impact; CONJECTURE for production-scope assessment]
+
+   **(b) Change `PredictionRecord.id` to `String` — NOT RECOMMENDED.** Weakens type safety across the entire spec system. All four spec element types use `SpecElementId`. Loses `Hash`/`Copy`/`Eq` guarantees, complicating HashMap-based lookups. Diverges from ComparisonProfileV1. [PROVEN: four spec element types use `SpecElementId`]
+
+   **(c) Introduce a shared `PredictionId` newtype — VIABLE BUT PREMATURE.** Decouples prediction identity from `SpecElementId` space. But adds a new type for a single-use case with no demonstrated need for different semantics. Currently all four spec element types share the same ID space — introducing a separate type only for predictions breaks uniformity without motivation. [CONJECTURE: assessment of future need]
+
+7. **`SpecElementId` is a newtype wrapper around `u64` (`common.rs:12-13`), not an enum.** No variant extension needed for harmonization. [PROVEN: `common.rs:12-13`]
+
+**Implications:**
+
+- Option (a) is the clear recommendation: eliminates workaround, aligns with four other spec element types, matches ComparisonProfileV1, zero adapter impact since `ComparisonResult` is a derived event type.
+- The change is small (1 type change, 1 method simplification, 6 test updates) but flagged as ADR-scoped work, so can remain documented until production design decisions.
+- The `String` type was likely a placeholder from before the spec element ID system was fully established, not a deliberate design choice.
+- If production requires non-numeric prediction IDs (multi-experiment namespacing), option (c) becomes relevant, but `SpecElementId` would need to evolve for all spec element types.
+
+**Open Threads:**
+
+- The comparison engine that will construct `ComparisonResult` events in non-test contexts does not yet exist. When built, it should construct `prediction_id` as `SpecElementId` directly.
+- Finding 2b (numeric ID with no matching `PredictionRecord`) is not tested. A test for this case would clarify whether the fallback behavior is intentional or a gap.
+- `TraceEvent.spec_ref: Option<SpecElementId>` (`lel.rs:78`) provides a general-purpose spec element link at the event level, which could serve as an alternative to carrying `prediction_id` inside `ComparisonResult`'s payload. This payload-level vs event-level spec linkage question is broader than WDK#39.
+
+---
+
+### 2026-02-21: WDK#35 + WDK#36 — ContractTerm Value Extensions for VASP
+**Date:** 2026-02-21
+**Scope:** Investigate what VASP preconditions need machine-readable values in ContractTerm and what Value variants are needed for spectral/grid data
+**Method:** Systematic code analysis of `common.rs` (ContractTerm, Value, PredictionRecord), `vasp_adapter.rs` (current usage), `lel.rs` (ExperimentSpec), and `event_kinds.rs` (EventKind consumers of Value). Cross-referenced against VASP domain knowledge from `dsl-evaluation/vasp-trace-analysis.md` and `dsl-evaluation/cross-framework-synthesis.md`. Steel-manned each design option before stress-testing.
+
+**Findings:**
+
+**WDK#35 — ContractTerm `value` field:**
+
+1. [PROVEN] The current `ContractTerm` struct (`common.rs:94-99`) has only three fields: `id: SpecElementId`, `description: String`, `layer: Layer`. The `description` field is the sole carrier of precondition semantics, making machine-readable checking impossible. [`common.rs:94-99`; test usage at `tests/mod.rs:33-36`]
+
+2. [PROVEN] The VASP adapter (`vasp_adapter.rs:592-594`) currently sets both `preconditions` and `postconditions` to empty `Vec::new()`. The same is true for GROMACS (`gromacs_adapter.rs:632-634`) and MockOpenMM adapters. ContractTerm is not exercised in any adapter path. [`vasp_adapter.rs:592-594`]
+
+3. [PROVEN] Other spec-level types already carry machine-readable `Value` fields: `PredictionRecord.predicted_value: Value` (`common.rs:106`), `InterventionRecord.values: Vec<Value>` (`common.rs:115`), `ControlledVariable.held_value: Value` (`common.rs:123`). ContractTerm is the sole spec-level type lacking a value field. [`common.rs:94-123`]
+
+4. [CONJECTURE — domain knowledge] VASP preconditions that require machine-readable values fall into at least five concrete categories:
+   - **POTCAR family/identity**: Categorical match (`Value::KnownCat("PBE")`). [`vasp-trace-analysis.md` lines 92, 346-347]
+   - **ENCUT vs POTCAR ENMAX threshold**: Numeric comparison (`Value::Known(f64, "eV")`). [`vasp-trace-analysis.md` lines 354-361]
+   - **KPOINTS mesh density**: Vector value for mesh grid. [`vasp-trace-analysis.md` lines 363-373]
+   - **ISMEAR appropriateness**: Categorical precondition. [`vasp-trace-analysis.md` lines 83-84]
+   - **POSCAR atom count / species consistency**: Structural match. [`cross-framework-synthesis.md` line 434]
+
+5. [CONJECTURE — design analysis] Three design options evaluated:
+   - **Option A (`value: Option<Value>`) — RECOMMENDED for prototype.** Minimal, backward-compatible, consistent with `ControlledVariable.held_value` pattern. The checking logic is domain-specific and belongs in adapters/LFI, not the IR schema. All five precondition categories representable with existing Value variants.
+   - **Option B (typed predicate `ContractCheck`)**: Machine-checkable from IR but significantly more complex; operator set would grow per domain.
+   - **Option C (hybrid `value` + `check_rule: Option<String>`)**: Introduces string-keyed dispatch.
+
+   Option A is correct because the IR's job is to carry the expected value so the comparison is recordable; the comparison logic lives in `compare_predictions` (`overlay.rs:230-277`), not in the schema.
+
+**WDK#36 — Value enum KnownMatrix/grid variant:**
+
+6. [PROVEN] The current Value enum (`common.rs:201-213`) has four variants: `Known(f64, Unit)`, `KnownVec(Vec<f64>, Unit)`, `KnownCat(String)`, `Havoc { expected_type, reason }`. None can represent 2D or higher-dimensional data. [`common.rs:201-213`]
+
+7. [PROVEN] `PredictionRecord.predicted_value: Value` (`common.rs:106`) is the primary consumer needing matrix/grid values for spectral predictions. `ObservableMeasurement.value: Value` (`event_kinds.rs:69`) and `ObservableMeasurement.uncertainty: Option<Value>` (`event_kinds.rs:70`) are secondary consumers. [`common.rs:102-108`, `event_kinds.rs:66-73`]
+
+8. [PROVEN from domain sources] VASP produces at least five distinct spectral/grid data types not representable by current Value variants:
+   - **Band structure (EIGENVAL)**: `[n_kpoints][n_bands][n_spin]` of f64 in eV. [`vasp-trace-analysis.md:29`]
+   - **Total DOS (DOSCAR)**: `[n_energy_points][2+]` of f64 with units (eV, states/eV). [`vasp-trace-analysis.md:30`]
+   - **Projected DOS/bands (PROCAR)**: `[n_kpoints][n_bands][n_ions][n_orbitals]` of f64, up to 1 GB. [`vasp-trace-analysis.md:31`]
+   - **Charge density (CHGCAR)**: `[nx][ny][nz]` of f64, 10 MB to 10 GB. [`vasp-trace-analysis.md:32`]
+   - **Local potential (LOCPOT)**: Same shape as CHGCAR. [`vasp-trace-analysis.md:34`]
+
+9. [CONJECTURE — design analysis] Four design options evaluated. **Recommended: Add two variants — `KnownGrid` for inline spectral data and `DataRef` for volumetric references.**
+
+   ```
+   KnownGrid {
+       axes: Vec<(String, Vec<f64>, Unit)>,  // (label, values, unit) per axis
+       values: Vec<f64>,                      // flattened row-major data
+       value_unit: Unit,                      // unit of the values
+   },
+   DataRef {
+       path: String,                          // reference to external data
+       data_type: String,                     // e.g., "charge_density"
+       shape: Vec<usize>,                     // shape metadata
+       unit: Unit,
+   },
+   ```
+
+   This follows the existing pattern where small data is inline (`Known`, `KnownVec`) and large data is referenced (`StateSnapshot.data_ref`). Band structure/DOS fit KnownGrid; CHGCAR/LOCPOT/PROCAR fit DataRef.
+
+10. [CONJECTURE — cross-framework] OpenMM and GROMACS do not produce spectral data. These extensions are VASP-specific within the current three-framework scope but would serve future DFT adapters (Quantum ESPRESSO, CASTEP, CP2K). [`cross-framework-synthesis.md` line 437]
+
+**Implications:**
+
+- WDK#35 can be closed with `value: Option<Value>`. All five VASP precondition categories are representable with existing Value variants. No new Value types needed for WDK#35.
+- WDK#36 requires two new Value variants: `KnownGrid` (inline spectral data) and `DataRef` (volumetric references). `ValueType` enum (`common.rs:24-28`) needs corresponding `Grid` and `DataRef` variants.
+- Neither change is blocking. Both are VASP Stage 3 features. `Havoc` variant can serve as placeholder until implemented.
+- Step 12 ComparisonProfileV1 is affected: spectral data comparison requires profile-level extensions (e.g., `SpectralDivergence` variant). Downstream dependency, not a blocker.
+
+**Open Threads:**
+
+- Axis convention for KnownGrid: canonical ordering per data_type in adapter conventions, not in the IR schema.
+- DataRef resolution mechanism: how does the IR consumer locate external files? Same unresolved question as `StateSnapshot.data_ref`.
+- Spectral comparison for R17: distance metrics for band structures / DOS curves not covered by current `DivergenceMeasure`. Defers to adversarial-reward track.
+- VASP adapter Stage 2/3 implementation: once ContractTerm.value and new Value variants exist, the adapter needs to populate preconditions and predictions.
+
+---
+
 ### 2026-02-22: Step 14 — UncertaintySummary Schema for Divergence Metrics (WDK#40)
 
 **Scope:** Resolve/narrow What We Don't Know #40 ("What minimal `UncertaintySummary` schema should accompany each divergence metric so one comparison profile can support both V&V/effect-size reporting and Bayesian/active-learning reward calibration without adapter-specific branching"), while preserving Step 12 `ComparisonProfileV1` guarantees (G1-G5) and Step 13 convergence-summary compatibility.
@@ -1328,6 +1671,16 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 
 70. **`MetricComponent.uncertainty` and `ConvergenceSummary.uncertainty` should share the same numeric uncertainty core, while convergence-pattern confidence remains separate pending WDK#42-44.** This preserves Step 13 compatibility without prematurely freezing pattern-taxonomy semantics. [Step 14 log 2026-02-22; Step 13 log 2026-02-22; WDK#42-44]
 
+71. **WDK#35 resolved: `ContractTerm` needs `value: Option<Value>` for machine-readable precondition checking.** Five concrete VASP precondition categories (POTCAR family, ENCUT threshold, KPOINTS density, ISMEAR type, POSCAR consistency) are all representable with existing Value variants. Checking logic belongs in adapters/LFI, consistent with the `ControlledVariable.held_value` pattern. No new Value types needed for preconditions. [WDK#35+#36 log 2026-02-21; `common.rs:94-99,106,115,123`]
+
+72. **WDK#36 resolved: Value enum needs two new variants — `KnownGrid` for inline spectral data and `DataRef` for volumetric references.** `KnownGrid { axes, values, value_unit }` covers band structure and DOS (typically <10MB); `DataRef { path, data_type, shape, unit }` covers CHGCAR/LOCPOT/PROCAR (10MB-100GB). Follows the existing pattern of inline small data + referenced large data (`StateSnapshot.data_ref`). OpenMM and GROMACS do not produce spectral data — these extensions are VASP/DFT-specific. [WDK#35+#36 log 2026-02-21; `common.rs:201-213`; `vasp-trace-analysis.md:29-34`]
+
+73. **WDK#39 resolved: `ComparisonResult.prediction_id` should be `SpecElementId`, not `String`.** Zero adapter impact because `ComparisonResult` is a derived event type — no adapter constructs it. Aligns with all four spec element types (`ContractTerm`, `PredictionRecord`, `InterventionRecord`, `ControlledVariable`) and the ComparisonProfileV1 forward design. The `String` type was a placeholder, not a deliberate design choice. [WDK#39 log 2026-02-21; `event_kinds.rs:86,88`; `common.rs:96,104,113,121`]
+
+74. **WDK#25 narrowed: VASP closed-source ceiling impact is bounded at ~20-30% of failure instances, with asymmetric distribution.** Three-tier observability classification across 16 failure modes: Tier A (fully observable) covers 7 modes, Tier B (partially observable with heuristics) covers 6 modes, Tier C (hard ceiling) covers 3 modes plus internal numerical issues. Weighted across workflow types: ~70-80% of failures allow fault isolation from external outputs. The ceiling concentrates on strongly correlated systems (~35-50% unobservable) and is minimal for bulk metals (~10-15%). [WDK#25 log 2026-02-21; `cross-framework-synthesis.md §3.3, §6.3`]
+
+75. **WDK#26 narrowed: INCAR classification table covers ~20% of commonly used parameters explicitly and has two known gaps (ADDGRID, NBANDS).** Six additional ambiguous parameters identified (ISYM, SYMPREC, LASPH, LMAXMIX, ENAUG, NGX/NGY/NGZ), bringing total ambiguous count to ~12. Classification strategy recommendation: evolve from flat static lookup to static table with context-dependent flags (Strategy B), separating "what conditions matter" (static, testable) from "what conditions hold" (dynamic, requires POSCAR/POTCAR/KPOINTS context). The 70-80% confidence estimate from Decision Gate 1 remains plausible. [WDK#26 log 2026-02-21; `vasp_adapter.rs:12-96`; `cross-framework-synthesis.md §2.3`]
+
 ### What We Suspect
 
 **DSL Trace Architecture**
@@ -1442,9 +1795,9 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 
 24. ~~**How boundary parameters should be represented in a dialect-based IR.**~~ RESOLVED: BoundaryClassification enum with PrimaryLayer/DualAnnotated/ContextDependent variants. See What We Know #45. [Candidate IR schemas log 2026-02-20; candidate-ir-schemas.md §1, §8 OQ4]
 
-25. **The practical impact of VASP's closed-source ceiling.** How often does correct fault classification require information not present in vasprun.xml + OUTCAR + stdout? Needs stress-testing with real VASP failure cases. [Cross-framework synthesis log 2026-02-20; cross-framework-synthesis.md §6.4]
+25. **The practical impact of VASP's closed-source ceiling.** ~~How often does correct fault classification require information not present in vasprun.xml + OUTCAR + stdout? Needs stress-testing with real VASP failure cases.~~ NARROWED: Three-tier observability classification (A/B/C) across 16 failure modes estimates ~70-80% weighted fault isolation from external outputs. Degradation is asymmetric: ~10-20% for routine workflows (bulk metals), ~35-50% for challenging workflows (strongly correlated systems). Remaining uncertainty: per-workflow frequency estimates are conjectural and need empirical validation against real VASP failure corpora. [WDK#25 log 2026-02-21; cross-framework-synthesis.md §6.4]
 
-26. **Whether the INCAR classification table is correct and complete.** The tag-level classification (theory/implementation/ambiguous) for ~200-300 INCAR parameters needs domain expert validation, particularly for context-dependent tags. [Cross-framework synthesis log 2026-02-20; cross-framework-synthesis.md §6.4]
+26. **Whether the INCAR classification table is correct and complete.** ~~The tag-level classification (theory/implementation/ambiguous) for ~200-300 INCAR parameters needs domain expert validation, particularly for context-dependent tags.~~ NARROWED: Prototype covers 16 of ~50-80 commonly used parameters; 2 of 6 identified ambiguous parameters (ADDGRID, NBANDS) are missing. Six additional ambiguous parameters identified (ISYM, SYMPREC, LASPH, LMAXMIX, ENAUG, NGX/NGY/NGZ). Classification strategy recommendation: static table with context-dependent flags (Strategy B). Remaining uncertainty: the 6 newly identified parameters need domain expert validation; ALGO secondary layer (Methodology vs Theory) needs reconsideration for pathological systems; version-specific behavior catalog needed. [WDK#26 log 2026-02-21; cross-framework-synthesis.md §6.4]
 
 27. **What the streaming/buffering trade-off is for Stage 3.** LEL is fully streaming; DGR may require partial graph buffering; TAL may require assertion reordering. Depends on how often Stage 3 needs full-trace access vs. phase-level summaries. [IR synthesis log 2026-02-20; ir-pattern-catalog.md §7]
 
@@ -1466,15 +1819,15 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 
 34. ~~**Whether the OverlayEntity is sufficient for Stage 2-3 queries.**~~ RESOLVED (prototype scope): Lightweight OverlayEntity supports implemented Stage 2 confounder traversal (R14) with `by_id` lookup in place. R17/R18 remain design-aligned and unblocked by structure. See What We Know #49 and #50. [Step 6 log 2026-02-21; `lel-ir-prototype/src/overlay.rs`]
 
-35. **Whether `ContractTerm` needs a `value: Option<Value>` field** for machine-readable precondition checking in VASP Stage 3 (e.g., POTCAR family = PBE). Currently `ContractTerm` has only `description: String`. Non-blocking for OpenMM/GROMACS Stage 1. [Open thread resolution log 2026-02-21; common.rs:94-99]
+35. ~~**Whether `ContractTerm` needs a `value: Option<Value>` field** for machine-readable precondition checking in VASP Stage 3 (e.g., POTCAR family = PBE). Currently `ContractTerm` has only `description: String`. Non-blocking for OpenMM/GROMACS Stage 1.~~ RESOLVED (design level): Yes — `value: Option<Value>` is the correct design. Five concrete VASP precondition categories identified (POTCAR family, ENCUT threshold, KPOINTS density, ISMEAR type, POSCAR consistency), all representable with existing Value variants. Checking logic belongs in adapters/LFI, not the IR schema, consistent with the `ControlledVariable.held_value` pattern. [WDK#35+#36 log 2026-02-21; common.rs:94-99]
 
-36. **Whether `Value` enum needs a `KnownMatrix` or function variant** for VASP spectral data (band structure over k-points). `PredictionRecord.predicted_value: Value` cannot represent spectral predictions with current variants. Non-blocking for OpenMM Stage 1. [Open thread resolution log 2026-02-21; common.rs:102-108]
+36. ~~**Whether `Value` enum needs a `KnownMatrix` or function variant** for VASP spectral data (band structure over k-points). `PredictionRecord.predicted_value: Value` cannot represent spectral predictions with current variants. Non-blocking for OpenMM Stage 1.~~ RESOLVED (design level): Yes — two new variants recommended: `KnownGrid` (inline spectral data: band structure, DOS) and `DataRef` (volumetric references: CHGCAR, LOCPOT, PROCAR). Follows existing pattern of inline small data + referenced large data (`StateSnapshot.data_ref`). `ValueType` enum needs corresponding extension. Non-blocking for Stage 1/2. [WDK#35+#36 log 2026-02-21; common.rs:201-213]
 
 37. ~~**Whether `EventIndexes` needs a `by_id: HashMap<EventId, usize>` index** for O(1) event lookup by ID.~~ RESOLVED: Implemented in prototype (`EventIndexes.by_id`) with insert-time population and test/serde coverage. See What We Know #49. [Step 6 log 2026-02-21; `lel-ir-prototype/src/lel.rs`, tests]
 
 38. **Whether arena allocation provides measurable benefit for CausalOverlay construction.** NARROWED: Vec-first allocation is now validated on the real overlay path at 10^6 scale (`CausalOverlay::from_log` = 251.82ms). Arena remains deferred and should only be introduced if future profiling shows measurable allocation overhead in broader workloads. [Step 6 log 2026-02-21; `lel-ir-prototype/src/bench.rs`]
 
-39. **Whether `EventKind::ComparisonResult.prediction_id: String` should be harmonized with `PredictionRecord.id: SpecElementId` in production.** Prototype resolves the mismatch at query time via parse-at-query-time conversion, but production semantics and type-level guarantees remain ADR-scoped work. [Step 7 log 2026-02-21; `lel-ir-prototype/src/overlay.rs`]
+39. ~~**Whether `EventKind::ComparisonResult.prediction_id: String` should be harmonized with `PredictionRecord.id: SpecElementId` in production.**~~ RESOLVED (design level): Yes — change `ComparisonResult.prediction_id` to `SpecElementId` (Option a). Zero adapter impact since `ComparisonResult` is a derived event type (no adapter constructs it). Aligns with all four spec element types and ComparisonProfileV1 forward design. Parse-at-query-time workaround has four failure modes (silent mismatch, partial-success, whitespace, overflow). Change scope: 1 type in `event_kinds.rs`, 1 method in `overlay.rs`, 6 test sites. [WDK#39 log 2026-02-21; `event_kinds.rs:88`; `overlay.rs:261`]
 
 40. ~~**What minimal `UncertaintySummary` schema should accompany each divergence metric** so one comparison profile can support both V&V/effect-size reporting and Bayesian/active-learning reward calibration without adapter-specific branching.~~ NARROWED: Step 14 recommends Candidate C (layered point uncertainty + optional tagged distribution payload + explicit `NoUncertainty` reason) as the minimal adapter-agnostic direction. Remaining work is implementation/field canonicalization and downstream aggregation/pattern-taxonomy dependencies (WDK#41-44), not baseline schema shape. [Step 14 log 2026-02-22]
 
