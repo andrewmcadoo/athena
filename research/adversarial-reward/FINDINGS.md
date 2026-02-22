@@ -30,6 +30,40 @@ IN PROGRESS
 
 ## Investigation Log
 
+### 2026-02-22 -- WDK#41 Session 4.2/4.3: Regime Validity Analysis + Guardrail Specification
+
+**Scope**
+
+- Close `athena-17c` (regime validity) and `athena-zvg` (guardrail spec) by classifying Session 4/5 failures against realistic DSL operating ranges.
+- Answer the central question per failure mode: in-range risk vs stress-test boundary.
+- Produce architecture-level guardrail specification for custom sigmoid midpoint constraints.
+
+**Method**
+
+- Read `perturbation_summary.md`, `stretch_summary.md`, `ceiling_analysis.md`, `normalization.py`, `scenarios.py`, and Session 4/4.1/5 context in this log.
+- Derived training-knowledge-informed operating ranges (with confidence tags) for: z-score magnitude, Bayes factor, custom sigmoid `x0/k`, SE multipliers, missing uncertainty count, and abrupt single-metric jump factors across OpenMM/GROMACS, CESM, and VASP contexts.
+- Produced `research/adversarial-reward/prototypes/aggregation-candidates/regime_validity.md` and `research/adversarial-reward/prototypes/aggregation-candidates/regime_validity.json` with parameter-range tables, failure overlays, and per-domain Pattern B realism checks.
+- Produced `research/adversarial-reward/prototypes/aggregation-candidates/guardrail_spec.md` specifying custom sigmoid `x0 >= 0`, scope, and reject-on-violation enforcement behavior.
+
+**Findings**
+
+- Unresolved failures from Sessions 4/5 are out-of-range stress conditions under the derived DSL operating bands:
+  - S2 fragility appears only at negative midpoint (`x0=-0.2`) with higher steepness (`k>=2.0`).
+  - S1 fragility appears only at extreme uncertainty inflation (`SE_mult=5.0`, `10.0`).
+  - Pattern B under-response is measured under an intentionally extreme 50x isolated one-metric jump (`0.1 -> 5.0`), not representative of nominal valid DSL output behavior.
+- S5 BF ceiling and S6 joint compression are resolved via Session 4.1's log-scaled BF normalization (`bf_max_target=10000`), corroborated by Session 5 baseline gate and stretch artifacts.
+- Guardrail decision locked: custom sigmoid midpoint must satisfy `x0 >= 0` (hard validation, reject invalid configs, no silent clamping).
+
+**Implications**
+
+- `athena-6ax` is unblocked to proceed with Session 6 recommendation synthesis using explicit accepted-boundary language for S1/Pattern B stress regions.
+- The only mandatory new architecture-level control from this session is config-time enforcement of `x0 >= 0` for `custom_sigmoids`.
+
+**Open Threads**
+
+- Validate the estimated operating ranges with empirical DSL trace distributions once production-like data is available.
+- If future operating traces regularly enter currently out-of-range regions, re-run regime-validity classification before changing guardrail scope.
+
 ### 2026-02-22 -- WDK#41 Session 5: Hybrid Stretch Analyses (Calibration + Correlation)
 
 **Scope**
@@ -388,6 +422,10 @@ IN PROGRESS
   Evidence: same Session 4 log entry (`perturbation_summary.md` S5 sweep table).
 - S7 boundary behavior and S4 missing-uncertainty behavior remained robust across sampled perturbations (`7/7` and `4/4` respectively).  
   Evidence: same Session 4 log entry (`perturbation_results.json` axis stats).
+- Session 4.2/4.3 regime-validity synthesis classifies remaining unresolved failure loci as out-of-range stress boundaries (S2 negative `x0`, S1 `SE_mult>=5`, Pattern B 50x isolated jump), while keeping BF-related failures as resolved.  
+  Evidence: Investigation Log entry `2026-02-22 -- WDK#41 Session 4.2/4.3` (`regime_validity.md`, `regime_validity.json`).
+- Custom sigmoid guardrail is now specified at architecture level: `x0 >= 0` for all `custom_sigmoids`, enforced by config validation with reject-on-violation behavior.  
+  Evidence: same Session 4.2/4.3 log entry (`guardrail_spec.md`).
 - All three candidates are bounded in practice for Session 1 fixtures: no NaN and no out-of-range scores in the full 3x7 matrix.  
   Evidence: Investigation Log entry `2026-02-22 — WDK#41 Session 1` (`results.json`, boundedness check).
 - Session 2 structural flags are backward-compatible: with defaults, `evaluate.py` exactly reproduces Session 1 pass/fail outputs (`5/7`, `5/7`, `3/7`).  
@@ -409,16 +447,13 @@ IN PROGRESS
 
 - Joint use of normalization-level SE dampening and Fisher SE-reliability scaling may be over-attenuating evidence in some regimes.  
   Evidence basis: Fisher isolation (`se_dampen=False`) improved from 4/7 to 5/7 vs. main sweep (Session 2).
-- The newly observed S1 failures under extreme SE multipliers (`5x`, `10x`) may indicate an additional high-uncertainty corner case in the current hybrid gating pipeline, rather than a broad Noisy-TV regression.  
-  Evidence basis: Session 4 perturbation axis `s1_se_mult` (`3/5` pass; failures only at highest multipliers).
 
 ### What We Don't Know
 
 - Whether the hybrid remains `7/7` outside the current fixed fixture set (especially under correlated weak signals and non-floor-saturated Fisher regimes).
-- Whether S1 extreme-SE failures occur in realistic simulator uncertainty ranges or only under adversarially inflated scaling.
-- Whether small targeted guardrails around S2 custom sigmoid and S5 BF ceiling can eliminate observed failures without degrading baseline S2 compounding.
 - Whether any non-hybrid single-family configuration can match hybrid performance under current criteria.
 - Whether Fisher correlation inflation remains near-neutral when evaluated in a non-floor-saturated weak-signal regime.
+- Whether derived operating-range estimates in `regime_validity.md` match observed parameter distributions in real production DSL traces (OpenMM/GROMACS/CESM/VASP), rather than training-knowledge priors.
 - Which candidate/variant should be promoted to a formal `AggregateScore` definition for architecture integration (Session 3 decision).
 
 ## Prototype Index
@@ -446,6 +481,9 @@ IN PROGRESS
 | `research/adversarial-reward/prototypes/aggregation-candidates/stretch_test.py` | Session 5 post-ceiling hybrid stretch harness (Phase 0 gate, calibration patterns, correlation robustness, artifact emission) | Complete (Session 5 Stretch) | Deterministic 4-phase execution with strict baseline gate and S6 non-floor-saturated correlation diagnostics |
 | `research/adversarial-reward/prototypes/aggregation-candidates/stretch_results.json` | Session 5 machine-readable stretch outputs | Complete (Session 5 Stretch) | Verified Phase 0 `7/7`, Pattern B under-response classification, and rho=0.5 inflation pass with floor_saturated=False |
 | `research/adversarial-reward/prototypes/aggregation-candidates/stretch_summary.md` | Session 5 human-readable stretch summary | Complete (Session 5 Stretch) | Side-by-side Session 2 comparison tables and explicit verdict on calibration vs correlation stretch behavior |
+| `research/adversarial-reward/prototypes/aggregation-candidates/regime_validity.md` | Session 4.2 regime-validity writeup for DSL-realistic parameter ranges and failure overlays | Complete (Session 4.2/4.3) | Explicit in-range/out-of-range/resolved classification for S2, S1, Pattern B, S5, and S6 with confidence tags |
+| `research/adversarial-reward/prototypes/aggregation-candidates/regime_validity.json` | Machine-readable Session 4.2 regime-validity artifact | Complete (Session 4.2/4.3) | Structured parameter ranges, domain assessments, failure classifications, and verdict for downstream automation |
+| `research/adversarial-reward/prototypes/aggregation-candidates/guardrail_spec.md` | Session 4.3 architecture-level guardrail specification (`x0 >= 0`) for custom sigmoids | Complete (Session 4.2/4.3) | Constraint statement, rationale, scope, and reject-on-violation enforcement contract for future production integration |
 
 ## Next Steps
 

@@ -1,0 +1,171 @@
+{
+  "session": "WDK#41 Session 4.2",
+  "question": "Are remaining failures in realistic operating ranges or only in stress-test extremes?",
+  "evidence_inputs": [
+    "perturbation_summary.md",
+    "stretch_summary.md",
+    "ceiling_analysis.md",
+    "research/adversarial-reward/FINDINGS.md",
+    "normalization.py",
+    "scenarios.py"
+  ],
+  "confidence_scale": {
+    "HIGH": "Well-established in standard practice",
+    "MEDIUM": "Reasonable inference from domain knowledge",
+    "LOW": "Uncertain; needs domain expert validation"
+  },
+  "parameter_ranges": [
+    {
+      "parameter": "z_score_abs",
+      "realistic_min": 0.0,
+      "realistic_max": 6.0,
+      "confidence": "HIGH",
+      "rationale": "Typical accepted standardized residual/effect magnitudes in DSL simulation workflows are in low-to-moderate bands; >6 is usually outlier or run-quality failure."
+    },
+    {
+      "parameter": "bayes_factor",
+      "realistic_min": 1.0,
+      "realistic_max": 1000.0,
+      "common_operating_band": [1.0, 300.0],
+      "confidence": "MEDIUM",
+      "rationale": "Computational Bayesian model comparisons often lie in low hundreds; high hundreds/low thousands can occur under strong cumulative evidence."
+    },
+    {
+      "parameter": "custom_sigmoid_x0",
+      "realistic_min": 0.0,
+      "realistic_max": 0.5,
+      "confidence": "MEDIUM",
+      "rationale": "For nonnegative contradiction-oriented custom metrics, x0<0 implies half-activation before zero evidence and over-amplifies weak signals."
+    },
+    {
+      "parameter": "custom_sigmoid_k",
+      "realistic_min": 0.8,
+      "realistic_max": 3.0,
+      "confidence": "MEDIUM",
+      "rationale": "Moderate slopes preserve weak-signal gradation; very steep k behaves like hard thresholding and is usually stress calibration."
+    },
+    {
+      "parameter": "se_multiplier_vs_baseline",
+      "realistic_min": 0.5,
+      "realistic_max": 3.0,
+      "confidence": "MEDIUM",
+      "rationale": "2-3x inflation can occur with sampling variability; 5-10x usually indicates non-equilibrated or low-quality runs."
+    },
+    {
+      "parameter": "missing_uncertainty_count_per_4_metrics",
+      "realistic_min": 0,
+      "realistic_max": 2,
+      "confidence": "MEDIUM",
+      "rationale": "Partial uncertainty omissions occur, but most metrics missing uncertainty is typically a QA/reporting failure."
+    },
+    {
+      "parameter": "abrupt_single_metric_jump_factor",
+      "realistic_min": 1.0,
+      "realistic_max": 5.0,
+      "confidence": "MEDIUM",
+      "rationale": "Valid physical regime shifts usually involve coupled metrics; isolated extreme one-metric jumps are usually artifacts."
+    }
+  ],
+  "pattern_b_domain_assessment": [
+    {
+      "domain": "OpenMM/GROMACS",
+      "supports_50x_isolated_jump_in_valid_run": false,
+      "confidence": "MEDIUM",
+      "rationale": "Large transitions exist but typically co-move multiple observables; isolated 50x one-metric spikes are non-nominal."
+    },
+    {
+      "domain": "CESM",
+      "supports_50x_isolated_jump_in_valid_run": false,
+      "confidence": "MEDIUM",
+      "rationale": "Abrupt climate changes are coupled and temporally distributed; one-metric 50x step is non-standard for valid outputs."
+    },
+    {
+      "domain": "VASP",
+      "supports_50x_isolated_jump_in_valid_run": false,
+      "confidence": "MEDIUM",
+      "rationale": "Extreme spikes can occur in non-converged SCF behavior, but those runs are rejected rather than used as valid evidence."
+    }
+  ],
+  "failure_overlay": [
+    {
+      "failure_mode": "S2 sigmoid fragility",
+      "boundary_value": "x0=-0.2 with k>=2.0 causes failure",
+      "realistic_range": {
+        "x0": [0.0, 0.5],
+        "k": [0.8, 3.0]
+      },
+      "classification": "Out-of-range",
+      "rationale": "Failure locus requires negative x0; all sampled x0>=0 points pass in Session 4 grid.",
+      "references": [
+        "perturbation_summary.md",
+        "normalization.py",
+        "scenarios.py"
+      ]
+    },
+    {
+      "failure_mode": "Pattern B under-response",
+      "boundary_value": "50x single-metric scale jump (0.1->5.0), observed step_ratio=1.029",
+      "realistic_range": {
+        "isolated_jump_factor": [1.0, 5.0]
+      },
+      "classification": "Out-of-range",
+      "rationale": "Pattern B is an intentionally extreme stress shape not representative of nominal valid DSL outputs.",
+      "references": [
+        "stretch_summary.md",
+        "calibration_sim.py"
+      ]
+    },
+    {
+      "failure_mode": "S1 SE multiplier fragility",
+      "boundary_value": "fails at SE_mult=5.0 and 10.0",
+      "realistic_range": {
+        "SE_mult": [0.5, 3.0]
+      },
+      "classification": "Out-of-range",
+      "rationale": "Observed failure occurs beyond realistic uncertainty inflation for quality-controlled runs.",
+      "references": [
+        "perturbation_summary.md"
+      ]
+    },
+    {
+      "failure_mode": "S5 BF ceiling",
+      "boundary_value": "old mapping failed for BF>=120",
+      "realistic_range": {
+        "BF": [1.0, 1000.0]
+      },
+      "classification": "Resolved",
+      "rationale": "Session 4.1 log-scaled normalization (bf_max_target=10000) restores S5 through BF=1000.",
+      "references": [
+        "ceiling_analysis.md",
+        "stretch_summary.md"
+      ]
+    },
+    {
+      "failure_mode": "S6 joint compression",
+      "boundary_value": "old mapping failed in high d_mid/high BF cells",
+      "realistic_range": {
+        "d_mid": [0.9, 4.0],
+        "BF": [12.0, 1000.0]
+      },
+      "classification": "Resolved",
+      "rationale": "Same Session 4.1 BF normalization recovered all five previously failing S6 cells.",
+      "references": [
+        "ceiling_analysis.md"
+      ]
+    }
+  ],
+  "verdict": {
+    "in_range_unresolved_failures": [],
+    "out_of_range_unresolved_failures": [
+      "S2 sigmoid fragility locus (negative x0)",
+      "Pattern B 50x isolated jump",
+      "S1 SE multiplier 5x/10x"
+    ],
+    "resolved_failures": [
+      "S5 BF ceiling",
+      "S6 joint compression"
+    ],
+    "required_guardrail": "Enforce custom sigmoid x0 >= 0",
+    "session_outcome": "athena-17c complete"
+  }
+}
