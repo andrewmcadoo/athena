@@ -1,6 +1,6 @@
 # Aggregation Candidate Evaluation (Session 1 Prototype)
 
-Generated: 2026-02-22T06:50:11.543669+00:00
+Generated: 2026-02-22T07:35:36.765494+00:00
 
 ## 3x7 Matrix (Primary Candidates)
 
@@ -9,6 +9,7 @@ Generated: 2026-02-22T06:50:11.543669+00:00
 | IVW-CDF | base=0.6457, doubled=0.8849 (FAIL) | agg=0.2698, max1=0.5818, target=0.8726 (FAIL) | mixed=0.5171, allC=0.6761, allA=0.3239 (PASS) | missing=0.5300, baseline=0.5261, delta=0.007 (PASS) | agg=0.8445, scores=[0.9545, 0.9901, 0.589] (PASS) | agg=0.8684, recon=0.8684, dom_share=0.657 (PASS) | boundary=0.6344, non_boundary=0.7686 (PASS) |
 | HTG-Max | base=0.1165, doubled=0.0238 (PASS) | agg=0.3033, max1=0.3033, target=0.4549 (FAIL) | mixed=0.3795, allC=0.3795, allA=0.1774 (PASS) | missing=0.1593, baseline=0.3423, delta=0.535 (FAIL) | agg=0.5712, scores=[0.9545, 0.9901, 0.589] (PASS) | agg=0.9618, recon=0.9618, dom_share=1.000 (PASS) | boundary=0.3022, non_boundary=0.5085 (PASS) |
 | Fisher-UP | base=0.5639, doubled=0.8227 (FAIL) | agg=0.0056, max1=0.5818, target=0.8726 (FAIL) | mixed=0.4002, allC=0.7134, allA=0.0454 (PASS) | missing=0.0662, baseline=0.3250, delta=0.796 (FAIL) | agg=0.9914, scores=[0.9545, 0.9901, 0.589] (PASS) | agg=0.9784, recon=0.9784, dom_share=0.568 (PASS) | boundary=0.9917, non_boundary=0.9917 (FAIL) |
+| Hybrid | base=0.6045, doubled=0.5738 (PASS) | agg=0.9235, max1=0.5739, target=0.8608 (PASS) | mixed=0.9928, allC=0.9989, allA=0.9200 (PASS) | missing=0.8903, baseline=0.9594, delta=0.072 (PASS) | agg=0.9995, scores=[0.9545, 0.9901, 0.589] (PASS) | agg=1.0000, recon=1.0000, dom_share=0.566 (PASS) | boundary=0.8949, non_boundary=0.9978 (PASS) |
 
 ## Scenario Pass Criteria
 

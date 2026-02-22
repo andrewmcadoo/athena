@@ -30,6 +30,65 @@ IN PROGRESS
 
 ## Investigation Log
 
+### 2026-02-21 -- WDK#41 Session 3: HTG-Gated Fisher Product Hybrid (n_terms=1)
+
+**Scope**
+
+- Implement one cross-family hybrid candidate that composes HTG-style per-component confidence gating with Fisher product combination (`n_terms=1`) in the existing aggregation prototype.
+- Preserve backward compatibility for existing candidates (`IVW-CDF`, `HTG-Max`, `Fisher-UP`) under the default Session 2 evaluator path.
+- Validate all seven scenario gates with special focus on S2 compounding, S4 missing-data stability, S6 decomposition reconstruction, and boundedness/finite outputs.
+
+**Method**
+
+- Updated `research/adversarial-reward/prototypes/aggregation-candidates/candidates.py`:
+  - Added `HybridConfig(alpha=1.5, tau=5.0, c_floor=0.1, c_missing=0.7, p_eps=1e-12, eps=1e-12)`.
+  - Added `aggregate_hybrid()` with this pipeline per component:
+    - normalize via `normalize_component(...)` with normalization-level SE dampening left OFF.
+    - compute precision via `gate_precision(component, eps)`.
+    - confidence rule: `max(c_floor, sigmoid(...))` when precision exists, else `c_missing`.
+    - gated score to p-value via `p=max(p_eps,1-gated)`, evidence `-2*log(p)`.
+    - aggregate with `chi_square_cdf_even_df(total_log_evidence, n_terms=1)` (product method).
+    - exact decomposition weights from `log_evidence_i * (aggregate / sum(log_evidence_j * score_j))` when denominator > `eps`.
+  - Registered `"Hybrid"` in `get_candidate_registry(...)` with `hybrid_cfg` parameter.
+- Updated `research/adversarial-reward/prototypes/aggregation-candidates/evaluate.py`:
+  - Added `HybridConfig` import.
+  - Passed `hybrid_cfg=HybridConfig(normalization=normalization)` into `get_candidate_registry(...)`.
+- Executed `python evaluate.py` in `research/adversarial-reward/prototypes/aggregation-candidates/`, then read `results.json` for exact metric checks.
+
+**Findings**
+
+- Backward compatibility held for existing candidates:
+  - `IVW-CDF`: `5/7`
+  - `HTG-Max`: `5/7`
+  - `Fisher-UP`: `3/7`
+- Hybrid passed all seven scenarios (`7/7`) in the default harness.
+- S2 sensitivity numbers (Hybrid):
+  - aggregate = `0.9234566367020085`
+  - max_single = `0.5738586978538172`
+  - ratio = `1.6092056113389201`
+  - margin = `(aggregate / (1.5 * max_single)) - 1.0 = +7.280374%`
+- S2 threshold-driver detail:
+  - `s2.custom.1` is the highest single contributor by normalized score (`0.5817593768418363`) and highest single aggregate (`0.5738586978538172` after confidence gating).
+  - Other S2 normalized component scores remain substantially lower (max non-custom = `0.382252125230751`).
+- S4 missing-data robustness (Hybrid):
+  - relative delta = `0.0719926034986539` (passes `<= 0.20`).
+- S6 decomposition exactness (Hybrid):
+  - reconstruction error = `1.1102230246251565e-16` (passes `<= 1e-8`).
+- Boundedness and finiteness:
+  - all Hybrid scenario aggregates and comparator values remained finite and within `[0,1]`.
+
+**Implications**
+
+- The cross-family hybrid resolves the Session 1/2 tradeoff in this fixture set: HTG-style front-end gating suppresses noisy components while Fisher product back-end compounds weak concordant evidence strongly enough to clear S2.
+- Keeping normalization-level SE dampening off and avoiding Fisher reliability exponentiation did not prevent robustness; confidence gating alone was sufficient in this run.
+- No S2 fallback sweep was required because the default hybrid configuration exceeded the 1.5x threshold with positive margin.
+
+**Open Threads**
+
+- Verify whether `7/7` is stable under broader perturbations (fixture resampling, stronger correlation structure, and alternative uncertainty-missingness patterns).
+- Decide whether Session 4 should stress-test this hybrid against calibration-pattern criteria used in Session 2 stretch analyses.
+- Determine whether the architecture-facing `AggregateScore` recommendation should now target this hybrid directly or require one additional robustness session.
+
 ### 2026-02-22 — WDK#41 Session 2: Structural Fixes + Two-Stage Sweep + Calibration + Correlation Robustness
 
 **Scope**
@@ -160,6 +219,12 @@ IN PROGRESS
 
 ### What We Know
 
+- A cross-family hybrid candidate (`Hybrid`) now satisfies all seven stress scenarios in the default harness while preserving baseline behavior of prior candidates (`IVW 5/7`, `HTG 5/7`, `Fisher 3/7`).  
+  Evidence: Investigation Log entry `2026-02-21 -- WDK#41 Session 3` (`research/adversarial-reward/prototypes/aggregation-candidates/results.json`).
+- Hybrid S2 compounding clears the fixed threshold without criterion relaxation: aggregate `0.9234566367020085`, max_single `0.5738586978538172`, ratio `1.6092056113389201`, margin `+7.280374%`.  
+  Evidence: same Session 3 log entry (`results.json` S2 raw scores).
+- Hybrid meets S4 and S6 integrity gates with margin: S4 relative delta `0.0719926034986539` (`<=0.20`), S6 reconstruction error `1.1102230246251565e-16` (`<=1e-8`).  
+  Evidence: same Session 3 log entry (`results.json` S4/S6 raw scores and decomposition).
 - All three candidates are bounded in practice for Session 1 fixtures: no NaN and no out-of-range scores in the full 3x7 matrix.  
   Evidence: Investigation Log entry `2026-02-22 — WDK#41 Session 1` (`results.json`, boundedness check).
 - Session 2 structural flags are backward-compatible: with defaults, `evaluate.py` exactly reproduces Session 1 pass/fail outputs (`5/7`, `5/7`, `3/7`).  
@@ -179,15 +244,15 @@ IN PROGRESS
 
 ### What We Suspect
 
-- A hybrid that combines HTG-style uncertainty gating with non-max compounding may better satisfy both Noisy-TV resistance and weak-signal accumulation than any single candidate tested so far.  
-  Evidence basis: Session 1 + Session 2 sweep outcomes show persistent tradeoff patterns across isolated families (`2026-02-22 — WDK#41 Session 1`, `2026-02-22 — WDK#41 Session 2`).
 - Joint use of normalization-level SE dampening and Fisher SE-reliability scaling may be over-attenuating evidence in some regimes.  
   Evidence basis: Fisher isolation (`se_dampen=False`) improved from 4/7 to 5/7 vs. main sweep (Session 2).
+- The S2 pass margin may be sensitive to fixture-level score concentration in `s2.custom.1`, because that component sets the max-single threshold and dominates the target denominator.  
+  Evidence basis: Session 3 S2 decomposition (`s2.custom.1` score `0.5818`; max non-custom `0.3823`).
 
 ### What We Don't Know
 
-- Whether any non-hybrid single-family configuration can ever satisfy all seven scenarios under current fixtures and criteria.
-- Which mechanism can resolve S2 compounding without regressing S5/S6 performance in HTG and S1 in IVW/Fisher.
+- Whether the hybrid remains `7/7` outside the current fixed fixture set (especially under correlated weak signals and non-floor-saturated Fisher regimes).
+- Whether any non-hybrid single-family configuration can match hybrid performance under current criteria.
 - Whether Fisher correlation inflation remains near-neutral when evaluated in a non-floor-saturated weak-signal regime.
 - Which candidate/variant should be promoted to a formal `AggregateScore` definition for architecture integration (Session 3 decision).
 

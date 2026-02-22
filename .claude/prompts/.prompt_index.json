@@ -87,6 +87,14 @@
       "slug": "session2-aggregation-fixes-sweep",
       "goal": "Implement Session 2 of adversarial reward aggregation research \u2014 structural fixes, parameter sweep, calibration, and correlation analysis",
       "framework": "RISEN"
+    },
+    {
+      "sequence": 12,
+      "filename": "prompt_012_2026-02-21_hybrid-aggregation-candidate.md",
+      "created": "2026-02-21T23:29:49.831822",
+      "slug": "hybrid-aggregation-candidate",
+      "goal": "Implement hybrid aggregation candidate (HTG-gated product combination) targeting 7/7 stress-test passes",
+      "framework": "RISEN"
     }
   ]
 }

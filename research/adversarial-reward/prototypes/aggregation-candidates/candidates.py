@@ -49,6 +49,17 @@ class FisherUPConfig:
     normalization: NormalizationConfig = field(default_factory=NormalizationConfig)
 
 
+@dataclass(frozen=True)
+class HybridConfig:
+    alpha: float = 1.5
+    tau: float = 5.0
+    c_floor: float = 0.1
+    c_missing: float = 0.7
+    p_eps: float = 1e-12
+    eps: float = 1e-12
+    normalization: NormalizationConfig = field(default_factory=NormalizationConfig)
+
+
 def chi_square_cdf_even_df(x: float, n_terms: int) -> float:
     # For df = 2N, CDF(x;2N) = 1 - exp(-x/2) * sum_{k=0}^{N-1} (x/2)^k / k!
     if n_terms <= 0:
@@ -369,6 +380,100 @@ def aggregate_fisher_up(
     )
 
 
+def aggregate_hybrid(
+    components: Sequence[MetricComponent], config: HybridConfig | None = None
+) -> AggregateResult:
+    cfg = config or HybridConfig()
+    warnings: list[str] = []
+    skipped: list[str] = []
+    staged: list[dict[str, object]] = []
+
+    for idx, component in enumerate(components):
+        score, local_warnings, score_diag = normalize_component(component, cfg.normalization)
+        warnings.extend(local_warnings)
+        if score is None:
+            skipped.append(component.method_ref)
+            continue
+
+        precision = gate_precision(component, cfg.eps)
+        if precision is None:
+            confidence = cfg.c_missing
+        else:
+            confidence = max(cfg.c_floor, sigmoid(precision, cfg.alpha, cfg.tau))
+        confidence = bounded_unit_interval(confidence, cfg.normalization.clip_eps)
+        gated_score = score * confidence
+        p_value = min(1.0, max(cfg.p_eps, 1.0 - gated_score))
+        log_evidence = -2.0 * math.log(p_value)
+
+        staged.append(
+            {
+                "idx": idx,
+                "component": component,
+                "score": score,
+                "precision": precision,
+                "confidence": confidence,
+                "gated_score": gated_score,
+                "p_value": p_value,
+                "log_evidence": log_evidence,
+                "raw_score": score_diag.get("raw_score"),
+                "direction_mode": score_diag.get("direction_mode"),
+            }
+        )
+
+    if not staged:
+        return AggregateResult(
+            candidate="Hybrid",
+            aggregate_score=0.0,
+            contributions=[],
+            skipped=skipped,
+            warnings=warnings,
+        )
+
+    total_log_evidence = sum(float(entry["log_evidence"]) for entry in staged)
+    aggregate = chi_square_cdf_even_df(total_log_evidence, n_terms=1)
+    aggregate = bounded_unit_interval(aggregate, cfg.normalization.clip_eps)
+
+    denom = sum(float(entry["log_evidence"]) * float(entry["score"]) for entry in staged)
+    if denom > cfg.eps:
+        scale = aggregate / denom
+        weights = [float(entry["log_evidence"]) * scale for entry in staged]
+    else:
+        weights = [0.0 for _ in staged]
+
+    contributions: list[ComponentContribution] = []
+    for weight, entry in zip(weights, staged):
+        score = float(entry["score"])
+        contribution = weight * score
+        component = entry["component"]
+        contributions.append(
+            ComponentContribution(
+                index=int(entry["idx"]),
+                method_ref=component.method_ref,
+                kind=component.kind,
+                score=score,
+                weight=weight,
+                contribution=contribution,
+                diagnostics={
+                    "precision": entry["precision"],
+                    "confidence": float(entry["confidence"]),
+                    "gated_score": float(entry["gated_score"]),
+                    "p_value": float(entry["p_value"]),
+                    "log_evidence": float(entry["log_evidence"]),
+                    "raw_score": entry["raw_score"],
+                    "direction_mode": entry["direction_mode"],
+                },
+            )
+        )
+
+    return AggregateResult(
+        candidate="Hybrid",
+        aggregate_score=aggregate,
+        contributions=contributions,
+        skipped=skipped,
+        warnings=warnings,
+    )
+
+
 CandidateFn = Callable[[Sequence[MetricComponent]], AggregateResult]
 
 
@@ -376,9 +481,13 @@ def get_candidate_registry(
     ivw_cfg: IVWCDFConfig | None = None,
     htg_cfg: HTGMaxConfig | None = None,
     fisher_cfg: FisherUPConfig | None = None,
+    hybrid_cfg: HybridConfig | None = None,
 ) -> dict[str, CandidateFn]:
+    if hybrid_cfg is None:
+        hybrid_cfg = HybridConfig()
     return {
         "IVW-CDF": lambda components: aggregate_ivw_cdf(components, ivw_cfg),
         "HTG-Max": lambda components: aggregate_htg_max(components, htg_cfg),
         "Fisher-UP": lambda components: aggregate_fisher_up(components, fisher_cfg),
+        "Hybrid": lambda components: aggregate_hybrid(components, hybrid_cfg),
     }

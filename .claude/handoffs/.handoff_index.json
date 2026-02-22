@@ -97,6 +97,13 @@
       "created": "2026-02-21T23:03:58.398432",
       "slug": "plan-session3-hybrid-aggregation",
       "directive": "Plan Session 3 for adversarial reward aggregation \u2014 design hybrid candidate combining HTG gating + Fisher compounding"
+    },
+    {
+      "sequence": 15,
+      "filename": "handoff_015_2026-02-22_plan-session4-fixture-robustness.md",
+      "created": "2026-02-22T00:18:01.467925",
+      "slug": "plan-session4-fixture-robustness",
+      "directive": "Plan Session 4: Hybrid fixture perturbation robustness testing for WDK#41"
     }
   ]
 }

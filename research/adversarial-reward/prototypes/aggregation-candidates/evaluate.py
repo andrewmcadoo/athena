@@ -11,6 +11,7 @@ from typing import Any, Callable, Mapping, Sequence
 from candidates import (
     FisherUPConfig,
     HTGMaxConfig,
+    HybridConfig,
     IVWCDFConfig,
     aggregate_htg_max,
     get_candidate_registry,
@@ -287,6 +288,7 @@ def main() -> None:
             normalization=normalization,
         ),
         fisher_cfg=FisherUPConfig(n_ref=100.0, r_floor=0.1, p_eps=1e-12, normalization=normalization),
+        hybrid_cfg=HybridConfig(normalization=normalization),
     )
 
     matrix: dict[str, dict[str, ScenarioCellResult]] = {
