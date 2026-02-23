@@ -30,6 +30,48 @@ IN PROGRESS
 
 ## Investigation Log
 
+### 2026-02-22 -- WDK#41 Session 6: AggregateScore Recommendation
+
+**Scope**
+
+- Produce the canonical AggregateScore specification document that downstream ATHENA components can build against, synthesizing all evidence from Sessions 1-5 + 4.1 + 4.2/4.3.
+- Lock recommended algorithm, fixed parameters, normalization family, guardrail, operating boundaries, and revisit triggers.
+- Close `athena-6ax`.
+
+**Method**
+
+- Read all evidence artifacts in full: `perturbation_summary.md`, `ceiling_analysis.md`, `stretch_summary.md`, `regime_validity.md`, `guardrail_spec.md`, source modules (`candidates.py`, `normalization.py`, `models.py`, `ceiling_analysis.py`), and all FINDINGS.md investigation log entries.
+- Cross-referenced each design choice to its originating evidence artifact and key quantitative result.
+- Classified all failure modes into resolved risks (with design changes) vs accepted limitations (with operating-range justification).
+- Defined five revisit triggers with specific conditions for reopening the recommendation.
+- Produced `aggregate_score_recommendation.md` (human-readable specification) and `aggregate_score_recommendation.json` (machine-readable locked parameters) in the aggregation-candidates directory.
+
+**Findings**
+
+- The recommended algorithm is HTG-gated Fisher product hybrid with `n_terms=1` and log-scaled BF normalization (`c=0.083647`, `bf_max_target=10000`).
+- All seven baseline scenarios pass with positive margins. Tightest margin: S6 at +0.000000 (exact decomposition boundary); widest: S4 at +0.128007.
+- Four risks are resolved by design changes included in the recommendation:
+  - S5 BF ceiling (log-scaled normalization)
+  - S6 compression failures (same normalization change)
+  - S2 custom sigmoid fragility (x0>=0 guardrail)
+  - Correlation floor-saturation (resolved in S5 stretch probe)
+- Two accepted limitations are documented with out-of-range classification at MEDIUM confidence:
+  - L1: Pattern B under-response (step_ratio=1.029, threshold >3.0) — 50x isolated single-metric jump not representative of valid DSL outputs
+  - L2: S1 SE multiplier fragility at 5x/10x — exceeds realistic uncertainty inflation band of [0.5, 3.0]
+- Five revisit triggers defined: empirical range violation (T1), new DivergenceKind (T2), Pattern B becomes blocking (T3), scenario suite expansion (T4), correlation structure change (T5).
+
+**Implications**
+
+- The adversarial reward aggregation function is now specified at architecture-integration readiness. Downstream sessions can implement `AggregateScore` against this contract.
+- The specification includes explicit seam notes: BF normalization should be a first-class configurable hook, guardrail enforcement is schema-level validation, decomposition exactness is a required invariant, and `n_terms=1` is intentional (not a placeholder).
+- Pattern B under-response remains a documented open thread (not a blocker) that can be revisited if the calibration loop (ARCHITECTURE.md 5.4) requires sharp step-response detection.
+
+**Open Threads**
+
+- Validate operating-range estimates with empirical DSL trace distributions when production-like data becomes available (T1).
+- If Pattern B step-response becomes a calibration loop requirement, investigate targeted hybrid adjustments (T3).
+- Consider adding adversarial scenarios beyond S1-S7 for expanded coverage before production implementation (T4).
+
 ### 2026-02-22 -- WDK#41 Session 4.2/4.3: Regime Validity Analysis + Guardrail Specification
 
 **Scope**
@@ -405,56 +447,62 @@ IN PROGRESS
 
 ### What We Know
 
-- A cross-family hybrid candidate (`Hybrid`) now satisfies all seven stress scenarios in the default harness while preserving baseline behavior of prior candidates (`IVW 5/7`, `HTG 5/7`, `Fisher 3/7`).  
-  Evidence: Investigation Log entry `2026-02-21 -- WDK#41 Session 3` (`research/adversarial-reward/prototypes/aggregation-candidates/results.json`).
-- Hybrid S2 compounding clears the fixed threshold without criterion relaxation: aggregate `0.9234566367020085`, max_single `0.5738586978538172`, ratio `1.6092056113389201`, margin `+7.280374%`.  
+- **AggregateScore recommendation is locked.** The HTG-gated Fisher product hybrid with log-scaled BF normalization (`c=0.083647`, `bf_max_target=10000`) is the recommended aggregation function for architecture integration. Specification: `aggregate_score_recommendation.md` and `aggregate_score_recommendation.json`.
+  Evidence: Investigation Log entry `2026-02-22 -- WDK#41 Session 6`.
+- All four previously identified risks are resolved by design changes in the recommendation: S5 BF ceiling (log-scaled normalization), S6 compression failures (same change), S2 sigmoid fragility (x0>=0 guardrail), correlation floor-saturation (S6-based probe).
+  Evidence: same Session 6 log entry (`aggregate_score_recommendation.md` Section 3.1).
+- Two accepted limitations are documented with MEDIUM-confidence out-of-range classification: Pattern B under-response (step_ratio=1.029 under 50x jump) and S1 SE fragility at 5x/10x.
+  Evidence: same Session 6 log entry (`aggregate_score_recommendation.md` Section 3.2).
+- Five revisit triggers are defined for reopening the recommendation: empirical range violation (T1), new DivergenceKind (T2), Pattern B becomes blocking (T3), scenario expansion (T4), correlation structure change (T5).
+  Evidence: same Session 6 log entry (`aggregate_score_recommendation.md` Section 4).
+- A cross-family hybrid candidate (`Hybrid`) satisfies all seven stress scenarios in the default harness while preserving baseline behavior of prior candidates (`IVW 5/7`, `HTG 5/7`, `Fisher 3/7`).
+  Evidence: Investigation Log entry `2026-02-21 -- WDK#41 Session 3` (`results.json`).
+- Hybrid S2 compounding clears the fixed threshold without criterion relaxation: aggregate `0.9234566367020085`, max_single `0.5738586978538172`, ratio `1.6092056113389201`, margin `+7.280374%`.
   Evidence: same Session 3 log entry (`results.json` S2 raw scores).
-- Hybrid meets S4 and S6 integrity gates with margin: S4 relative delta `0.0719926034986539` (`<=0.20`), S6 reconstruction error `1.1102230246251565e-16` (`<=1e-8`).  
+- Hybrid meets S4 and S6 integrity gates with margin: S4 relative delta `0.0719926034986539` (`<=0.20`), S6 reconstruction error `1.1102230246251565e-16` (`<=1e-8`).
   Evidence: same Session 3 log entry (`results.json` S4/S6 raw scores and decomposition).
 - Session 4 perturbation sweeps (70 runs) show localized but real fragility around three axes:
   - S2 custom sigmoid: `20/24` pass with failures only at `x0=-0.2` and `k>=2.0`
   - S5 BayesFactor: `4/9` pass with transition at `BF 110->120`
-  - S6 joint compression: `11/16` pass with failures concentrated at high `d_mid` and high `bf_strong`.  
+  - S6 joint compression: `11/16` pass with failures concentrated at high `d_mid` and high `bf_strong`.
   Evidence: Investigation Log entry `2026-02-22 -- WDK#41 Session 4` (`perturbation_results.json`, `perturbation_summary.md`).
-- S2 sensitivity to `s2.custom.1` is now verified, not conjectural: moving to `x0=-0.2` introduces immediate failures for `k>=2.0`, while non-custom SE scaling remained `5/5` pass.  
+- S2 sensitivity to `s2.custom.1` is now verified, not conjectural: moving to `x0=-0.2` introduces immediate failures for `k>=2.0`, while non-custom SE scaling remained `5/5` pass.
   Evidence: same Session 4 log entry (`perturbation_summary.md` S2 grid and axis pass rates).
-- S5 upper-bound margin is confirmed as a tight failure boundary: PASS at `BF=110` (margin `+0.000009`), FAIL at `BF=120` (margin `-0.000736`).  
+- S5 upper-bound margin is confirmed as a tight failure boundary: PASS at `BF=110` (margin `+0.000009`), FAIL at `BF=120` (margin `-0.000736`).
   Evidence: same Session 4 log entry (`perturbation_summary.md` S5 sweep table).
-- S7 boundary behavior and S4 missing-uncertainty behavior remained robust across sampled perturbations (`7/7` and `4/4` respectively).  
+- S7 boundary behavior and S4 missing-uncertainty behavior remained robust across sampled perturbations (`7/7` and `4/4` respectively).
   Evidence: same Session 4 log entry (`perturbation_results.json` axis stats).
-- Session 4.2/4.3 regime-validity synthesis classifies remaining unresolved failure loci as out-of-range stress boundaries (S2 negative `x0`, S1 `SE_mult>=5`, Pattern B 50x isolated jump), while keeping BF-related failures as resolved.  
+- Session 4.2/4.3 regime-validity synthesis classifies remaining unresolved failure loci as out-of-range stress boundaries (S2 negative `x0`, S1 `SE_mult>=5`, Pattern B 50x isolated jump), while keeping BF-related failures as resolved.
   Evidence: Investigation Log entry `2026-02-22 -- WDK#41 Session 4.2/4.3` (`regime_validity.md`, `regime_validity.json`).
-- Custom sigmoid guardrail is now specified at architecture level: `x0 >= 0` for all `custom_sigmoids`, enforced by config validation with reject-on-violation behavior.  
+- Custom sigmoid guardrail is now specified at architecture level: `x0 >= 0` for all `custom_sigmoids`, enforced by config validation with reject-on-violation behavior.
   Evidence: same Session 4.2/4.3 log entry (`guardrail_spec.md`).
-- All three candidates are bounded in practice for Session 1 fixtures: no NaN and no out-of-range scores in the full 3x7 matrix.  
-  Evidence: Investigation Log entry `2026-02-22 — WDK#41 Session 1` (`results.json`, boundedness check).
-- Session 2 structural flags are backward-compatible: with defaults, `evaluate.py` exactly reproduces Session 1 pass/fail outputs (`5/7`, `5/7`, `3/7`).  
-  Evidence: Investigation Log entry `2026-02-22 — WDK#41 Session 2` (`evaluate.py` rerun before/after modifications).
-- No candidate satisfies all seven stress scenarios after Session 2 sweeps; best pass counts are `IVW 2/7`, `HTG 5/7`, `Fisher 4/7` in main Stage 2 runs, with Fisher isolation at `5/7`.  
+- All three candidates are bounded in practice for Session 1 fixtures: no NaN and no out-of-range scores in the full 3x7 matrix.
+  Evidence: Investigation Log entry `2026-02-22 -- WDK#41 Session 1` (`results.json`, boundedness check).
+- Session 2 structural flags are backward-compatible: with defaults, `evaluate.py` exactly reproduces Session 1 pass/fail outputs (`5/7`, `5/7`, `3/7`).
+  Evidence: Investigation Log entry `2026-02-22 -- WDK#41 Session 2` (`evaluate.py` rerun before/after modifications).
+- No candidate satisfies all seven stress scenarios after Session 2 sweeps; best pass counts are `IVW 2/7`, `HTG 5/7`, `Fisher 4/7` in main Stage 2 runs, with Fisher isolation at `5/7`.
   Evidence: same Session 2 log entry (`sweep_summary.md`, `sweep_results.json`).
-- `HTG-Max` remains the strongest single-family performer by aggregate pass count in Session 2 sweeps, but still fails two gates in best settings (S5,S6).  
+- `HTG-Max` remains the strongest single-family performer by aggregate pass count in Session 2 sweeps, but still fails two gates in best settings (S5,S6).
   Evidence: same Session 2 log entry, Stage 2 top-table.
-- Calibration decomposability is workable for all primary candidates after normalized decomposition weights in IVW (`sum(w_i*u_i) ~= aggregate`).  
+- Calibration decomposability is workable for all primary candidates after normalized decomposition weights in IVW (`sum(w_i*u_i) ~= aggregate`).
   Evidence: same log entry, S6 reconstruction values.
-- S2 criterion-sensitivity frontier (for configs at 6/7 failing only S2) yielded no qualifying configs for any candidate in Session 2.  
+- S2 criterion-sensitivity frontier (for configs at 6/7 failing only S2) yielded no qualifying configs for any candidate in Session 2.
   Evidence: same Session 2 log entry (`sweep_summary.md`, S2 frontier table).
-- Calibration pattern B is unstable across all best-per-candidate configs (either insufficient step response or excessive jump/smoothness failure).  
+- Calibration pattern B is unstable across all best-per-candidate configs (either insufficient step response or excessive jump/smoothness failure).
   Evidence: same Session 2 log entry (`calibration_summary.md`).
-- Fisher correlation inflation flag did not trigger at rho=0.5 (`inflation_ratio` did not exceed 1.5), but the test aggregates were floor-saturated.  
+- Fisher correlation inflation flag did not trigger at rho=0.5 (`inflation_ratio` did not exceed 1.5), but the test aggregates were floor-saturated.
   Evidence: same Session 2 log entry (`correlation_results.json`).
 
 ### What We Suspect
 
-- Joint use of normalization-level SE dampening and Fisher SE-reliability scaling may be over-attenuating evidence in some regimes.  
+- Joint use of normalization-level SE dampening and Fisher SE-reliability scaling may be over-attenuating evidence in some regimes.
   Evidence basis: Fisher isolation (`se_dampen=False`) improved from 4/7 to 5/7 vs. main sweep (Session 2).
 
 ### What We Don't Know
 
-- Whether the hybrid remains `7/7` outside the current fixed fixture set (especially under correlated weak signals and non-floor-saturated Fisher regimes).
-- Whether any non-hybrid single-family configuration can match hybrid performance under current criteria.
-- Whether Fisher correlation inflation remains near-neutral when evaluated in a non-floor-saturated weak-signal regime.
 - Whether derived operating-range estimates in `regime_validity.md` match observed parameter distributions in real production DSL traces (OpenMM/GROMACS/CESM/VASP), rather than training-knowledge priors.
-- Which candidate/variant should be promoted to a formal `AggregateScore` definition for architecture integration (Session 3 decision).
+- Whether the hybrid remains `7/7` outside the current fixed fixture set under adversarial scenarios not covered by S1-S7 (e.g., metric-count scaling, temporal autocorrelation).
+- Whether Pattern B step-response can be improved above 3.0 without reintroducing Fisher-like non-smooth jumps (open thread from Session 5, documented as revisit trigger T3).
 
 ## Prototype Index
 
@@ -484,6 +532,8 @@ IN PROGRESS
 | `research/adversarial-reward/prototypes/aggregation-candidates/regime_validity.md` | Session 4.2 regime-validity writeup for DSL-realistic parameter ranges and failure overlays | Complete (Session 4.2/4.3) | Explicit in-range/out-of-range/resolved classification for S2, S1, Pattern B, S5, and S6 with confidence tags |
 | `research/adversarial-reward/prototypes/aggregation-candidates/regime_validity.json` | Machine-readable Session 4.2 regime-validity artifact | Complete (Session 4.2/4.3) | Structured parameter ranges, domain assessments, failure classifications, and verdict for downstream automation |
 | `research/adversarial-reward/prototypes/aggregation-candidates/guardrail_spec.md` | Session 4.3 architecture-level guardrail specification (`x0 >= 0`) for custom sigmoids | Complete (Session 4.2/4.3) | Constraint statement, rationale, scope, and reject-on-violation enforcement contract for future production integration |
+| `research/adversarial-reward/prototypes/aggregation-candidates/aggregate_score_recommendation.md` | Session 6 canonical AggregateScore specification for architecture integration | Complete (Session 6) | Locked algorithm, parameters, evidence map, operating boundaries, and revisit triggers |
+| `research/adversarial-reward/prototypes/aggregation-candidates/aggregate_score_recommendation.json` | Machine-readable Session 6 locked parameters and spec | Complete (Session 6) | Structured parameters, guardrails, envelope, limitations, and triggers for downstream automation |
 
 ## Next Steps
 

@@ -118,6 +118,13 @@
       "created": "2026-02-22T13:45:09.352786",
       "slug": "plan-athena-e2a-stretch",
       "directive": "Plan athena-e2a: Session 5 hybrid stretch analyses (calibration + correlation) with post-ceiling log-scaled BF normalization"
+    },
+    {
+      "sequence": 18,
+      "filename": "handoff_018_2026-02-22_session6-aggregate-score-recommendation.md",
+      "created": "2026-02-22T15:55:36.794173",
+      "slug": "session6-aggregate-score-recommendation",
+      "directive": "Write the architecture-ready AggregateScore recommendation (athena-6ax) that turns all Session 1-5 + 4.2/4.3 evidence into one stable architecture contract"
     }
   ]
 }

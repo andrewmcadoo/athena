@@ -1,0 +1,155 @@
+{
+  "recommendation": {
+    "version": "1.0",
+    "date": "2026-02-22",
+    "bead": "athena-6ax",
+    "status": "LOCKED",
+    "algorithm": "HTG-gated Fisher product hybrid (n_terms=1) with log-scaled BF normalization"
+  },
+  "parameters": {
+    "hybrid_config": {
+      "alpha": 1.5,
+      "tau": 5.0,
+      "c_floor": 0.1,
+      "c_missing": 0.7,
+      "p_eps": 1e-12,
+      "eps": 1e-12,
+      "n_terms": 1
+    },
+    "bf_normalization": {
+      "family": "log_scaled",
+      "function": "log1p(bf) / (log1p(bf) + c)",
+      "c": 0.083647,
+      "bf_max_target": 10000,
+      "bf_ceiling": 9999
+    },
+    "normalization_config": {
+      "absolute_difference_sigmoid": {
+        "k": 1200.0,
+        "x0": 0.0007
+      },
+      "clip_eps": 1e-12,
+      "se_dampen_enabled": false
+    }
+  },
+  "guardrails": [
+    {
+      "id": "GR-S2-CUSTOM-SIGMOID-X0-NONNEG",
+      "constraint": "x0 >= 0 for all NormalizationConfig.custom_sigmoids entries",
+      "enforcement": "reject_at_config_construction",
+      "silent_clamping": false
+    }
+  ],
+  "baseline_margins": {
+    "S1_noisy_tv": 0.030647,
+    "S2_unanimous_weak_signal": 0.072804,
+    "S3_mixed_signal": 0.006164,
+    "S4_missing_data": 0.128007,
+    "S5_scale_heterogeneity": 0.008802,
+    "S6_calibration_decomposability": 0.000000,
+    "S7_boundary_seeking": 0.102971
+  },
+  "operating_envelope": {
+    "bayes_factor": {
+      "validated_min": 1,
+      "validated_max": 1000,
+      "ceiling": 9999
+    },
+    "custom_sigmoid_x0": {
+      "validated_min": 0.0,
+      "validated_max": 0.5,
+      "hard_floor": 0.0
+    },
+    "custom_sigmoid_k": {
+      "validated_min": 0.8,
+      "validated_max": 3.0
+    },
+    "se_multiplier": {
+      "validated_min": 0.5,
+      "validated_max": 3.0,
+      "failure_onset": 5.0
+    },
+    "correlation_rho": {
+      "validated_min": 0.0,
+      "validated_max": 0.9,
+      "max_inflation": 1.048
+    }
+  },
+  "accepted_limitations": [
+    {
+      "id": "L1",
+      "name": "Pattern B under-response",
+      "observed_value": 1.029,
+      "threshold": 3.0,
+      "metric": "step_ratio",
+      "classification": "out_of_range",
+      "confidence": "MEDIUM"
+    },
+    {
+      "id": "L2",
+      "name": "S1 SE multiplier fragility",
+      "failure_onset": 5.0,
+      "realistic_max": 3.0,
+      "classification": "out_of_range",
+      "confidence": "MEDIUM"
+    }
+  ],
+  "resolved_risks": [
+    {
+      "name": "S5 BF ceiling",
+      "resolution": "log_scaled BF normalization (bf_max=10000)",
+      "evidence": "ceiling_analysis.md"
+    },
+    {
+      "name": "S6 compression failures",
+      "resolution": "same BF normalization change",
+      "evidence": "ceiling_analysis.md Section 4"
+    },
+    {
+      "name": "S2 custom sigmoid fragility",
+      "resolution": "GR-S2-CUSTOM-SIGMOID-X0-NONNEG guardrail",
+      "evidence": "guardrail_spec.md"
+    },
+    {
+      "name": "Correlation floor-saturation",
+      "resolution": "S6-based probe with non-floor aggregates",
+      "evidence": "stretch_summary.md Phase 2"
+    }
+  ],
+  "revisit_triggers": [
+    {
+      "id": "T1",
+      "name": "Empirical operating range violation",
+      "condition": "Production DSL traces regularly enter out-of-range regions"
+    },
+    {
+      "id": "T2",
+      "name": "New DivergenceKind addition",
+      "condition": "New metric kind requires uncovered normalization"
+    },
+    {
+      "id": "T3",
+      "name": "Pattern B recovery becomes blocking",
+      "condition": "Calibration loop requires sharp step-response detection"
+    },
+    {
+      "id": "T4",
+      "name": "Scenario suite expansion",
+      "condition": "New adversarial scenarios expose in-range failures"
+    },
+    {
+      "id": "T5",
+      "name": "Correlation structure change",
+      "condition": "Inflation ratio exceeds 1.5 at rho=0.5 or floor-saturation returns"
+    }
+  ],
+  "evidence_sessions": [
+    "S1: Candidate prototype + 3x7 stress test",
+    "S2: Structural fixes + 723-config sweep + calibration + correlation",
+    "S3: HTG-gated Fisher hybrid achieves 7/7",
+    "S4: 70-run perturbation robustness sweep",
+    "S4.1: BF ceiling analysis -> log-scaled normalization",
+    "S5: Post-ceiling stretch (calibration + correlation)",
+    "S4.2/4.3: Regime validity + guardrail specification"
+  ]
+}
