@@ -132,6 +132,13 @@
       "created": "2026-02-22T16:59:50.093294",
       "slug": "implementation-bf-normalization-seam",
       "directive": "Build athena-4xm (BF normalization seam) \u2014 first implementation session. Add configurable BF norm hook to normalization.py with locked default bf_norm_log_scaled(bf, c=0.083647). Then proceed to athena-8b9, athena-fgo, athena-3lu."
+    },
+    {
+      "sequence": 20,
+      "filename": "handoff_020_2026-02-22_acceptance-test-suite-athena-3lu.md",
+      "created": "2026-02-22T17:56:43.777041",
+      "slug": "acceptance-test-suite-athena-3lu",
+      "directive": "Write acceptance test suite (athena-3lu) encoding margin parity, guardrail rejection, and decomposition invariant as automated regression checks"
     }
   ]
 }
