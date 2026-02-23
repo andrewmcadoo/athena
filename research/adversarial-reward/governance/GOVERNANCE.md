@@ -1,6 +1,6 @@
 # AggregateScore Governance Runbook
 
-Last updated: 2026-02-23 (Session 16 — audit automation + escalation thresholds)
+Last updated: 2026-02-23 (Session 17 — break-glass outage resilience)
 Scope: `andrewmcadoo/athena` branch protection + contract-gate CI governance for `master`.
 
 ## Section 1 — Must-Stay-True Baseline
@@ -252,6 +252,103 @@ Guardrails:
 - Restore failure fallback:
   - If API restore fails, manually restore in GitHub web UI: `Settings` -> `Branches` -> `master` protection rule.
   - Document manual restore path and verification evidence in FINDINGS.
+### 3.1 Outage Mode Definitions
+
+| Mode | `gh api .../branches/master/protection` | GitHub web UI (`Settings -> Branches`) | Procedure path | Time window |
+| :--- | :--- | :--- | :--- | :--- |
+| Mode A | Available | Available | Default API-driven break-glass path in this section | Max 1 hour override |
+| Mode B | Unavailable | Available | UI fallback in Section 3.2 | Max 1 hour override |
+| Mode C | Unavailable | Unavailable | Containment path in Section 3.3 | Max 2 hours containment |
+| Note | Available | Unavailable | "UI down, API up" is functionally identical to Mode A because the current procedure uses API exclusively; this collapse is intentional (see Session 17 investigation log for rationale). | Same as Mode A |
+
+### 3.2 Mode B — API Down, Web UI Up
+- Use Mode B when `gh api` calls fail but the repository settings UI is reachable.
+- Backup capture (UI screenshots):
+  1. Open `https://github.com/andrewmcadoo/athena/settings/branches`.
+  2. Open the `master` protection rule details.
+  3. Capture a full screenshot showing all toggle states and required-check names before any override action.
+- Override action:
+  1. Uncheck **Include administrators** (this is `enforce_admins=false`).
+  2. Save rule changes.
+  3. Execute the emergency repository recovery change.
+- Restore action:
+  1. Re-open the same `master` protection rule.
+  2. Re-check **Include administrators** (`enforce_admins=true`).
+  3. Save rule changes.
+- Deferred machine verification:
+  - Run `bash research/adversarial-reward/governance/audit.sh` within 1 hour after API recovery.
+  - Document both timestamps in FINDINGS:
+    - API recovery detected at (UTC)
+    - `audit.sh` execution at (UTC)
+- Evidence requirements:
+  - Screenshot set: before override, after override, after restore.
+  - UTC timestamp logged at each phase transition (backup captured, override applied, emergency change complete, restore complete).
+  - Bead entry explicitly labeled `Mode B`.
+
+### 3.3 Mode C — Both Down (Containment)
+- Use Mode C only when both API and UI paths are unavailable.
+- Immediate containment actions:
+  1. Freeze all merge activity (operational hold only; no branch-protection mutation is possible in this state).
+  2. Notify active contributors that merge/release activity is paused.
+  3. Record freeze start time in the remediation bead.
+  4. Record outage start in both bead and local outage file:
+     ```bash
+     TS="$(date -u +%Y%m%dT%H%M%SZ)"
+     printf "mode=Mode C\noutage_start_utc=%s\n" "$TS" > "/tmp/governance-outage-$TS.txt"
+     ```
+- Constraint during outage:
+  - Do NOT make untracked policy changes; server-side branch-protection rules remain authoritative while control-plane interfaces are unavailable.
+- Monitoring loop (every 15 minutes):
+  - API probe target: `gh api repos/andrewmcadoo/athena/branches/master/protection`
+  - UI probe target: `https://github.com/andrewmcadoo/athena/settings/branches`
+  - Log each probe timestamp/result in bead notes.
+- Containment limit and escalation:
+  - Maximum containment window: 2 hours from outage start.
+  - If outage persists beyond 2 hours, escalate to GitHub Support and record support ticket ID in bead.
+- Recovery exit:
+  - Resume via Mode A or Mode B, whichever recovers first.
+  - Run `bash research/adversarial-reward/governance/audit.sh` as soon as API is available.
+
+### 3.4 Operator Decision Tree
+
+```text
+Break-glass needed?
+  |
+  v
+Test API: gh api repos/andrewmcadoo/athena/branches/master/protection
+  |-- YES --> Mode A (max 1h override)
+  |            - Execute default API procedure in Section 3
+  |
+  |-- NO  --> Test web UI: https://github.com/andrewmcadoo/athena/settings/branches
+               |-- YES --> Mode B (max 1h override; deferred audit on API recovery)
+               |
+               |-- NO  --> Mode C (max 2h containment; check API/UI every 15 min;
+                            escalate to GitHub Support after 2h)
+```
+
+Post-action requirements for all modes:
+1. Restore `enforce_admins=true`.
+2. Run `audit.sh`:
+   - Mode A: immediately after restore.
+   - Mode B/C: deferred until API recovery, then must execute within 1 hour of recovery.
+3. Write post-incident entry in `research/adversarial-reward/FINDINGS.md`.
+4. Close remediation bead.
+
+Per-mode evidence checklist:
+- Mode A evidence:
+  - Backup JSON: `/tmp/master-protection-backup-$TS.json`
+  - Override duration (start/end UTC + total)
+  - `audit.sh` output showing `7/7 PASS`
+  - Remediation bead closed
+- Mode B evidence:
+  - Before/after-override/after-restore screenshots
+  - UTC timestamps for each phase transition
+  - Bead labeled `Mode B`
+  - Deferred `audit.sh` record within 1 hour of API recovery
+- Mode C evidence:
+  - Outage log file: `/tmp/governance-outage-$TS.txt`
+  - Bead timestamps (freeze start, 15-minute probes, escalation if triggered, recovery detection)
+  - Recovery mode selection (A or B) and subsequent `audit.sh` evidence
 - Required post-incident FINDINGS entry must include:
   - Trigger/reason
   - Override start/end timestamps and total duration

@@ -30,6 +30,56 @@ IN PROGRESS
 
 ## Investigation Log
 
+### 2026-02-23 -- Session 17: Break-Glass Outage Resilience (Tabletop, Read-Only)
+
+**Scope**
+
+- Close the outage-mode documentation gaps identified in Session 16 by extending GOVERNANCE.md Section 3 with explicit fallback paths for API outage and full control-plane outage.
+- Reconcile outage taxonomy so "UI down, API up" is treated as Mode A because the break-glass default path is API-only.
+- Run a documentation-only tabletop walkthrough for Modes A, B, and C (no live GitHub settings mutations, no live `audit.sh` execution).
+- Update accumulated findings and current open threads based on Session 17 outcomes.
+
+**Method**
+
+- Read `research/adversarial-reward/governance/GOVERNANCE.md` in full and re-read the top of this file (Accumulated Findings plus latest Session 16 log entry) before editing.
+- Inserted four new Section 3 subsections between "Restore failure fallback" and "Required post-incident FINDINGS entry":
+  - `3.1 Outage Mode Definitions`
+  - `3.2 Mode B — API Down, Web UI Up`
+  - `3.3 Mode C — Both Down (Containment)`
+  - `3.4 Operator Decision Tree`
+- Added per-mode evidence requirements (JSON backup vs screenshots vs outage log + timestamps), explicit time windows, and post-action obligations.
+- Performed tabletop walkthrough by tracing documented operator actions only, with phase-level timing estimates.
+
+**Findings**
+
+- GOVERNANCE.md Section 3 now has explicit outage-mode coverage:
+  - Mode A: API/UI available, default API path, max 1 hour override window.
+  - Mode B: API unavailable, UI available; screenshot-based backup/restore workflow with `Include administrators` (`enforce_admins`) toggle control and deferred `audit.sh` within 1 hour of API recovery.
+  - Mode C: API/UI unavailable; containment-only hold with merge freeze, `/tmp/governance-outage-$TS.txt` outage log, 15-minute probe loop, 2-hour escalation threshold to GitHub Support, and recovery handoff to Mode A/B when either path returns.
+- Outage taxonomy reconciliation is now documented in Section 3.1:
+  - "UI down, API up" is intentionally collapsed into Mode A because the current break-glass procedure is API-driven end-to-end.
+- Operator decision tree is now explicit and time-bounded:
+  - API probe first -> Mode A if available.
+  - If API unavailable, UI probe -> Mode B if available.
+  - If both unavailable -> Mode C containment (max 2 hours, 15-minute checks, escalate after 2 hours).
+- Tabletop drill results (documentation-only):
+  - Mode A walkthrough remains coherent in the new structure; Session 16 timing anchor still applies at roughly 6 minutes total excluding emergency fix implementation.
+  - Mode B walkthrough sequence is complete (`before screenshot -> uncheck Include administrators -> emergency change -> re-check Include administrators -> restore screenshot -> deferred audit`) with estimated operator-active time of ~5-8 minutes excluding emergency fix time and outage wait.
+  - Mode C walkthrough sequence is complete (`freeze merges -> record outage start -> 15-minute monitor loop -> recover via A/B`) with initial containment setup ~2-3 minutes and each monitor cycle ~1-2 minutes.
+- Realism assessment of containment windows:
+  - 1-hour override windows for Modes A/B are consistent with existing tabletop timing and mandatory restore/audit tasks.
+  - 2-hour containment and 15-minute polling are policy defaults rather than empirically calibrated values; calibration requires timestamped data from future outages or an explicitly approved sandboxed live drill.
+
+**Implications**
+
+- Session 16 governance open threads for UI fallback and full outage contingency are now resolved by documented Mode B and Mode C procedures.
+- Section 3 now provides a complete operator path for all API/UI availability combinations with required evidence artifacts per mode.
+- Remaining uncertainty is operational calibration under live conditions, not missing procedural branches.
+
+**Open Threads**
+
+- Optional: run a separately approved sandboxed live break-glass drill to validate Mode B/Mode C timing assumptions and calibrate 2-hour/15-minute thresholds with empirical evidence.
+
 ### 2026-02-23 -- Session 16: Audit Automation, Break-Glass Tabletop, and Escalation Thresholds
 
 **Scope**
@@ -971,6 +1021,10 @@ Audit cadence policy added to GOVERNANCE.md:
 
 ### What We Know
 
+- **Break-glass outage-mode coverage is now complete in the governance runbook.** GOVERNANCE.md Section 3 now defines Mode A/Mode B/Mode C, an explicit outage decision tree with time windows, and per-mode evidence requirements (JSON backup, screenshots, outage log + timestamps).
+  Evidence: Investigation Log entry `2026-02-23 -- Session 17: Break-Glass Outage Resilience (Tabletop, Read-Only)`.
+- **Session 16 outage-gap threads are now resolved in documented procedure text.** The web-UI fallback for backup/override is resolved by Mode B, and the full API+UI outage contingency is resolved by Mode C.
+  Evidence: Investigation Log entry `2026-02-23 -- Session 17: Break-Glass Outage Resilience (Tabletop, Read-Only)`.
 - **Governance audit is now automatable via a read-only operations script.** `research/adversarial-reward/governance/audit.sh` executes C1-C7, reports PASS/FAIL per check, emits the filled governance evidence template on live runs, and supports `--dry-run` command preview mode without evaluating checks.
   Evidence: Investigation Log entry `2026-02-23 -- Session 16: Audit Automation, Break-Glass Tabletop, and Escalation Thresholds`.
 - **Escalation thresholds are now explicitly codified per governance check.** GOVERNANCE.md Section 2 now defines severity, failure meaning, owner action, and response-time targets for C1-C7, with severity assignments validated against the Session 11-13 governance evidence chain.
@@ -1054,8 +1108,8 @@ Audit cadence policy added to GOVERNANCE.md:
 
 ### What We Don't Know
 
-- Whether break-glass can be executed end-to-end during partial/full GitHub control-plane outages, because current fallback text explicitly covers manual restore only and does not yet specify backup/override parity paths when `gh api` is unavailable.
-  Evidence: Investigation Log entry `2026-02-23 -- Session 16: Audit Automation, Break-Glass Tabletop, and Escalation Thresholds`.
+- Whether the Session 17 outage timing windows (`<=1h` override for Modes A/B; `<=2h` containment with 15-minute probes for Mode C) hold under live operational conditions, because Session 17 was tabletop-only.
+  Evidence: Investigation Log entry `2026-02-23 -- Session 17: Break-Glass Outage Resilience (Tabletop, Read-Only)`.
 - Whether derived operating-range estimates in `regime_validity.md` match observed parameter distributions in real production DSL traces (OpenMM/GROMACS/CESM/VASP), rather than training-knowledge priors.
 - Whether the hybrid remains `7/7` outside the current fixed fixture set under adversarial scenarios not covered by S1-S7 (e.g., metric-count scaling, temporal autocorrelation).
 - Whether Pattern B step-response can be improved above 3.0 without reintroducing Fisher-like non-smooth jumps (open thread from Session 5, documented as revisit trigger T3).
