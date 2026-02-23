@@ -30,6 +30,55 @@ IN PROGRESS
 
 ## Investigation Log
 
+### 2026-02-23 -- Session 14: Governance Audit Runbook + Break-Glass Procedure Codification
+
+**Scope**
+
+- Convert the Session 11-13 governance chain into a repeatable, operator-friendly audit runbook.
+- Verify live branch-protection state before codifying a baseline (source of truth precedence over handoff text).
+- Define a constrained break-glass procedure with explicit restoration guardrails.
+- Update project governance index (`CLAUDE.md`) to include the new governance artifact.
+
+**Method**
+
+- Re-read this investigation log (including Session 13) before changes.
+- Resolved live repository identity: `gh repo view --json nameWithOwner --jq .nameWithOwner` -> `andrewmcadoo/athena`.
+- Queried live protection state from GitHub API:
+  - `gh api repos/andrewmcadoo/athena/branches/master/protection`
+  - Extracted critical fields and normalized baseline object used for documentation.
+- Queried workflow state and latest run:
+  - `gh api repos/andrewmcadoo/athena/actions/workflows` (selected `.github/workflows/contract-gate.yml`)
+  - `gh api repos/andrewmcadoo/athena/actions/workflows/contract-gate.yml/runs?per_page=1`
+- Authored `research/adversarial-reward/governance/GOVERNANCE.md` with:
+  - Must-stay-true baseline JSON + critical-field rationale table.
+  - Five-minute audit runbook with 7 explicit checks (exact commands, jq queries, expected outputs, pass/fail indicators).
+  - Break-glass procedure with backup, constrained override, restore + re-audit requirements, and non-examples.
+  - Known-issues list seeded with `bd` panic note.
+- Checked `bd list --status=open` during this session to confirm prior panic was non-reproducing.
+
+**Findings**
+
+- Live protection state matches Session 13 governance baseline (no discrepancy detected):
+  - `required_status_checks.contexts = [\"contract-verification\"]`
+  - `required_status_checks.strict = true`
+  - `enforce_admins.enabled = true`
+  - `allow_force_pushes.enabled = false`
+- The runbook now codifies 7 auditable checks with deterministic pass/fail criteria and an evidence template for future audits.
+- CI governance remains active:
+  - Workflow `.github/workflows/contract-gate.yml` state is `active`.
+  - Most recent run was `completed/success` at capture time (`run_id=22295738839`).
+- `bd list --status=open` did not reproduce the Session 13 panic in Session 14.
+
+**Implications**
+
+- Governance verification is now operationalized as a repeatable five-minute procedure, reducing dependence on session memory.
+- Break-glass handling now has explicit constraints (self-approval with mandatory documentation, one-hour max window, mandatory restore + re-audit), reducing policy-drift risk during emergency operations.
+- Because live API verification was used as baseline input, this runbook can be treated as current-state authoritative for the AggregateScore governance contract.
+
+**Open Threads**
+
+- Define a lightweight audit cadence (for example weekly or pre-release) and record it in future session planning once operational load is understood.
+
 ### 2026-02-22 -- Session 13: Admin Bypass Closure and Direct-Push Rejection Proof
 
 **Scope**
@@ -799,6 +848,12 @@ IN PROGRESS
 
 ### What We Know
 
+- **Governance operations are now codified into a repeatable audit + incident procedure.** `research/adversarial-reward/governance/GOVERNANCE.md` defines a 7-check five-minute audit runbook (exact commands, jq filters, expected outputs, pass/fail criteria), an evidence template, and break-glass guardrails with mandatory restoration + re-verification.
+  Evidence: Investigation Log entry `2026-02-23 -- Session 14: Governance Audit Runbook + Break-Glass Procedure Codification`.
+- **Live strict-mode state remains confirmed and documented from source-of-truth API.** Session 14 re-verified `required_status_checks.strict=true` directly from `gh api .../branches/master/protection`; no drift from Session 13 baseline was observed.
+  Evidence: Investigation Log entry `2026-02-23 -- Session 14: Governance Audit Runbook + Break-Glass Procedure Codification`.
+- **The prior `bd list` panic is non-reproducing in the current session.** `bd list --status=open` completed successfully in Session 14, so no immediate remediation is required beyond documenting the known issue and workaround.
+  Evidence: Investigation Log entry `2026-02-23 -- Session 14: Governance Audit Runbook + Break-Glass Procedure Codification`.
 - **Admin enforcement is now active on `master`.** Branch protection now has `enforce_admins=true`, with required status checks unchanged (`contract-verification`, strict mode enabled), closing the administrator direct-push bypass.
   Evidence: Investigation Log entry `2026-02-22 -- Session 13: Admin Bypass Closure and Direct-Push Rejection Proof`.
 - **Direct push to `master` is rejected under protection policy.** Attempted push `ci-proof/direct-push -> master` failed with `GH006` and required-check enforcement (`Required status check "contract-verification" is expected.`).
