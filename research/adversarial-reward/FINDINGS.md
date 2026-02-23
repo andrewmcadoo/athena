@@ -30,6 +30,51 @@ IN PROGRESS
 
 ## Investigation Log
 
+### 2026-02-23 -- Session 10: Continuous Monitoring Hooks for Locked AggregateScore Contract
+
+**Scope**
+
+- Implement continuous monitoring hooks for the locked AggregateScore contract in `aggregation-candidates`.
+- Instrument revisit triggers `T1`-`T5` as executable checks and add contract metadata validation.
+- Produce a deterministic pass/fail monitoring report runnable via `python monitoring_hooks.py`.
+
+**Method**
+
+- Added `research/adversarial-reward/prototypes/aggregation-candidates/monitoring_hooks.py` (stdlib-only, read-only instrumentation).
+- Implemented trigger checks mapped to the monitoring trigger contract:
+  - `T1`: operating-envelope parity/range checks (`BF_NORM_LOG_SCALED_C`, default absolute-difference sigmoid, custom sigmoid `k/x0` envelope).
+  - `T2`: `DivergenceKind` coverage audit against the locked 6-kind normalization dispatch surface.
+  - `T3`: Pattern B accepted-limitation metadata check using JSON-driven `observed_value`/`threshold` and `classification`.
+  - `T4`: scenario fixture coverage check for locked baseline indices `{1..7}` (no additions/missing entries).
+  - `T5`: correlation envelope validation (`max_inflation < 1.5`) plus optional runtime `inflation_ratio` scan from `correlation_results.json`.
+- Added contract metadata checks for `version`, `status`, `bf_norm_c` code/JSON parity, `n_terms`, and guardrail enforcement mode.
+- Executed:
+  - `cd research/adversarial-reward/prototypes/aggregation-candidates`
+  - `python monitoring_hooks.py`
+
+**Findings**
+
+- Monitoring run result: `20/20 checks passed`, exit code `0`.
+- All trigger groups (`T1`-`T5`) passed with no trigger alerts.
+- Contract metadata checks passed:
+  - `version=1.0`
+  - `status=LOCKED`
+  - `bf_norm_c=0.083647` parity with code constant
+  - `n_terms=1`
+  - guardrail `GR-S2-CUSTOM-SIGMOID-X0-NONNEG` enforcement set to `reject_at_config_construction`.
+- Report footer is deterministic and anchored to lockfile date (`2026-02-22`), not wall-clock time.
+
+**Implications**
+
+- AggregateScore contract protection now has continuous executable monitoring, complementing Session 9's one-time acceptance proof.
+- Drift in envelope assumptions, enum coverage, scenario catalog, correlation behavior, or lock metadata now fails fast with explicit trigger-tagged action summaries.
+- This reduces risk of silent contract erosion between research sessions and future implementation integration work.
+
+**Open Threads**
+
+- Integrate `monitoring_hooks.py` into CI/pre-merge gates so trigger checks run automatically.
+- Wire production telemetry inputs so T1/T3/T5 checks can consume live operational diagnostics rather than research artifacts only.
+
 ### 2026-02-23 -- Session 9: Automated Acceptance Regression Gates for Locked AggregateScore Contract
 
 **Scope**

@@ -151,6 +151,14 @@
       "slug": "acceptance-test-suite-aggregation",
       "goal": "Create a structured prompt that instructs an AI to implement an acceptance test suite for the ATHENA adversarial-reward aggregation prototype, covering three contracts (margin parity, guardrail rejection, decomposition invariant) as automated regression gates.",
       "framework": "RISEN"
+    },
+    {
+      "sequence": 20,
+      "filename": "prompt_020_2026-02-22_monitoring-hooks-aggregate-contract.md",
+      "created": "2026-02-22T19:18:53.731892",
+      "slug": "monitoring-hooks-aggregate-contract",
+      "goal": "Implement continuous monitoring hooks (triggers T1-T5, contract metadata emission, deterministic drift report) for the locked AggregateScore contract, converting Session 9's one-time acceptance proof into an ongoing regression alarm system.",
+      "framework": "RISEN"
     }
   ]
 }
