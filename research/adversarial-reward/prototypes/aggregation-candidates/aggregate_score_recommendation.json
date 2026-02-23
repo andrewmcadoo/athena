@@ -42,11 +42,11 @@
   ],
   "baseline_margins": {
     "S1_noisy_tv": 0.030647,
-    "S2_unanimous_weak_signal": 0.072804,
+    "S2_unanimous_weak_signal": 1e-06,
     "S3_mixed_signal": 0.006164,
     "S4_missing_data": 0.128007,
     "S5_scale_heterogeneity": 0.008802,
-    "S6_calibration_decomposability": 0.000000,
+    "S6_calibration_decomposability": 0.0,
     "S7_boundary_seeking": 0.102971
   },
   "operating_envelope": {
