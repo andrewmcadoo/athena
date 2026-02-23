@@ -30,6 +30,65 @@ IN PROGRESS
 
 ## Investigation Log
 
+### 2026-02-23 -- Session 16: Audit Automation, Break-Glass Tabletop, and Escalation Thresholds
+
+**Scope**
+
+- Audit automation script for C1-C7 as a read-only governance operation.
+- Documentation-only break-glass drill walkthrough (no live mutations).
+- Escalation threshold insertion and severity validation against the governance evidence chain.
+
+**Method**
+
+- Authored `research/adversarial-reward/governance/audit.sh` as executable bash using only `gh`, `jq`, `date`, `git`, and shell built-ins.
+- Implemented C1-C7 with pass/fail checks against the locked Section 2 expectations, filled audit-evidence template output for live runs, `0/1` exit semantics (`0` all pass, `1` any fail), and `--dry-run` command-print mode (no check execution, no evidence template, always exit `0`).
+- Validated script by running:
+  - `bash research/adversarial-reward/governance/audit.sh`
+  - `bash research/adversarial-reward/governance/audit.sh --dry-run`
+- Executed a tabletop-only break-glass walkthrough of GOVERNANCE.md Section 3 with simulated trigger and phase timing estimates; no override commands were executed.
+- Added pre-authored escalation threshold table to GOVERNANCE.md Section 2 (after Audit Cadence) and verified each severity assignment against the Session 11-13 governance evidence chain in GOVERNANCE.md Section 1.
+- Reviewed Sessions 11-14 prior open threads to check whether this session newly closes any remaining thread.
+
+**Findings**
+
+- Audit automation live validation passed all checks (`7/7`) with exit code `0` and populated evidence template output:
+  - Date (UTC): `2026-02-23T20:19:58Z`
+  - Auditor: `aj`
+  - Commit SHA observed: `02c67aa9db4800d427aa39dd74b7fdbbae17a803`
+  - Results: C1-C7 all `PASS`
+- Dry-run validation behaved as required:
+  - Printed exactly 7 command strings (C1-C7) with resolved `OWNER/NAME`.
+  - Did not print governance evidence template.
+  - Exited `0`.
+  - Did not evaluate pass/fail checks (command print-only mode).
+- Tabletop break-glass drill narrative (documentation-only):
+  - Simulated trigger scenario: CI contract gate (`.github/workflows/contract-gate.yml`) is accidentally disabled during GitHub incident response and urgent remediation is required.
+  - Phase 1 backup capture (est. 30s): operator would run repo resolution + protection backup command from Section 3 step 1 (`gh api .../protection > /tmp/master-protection-backup-$TS.json`).
+  - Phase 2 override (est. 30s): operator would generate break-glass payload with `jq` and apply `gh api .../protection --method PUT --input ...` from Section 3 step 2.
+  - Phase 3 emergency change (variable duration): operator would apply the urgent fix (for this scenario, re-enable workflow and verify state).
+  - Phase 4 restore + re-audit (est. 5 min): operator would restore `enforce_admins=true`, run full 7-check audit, and close remediation bead per guardrails.
+- Tabletop gap analysis:
+  - The procedure explicitly documents web UI fallback only for restore failure (GOVERNANCE.md line 236), not for backup-capture or override-apply steps.
+  - If `gh api` is unavailable but web UI is reachable, restoration can be done manually, but the runbook lacks explicit manual parity instructions for backup fidelity and override payload reconstruction.
+  - If both API and UI are unavailable, the current runbook has no documented fallback path.
+- Escalation-threshold validation against governance evidence chain (Section 1) found no required severity changes:
+  - `C2`, `C4`, `C5` marked `CRITICAL` are consistent with demonstrated bypass-surface risks from Sessions 12-13 and protected-history integrity baseline requirements.
+  - `C3` and `C6` marked `HIGH` are consistent with degraded governance posture without immediate full bypass.
+  - `C7` marked `MEDIUM` is consistent with execution anomaly handling while governance controls remain configured.
+- Review of Sessions 11-14 open threads: no thread was newly closable by Session 16 changes because all previously listed governance open threads had already been closed in Sessions 12, 13, and 15.
+
+**Implications**
+
+- Governance verification is now automatable via a single read-only command path with deterministic pass/fail and evidence emission.
+- Break-glass handling now has a documented tabletop timing model (backup, override, emergency change, restore/re-audit) for operator planning.
+- Failure-severity triage is now codified per check, reducing ambiguity in incident response prioritization.
+
+**Open Threads**
+
+- Add explicit web-UI fallback instructions for break-glass backup and override steps (not only restore).
+- Define contingency procedure for full GitHub control-plane outage (API and UI both unavailable).
+- Optionally run a sandboxed live break-glass drill only if explicitly approved for live mutation.
+
 ### 2026-02-23 -- Session 15: First Live Governance Audit Drill and Cadence Policy
 
 **Scope**
@@ -912,6 +971,10 @@ Audit cadence policy added to GOVERNANCE.md:
 
 ### What We Know
 
+- **Governance audit is now automatable via a read-only operations script.** `research/adversarial-reward/governance/audit.sh` executes C1-C7, reports PASS/FAIL per check, emits the filled governance evidence template on live runs, and supports `--dry-run` command preview mode without evaluating checks.
+  Evidence: Investigation Log entry `2026-02-23 -- Session 16: Audit Automation, Break-Glass Tabletop, and Escalation Thresholds`.
+- **Escalation thresholds are now explicitly codified per governance check.** GOVERNANCE.md Section 2 now defines severity, failure meaning, owner action, and response-time targets for C1-C7, with severity assignments validated against the Session 11-13 governance evidence chain.
+  Evidence: Investigation Log entry `2026-02-23 -- Session 16: Audit Automation, Break-Glass Tabletop, and Escalation Thresholds`.
 - **The governance audit runbook has been executed end-to-end as a live fire drill with 7/7 checks passing.** All branch-protection and CI controls remain intact and undrifted. Audit cadence is now defined (weekly spot-check, mandatory pre-merge, post-incident). The runbook is confirmed followable in under 5 minutes.
   Evidence: Investigation Log entry `2026-02-23 -- Session 15: First Live Governance Audit Drill and Cadence Policy`.
 - **Governance operations are now codified into a repeatable audit + incident procedure.** `research/adversarial-reward/governance/GOVERNANCE.md` defines a 7-check five-minute audit runbook (exact commands, jq filters, expected outputs, pass/fail criteria), an evidence template, and break-glass guardrails with mandatory restoration + re-verification.
@@ -991,6 +1054,8 @@ Audit cadence policy added to GOVERNANCE.md:
 
 ### What We Don't Know
 
+- Whether break-glass can be executed end-to-end during partial/full GitHub control-plane outages, because current fallback text explicitly covers manual restore only and does not yet specify backup/override parity paths when `gh api` is unavailable.
+  Evidence: Investigation Log entry `2026-02-23 -- Session 16: Audit Automation, Break-Glass Tabletop, and Escalation Thresholds`.
 - Whether derived operating-range estimates in `regime_validity.md` match observed parameter distributions in real production DSL traces (OpenMM/GROMACS/CESM/VASP), rather than training-knowledge priors.
 - Whether the hybrid remains `7/7` outside the current fixed fixture set under adversarial scenarios not covered by S1-S7 (e.g., metric-count scaling, temporal autocorrelation).
 - Whether Pattern B step-response can be improved above 3.0 without reintroducing Fisher-like non-smooth jumps (open thread from Session 5, documented as revisit trigger T3).
@@ -999,6 +1064,7 @@ Audit cadence policy added to GOVERNANCE.md:
 
 | Filename | Purpose | Status | Demonstrated |
 | :--- | :--- | :--- | :--- |
+| `research/adversarial-reward/governance/audit.sh` | Governance audit automation script (co-located with GOVERNANCE.md; operational tooling, not an aggregation prototype) | Complete (Session 16) | Read-only single-command C1-C7 governance audit with PASS/FAIL reporting, evidence-template output, and `--dry-run` command-preview mode |
 | `research/adversarial-reward/prototypes/aggregation-candidates/models.py` | Contract-preserving dataclasses/enums for aggregation prototype inputs and outputs | Complete (Session 1) | Input contract mirrored without mutating schema semantics |
 | `research/adversarial-reward/prototypes/aggregation-candidates/normalization.py` | Shared CDF normalization, direction handling, uncertainty extraction, and weight helpers | Complete (Session 1) | Uniform `[0,1]` mapping across heterogeneous divergence kinds; agreement inversion implemented |
 | `research/adversarial-reward/prototypes/aggregation-candidates/candidates.py` | C1 IVW-CDF, C2 HTG-Max, C3 Fisher-UP candidate implementations + exploratory HTG-LSE | Complete (Session 1) | Three bounded aggregation formulations with per-component decomposition output |
