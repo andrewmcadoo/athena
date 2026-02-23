@@ -13,7 +13,7 @@ from models import (
 )
 
 
-BF_NORM_LOG_SCALED_C = 0.083647
+BF_NORM_LOG_SCALED_C = 0.100000
 
 
 def bf_norm_log_scaled(bf: float, c: float = BF_NORM_LOG_SCALED_C) -> float:
