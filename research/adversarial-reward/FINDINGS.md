@@ -30,6 +30,57 @@ IN PROGRESS
 
 ## Investigation Log
 
+### 2026-02-23 -- Session 12: Branch Protection Enforcement Proof + Exit-Code Integrity Fix
+
+**Scope**
+
+- Enforce `contract-verification` as a required branch-protection status check on `master`.
+- Produce proof evidence with one passing PR and one deliberately failing PR, confirming merge-block behavior.
+- Resolve and document any enforcement gaps discovered during proof execution.
+
+**Method**
+
+- Configured branch protection via GitHub API:
+  - Enabled protection on `master`.
+  - Required status checks: `contract-verification` (strict mode on).
+- Ran proof PRs:
+  - Pass proof PR: `#3` (`session12-pass-proof-v2`) with harmless marker file change.
+  - Fail proof PR: `#4` (`session12-fail-proof-v2`) with deliberate baseline drift in `aggregate_score_recommendation.json` (`S2_unanimous_weak_signal` set to `1e-06`).
+- During initial proof attempts (`#2` before fix), observed false-positive success despite local failing acceptance checks.
+- Root-caused CI masking to shell pipeline semantics: `python ... | tee ...` without `set -o pipefail` returns `tee` exit status.
+- Patched `.github/workflows/contract-gate.yml` to add `set -o pipefail` in both script execution steps so step outcomes reflect Python exit codes.
+- Captured evidence artifacts from GitHub Actions run metadata and merge-attempt behavior.
+
+**Findings**
+
+- Branch protection is now active with required status check context `contract-verification` on `master`.
+- Pass proof succeeded:
+  - PR: `https://github.com/andrewmcadoo/athena/pull/3`
+  - Run: `https://github.com/andrewmcadoo/athena/actions/runs/22295089577`
+  - Conclusion: `success`
+  - Artifact: `contract-gate-output` (`id=5612369204`)
+- Fail proof succeeded (as an enforcement test):
+  - PR: `https://github.com/andrewmcadoo/athena/pull/4`
+  - Run: `https://github.com/andrewmcadoo/athena/actions/runs/22295105551`
+  - Conclusion: `failure` (job `contract-verification`)
+  - Artifact: `contract-gate-output` (`id=5612374661`)
+- Merge-block was verified:
+  - `gh pr merge 4 --merge` returned non-zero (`MERGE_EXIT=1`) with message: base branch policy prohibits merge.
+- Discovered and fixed a load-bearing CI defect:
+  - Without `pipefail`, failing Python checks were masked by `tee`, causing false `success`.
+  - With `pipefail`, failing checks correctly propagate non-zero and fail the job.
+
+**Implications**
+
+- Contract enforcement is now both configured and empirically validated: required check policy plus demonstrated pass/fail behavior.
+- The Session 11 workflow contract is now semantically correct under failure conditions (no false green due to pipeline masking).
+- AggregateScore drift attempts in PRs are now reliably blocked by policy unless checks pass or admin override is used.
+
+**Open Threads**
+
+- Optionally close proof PRs `#3` and `#4` after evidence retention window decisions.
+- If direct pushes to `master` should also be blocked, tighten branch-protection rules to disallow bypass paths currently available to admins.
+
 ### 2026-02-22 -- Session 11: CI Gate for AggregateScore Contract Enforcement
 
 **Scope**
@@ -647,6 +698,10 @@ IN PROGRESS
 
 ### What We Know
 
+- **Branch-protection enforcement is now proven with empirical pass/fail evidence.** `master` requires `contract-verification`; PR `#3` passed (`run 22295089577`) and PR `#4` failed (`run 22295105551`), with merge attempt on `#4` blocked by base branch policy.
+  Evidence: Investigation Log entry `2026-02-23 -- Session 12`.
+- **The CI gate had an exit-code masking defect that is now fixed.** In Session 12, `python ... | tee ...` was shown to mask non-zero script exits without `set -o pipefail`; workflow steps were updated so contract-check failures now propagate correctly to step outcomes.
+  Evidence: Investigation Log entry `2026-02-23 -- Session 12`.
 - **AggregateScore contract enforcement now includes automated CI gating.** Workflow `.github/workflows/contract-gate.yml` runs `acceptance_test.py` and `monitoring_hooks.py` on every `push`/`pull_request` to `master`, uploads both stdout logs as artifact `contract-gate-output`, and fails the job unless both checks succeed.
   Evidence: Investigation Log entry `2026-02-22 -- Session 11`.
 - **Session 7 architecture integration is complete.** The locked recommendation is now encoded in architecture contracts and handoff artifacts: `ARCHITECTURE.md` (Sections 4.4.1, 5.4, 8.1, Appendix), ADR `decisions/002-aggregate-score-contract.md`, acceptance-test spec, and monitoring-trigger spec.
