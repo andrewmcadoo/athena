@@ -1,6 +1,6 @@
 # AggregateScore Governance Runbook
 
-Last updated: 2026-02-23 (Session 14)
+Last updated: 2026-02-23 (Session 15 — first live audit)
 Scope: `andrewmcadoo/athena` branch protection + contract-gate CI governance for `master`.
 
 ## Section 1 — Must-Stay-True Baseline
@@ -173,6 +173,12 @@ Audit evidence template (copy/paste):
 - C7 Latest run success: PASS/FAIL
 - Notes: <freeform>
 ```
+
+### Audit Cadence
+
+- **Weekly spot-check**: Run the 7-check runbook once per week. Log a Governance Audit Record in FINDINGS.md only if any check fails; otherwise update `Last audited` date in this document.
+- **Mandatory pre-merge audit**: Run the full runbook before merging any PR that touches files in `research/adversarial-reward/prototypes/aggregation-candidates/` or `.github/workflows/`.
+- **Post-incident audit**: After any break-glass procedure, run the full runbook as part of mandatory restoration (already required by Section 3).
 
 ## Section 3 — Break-Glass Procedure
 

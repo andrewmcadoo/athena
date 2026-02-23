@@ -30,6 +30,70 @@ IN PROGRESS
 
 ## Investigation Log
 
+### 2026-02-23 -- Session 15: First Live Governance Audit Drill and Cadence Policy
+
+**Scope**
+
+- Execute the 7-check governance audit runbook (GOVERNANCE.md Section 2) end-to-end as a fire drill.
+- Validate that the runbook is followable by an operator with no prior session memory.
+- Define a lightweight audit cadence and record it in GOVERNANCE.md.
+- Log all raw command outputs and per-check pass/fail results.
+
+**Method**
+
+- Read GOVERNANCE.md in full before starting any commands.
+- Executed each runbook command verbatim in the order specified by Section 2 (steps 1-4).
+- Compared raw output against expected values from the pass/fail summary table (lines 149-157).
+- Captured UTC timestamp (`2026-02-23T19:25:09Z`) and commit SHA (`20106236ee112ef64a122149ff33affd935c5145`) for the evidence record.
+- Populated the audit evidence template (lines 159-175) with live results.
+- Added an "Audit Cadence" subsection to GOVERNANCE.md Section 2 defining weekly, pre-merge, and post-incident audit triggers.
+- Updated GOVERNANCE.md "Last updated" line to reflect Session 15.
+
+**Findings**
+
+All 7 checks passed with no discrepancies:
+
+| Check | Command | Raw Output | Expected | Result |
+| :--- | :--- | :--- | :--- | :--- |
+| C1 | `gh repo view --json nameWithOwner --jq '.nameWithOwner'` | `andrewmcadoo/athena` | `andrewmcadoo/athena` | PASS |
+| C2 | `gh api .../protection --jq '.required_status_checks.contexts'` | `["contract-verification"]` | `["contract-verification"]` | PASS |
+| C3 | `gh api .../protection --jq '.required_status_checks.strict'` | `true` | `true` | PASS |
+| C4 | `gh api .../protection --jq '.enforce_admins.enabled'` | `true` | `true` | PASS |
+| C5 | `gh api .../protection --jq '.allow_force_pushes.enabled'` | `false` | `false` | PASS |
+| C6 | `gh api .../actions/workflows --jq '...contract-gate.yml... \| .state'` | `active` | `active` | PASS |
+| C7 | `gh api .../contract-gate.yml/runs?per_page=1 --jq '...\| {status, conclusion}'` | `{"conclusion":"success","status":"completed"}` | `{"status":"completed","conclusion":"success"}` | PASS |
+
+Completed Governance Audit Record:
+
+> ### Governance Audit Record
+> - Date (UTC): 2026-02-23T19:25:09Z
+> - Auditor: Claude Code / Session 15
+> - Repo: andrewmcadoo/athena
+> - Commit SHA observed: 20106236ee112ef64a122149ff33affd935c5145
+> - C1 Repo identity: PASS
+> - C2 Required contexts: PASS
+> - C3 Strict mode: PASS
+> - C4 Admin enforcement: PASS
+> - C5 Force pushes disabled: PASS
+> - C6 Workflow active: PASS
+> - C7 Latest run success: PASS
+> - Notes: First live execution of the audit runbook as a fire drill. All checks passed on first attempt with no operator confusion or ambiguity in instructions. Runbook is followable end-to-end in under 5 minutes.
+
+Audit cadence policy added to GOVERNANCE.md:
+- Weekly spot-check (update `Last audited` date on pass; log full record on failure).
+- Mandatory pre-merge audit for PRs touching `aggregation-candidates/` or `.github/workflows/`.
+- Post-incident audit after any break-glass procedure (already required by Section 3).
+
+**Implications**
+
+- The runbook is confirmed followable end-to-end by an operator executing commands verbatim, with no ambiguity or missing steps. Total wall-clock time was under 5 minutes.
+- All governance controls remain intact and undrifted since Session 14 codification.
+- Audit cadence is now defined, closing the open thread from Session 14 ("Define a lightweight audit cadence").
+
+**Open Threads**
+
+- None. Cadence is defined; runbook is validated. Future audits follow the established cadence policy.
+
 ### 2026-02-23 -- Session 14: Governance Audit Runbook + Break-Glass Procedure Codification
 
 **Scope**
@@ -848,6 +912,8 @@ IN PROGRESS
 
 ### What We Know
 
+- **The governance audit runbook has been executed end-to-end as a live fire drill with 7/7 checks passing.** All branch-protection and CI controls remain intact and undrifted. Audit cadence is now defined (weekly spot-check, mandatory pre-merge, post-incident). The runbook is confirmed followable in under 5 minutes.
+  Evidence: Investigation Log entry `2026-02-23 -- Session 15: First Live Governance Audit Drill and Cadence Policy`.
 - **Governance operations are now codified into a repeatable audit + incident procedure.** `research/adversarial-reward/governance/GOVERNANCE.md` defines a 7-check five-minute audit runbook (exact commands, jq filters, expected outputs, pass/fail criteria), an evidence template, and break-glass guardrails with mandatory restoration + re-verification.
   Evidence: Investigation Log entry `2026-02-23 -- Session 14: Governance Audit Runbook + Break-Glass Procedure Codification`.
 - **Live strict-mode state remains confirmed and documented from source-of-truth API.** Session 14 re-verified `required_status_checks.strict=true` directly from `gh api .../branches/master/protection`; no drift from Session 13 baseline was observed.
