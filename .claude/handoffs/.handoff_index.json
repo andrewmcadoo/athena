@@ -139,6 +139,13 @@
       "created": "2026-02-22T17:56:43.777041",
       "slug": "acceptance-test-suite-athena-3lu",
       "directive": "Write acceptance test suite (athena-3lu) encoding margin parity, guardrail rejection, and decomposition invariant as automated regression checks"
+    },
+    {
+      "sequence": 21,
+      "filename": "handoff_021_2026-02-22_ci-gate-contract-enforcement.md",
+      "created": "2026-02-22T19:45:10.042420",
+      "slug": "ci-gate-contract-enforcement",
+      "directive": "Wire acceptance_test.py and monitoring_hooks.py into a CI/pre-merge gate so the locked AggregateScore contract is continuously enforced on every change"
     }
   ]
 }
