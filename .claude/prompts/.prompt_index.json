@@ -143,6 +143,14 @@
       "slug": "bf-norm-seam-contract-enforcement",
       "goal": "Implement BF normalization seam, x0 guardrail, and decomposition invariant in adversarial-reward aggregation prototype with 7-scenario baseline margin parity verification",
       "framework": "RISEN"
+    },
+    {
+      "sequence": 19,
+      "filename": "prompt_019_2026-02-22_acceptance-test-suite-aggregation.md",
+      "created": "2026-02-22T18:27:17.609264",
+      "slug": "acceptance-test-suite-aggregation",
+      "goal": "Create a structured prompt that instructs an AI to implement an acceptance test suite for the ATHENA adversarial-reward aggregation prototype, covering three contracts (margin parity, guardrail rejection, decomposition invariant) as automated regression gates.",
+      "framework": "RISEN"
     }
   ]
 }

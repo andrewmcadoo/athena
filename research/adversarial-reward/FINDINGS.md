@@ -30,6 +30,43 @@ IN PROGRESS
 
 ## Investigation Log
 
+### 2026-02-23 -- Session 9: Automated Acceptance Regression Gates for Locked AggregateScore Contract
+
+**Scope**
+
+- Implement a standalone acceptance regression suite for `aggregation-candidates` that automates Session 8's manual verification contracts.
+- Enforce three contracts as executable gates: margin parity (7 scenarios), guardrail rejection (`GR-S2-CUSTOM-SIGMOID-X0-NONNEG`), and hybrid decomposition invariant stability.
+- Keep the suite stdlib-only and runnable as `python acceptance_test.py` from the prototype directory.
+
+**Method**
+
+- Added `research/adversarial-reward/prototypes/aggregation-candidates/acceptance_test.py`.
+- Implemented three function-level tests plus a `main()` runner:
+  - `test_margin_parity()` reads `aggregate_score_recommendation.json::baseline_margins`, evaluates all fixtures with locked hybrid config (`NormalizationConfig(custom_sigmoids=DEFAULT_CUSTOM_SIGMOIDS)`), and checks `abs(margin - expected) <= 1e-6`.
+  - `test_guardrail_rejection()` constructs `NormalizationConfig(custom_sigmoids={"test": SigmoidParams(k=2.0, x0=-0.2)})` and asserts `ValueError` contains `GR-S2-CUSTOM-SIGMOID-X0-NONNEG`.
+  - `test_decomposition_invariant()` directly calls `aggregate_hybrid(...)` over every dataset in each fixture and verifies no `RuntimeError` from the decomposition invariant assertion.
+- Executed:
+  - `cd research/adversarial-reward/prototypes/aggregation-candidates`
+  - `python acceptance_test.py`
+
+**Findings**
+
+- Acceptance suite result: `15/15 passed`, exit code `0`.
+- Margin parity passed all seven scenarios against JSON baselines with max absolute delta `4.414e-07` (within `1e-6` tolerance).
+- Guardrail behavior is correct: invalid custom sigmoid midpoint (`x0=-0.2`) is rejected at config construction with the expected guardrail ID in the error message.
+- Decomposition invariant held for every scenario dataset; no runtime decomposition discrepancies were observed.
+
+**Implications**
+
+- Session 8 manual contract verification is now codified as an executable regression gate in-repo.
+- The locked AggregateScore recommendation now has a deterministic, runnable acceptance harness suitable for CI integration or release checklists.
+- Any future regression in baseline margins, guardrail enforcement, or decomposition accounting will fail fast with scenario-level diagnostics.
+
+**Open Threads**
+
+- Wire `acceptance_test.py` into an automated pre-merge/CI gate so contract checks run continuously.
+- Extend acceptance metadata capture if future recommendation versions change locked constants or scenario definitions.
+
 ### 2026-02-22 -- Session 8: BF Normalization Seam + Contract Enforcement Implementation
 
 **Scope**
