@@ -1,6 +1,6 @@
 # AggregateScore Governance Runbook
 
-Last updated: 2026-02-23 (Session 15 — first live audit)
+Last updated: 2026-02-23 (Session 16 — audit automation + escalation thresholds)
 Scope: `andrewmcadoo/athena` branch protection + contract-gate CI governance for `master`.
 
 ## Section 1 — Must-Stay-True Baseline
@@ -179,6 +179,23 @@ Audit evidence template (copy/paste):
 - **Weekly spot-check**: Run the 7-check runbook once per week. Log a Governance Audit Record in FINDINGS.md only if any check fails; otherwise update `Last audited` date in this document.
 - **Mandatory pre-merge audit**: Run the full runbook before merging any PR that touches files in `research/adversarial-reward/prototypes/aggregation-candidates/` or `.github/workflows/`.
 - **Post-incident audit**: After any break-glass procedure, run the full runbook as part of mandatory restoration (already required by Section 3).
+
+### Escalation Thresholds
+
+| Check | Severity | Failure meaning | Owner action | Response time |
+| :--- | :--- | :--- | :--- | :--- |
+| C1 | CRITICAL | Wrong repository — audit running against incorrect target | Stop immediately. Verify `gh repo view` context and re-run. | Immediate |
+| C2 | CRITICAL | Required status check missing or altered — merges can bypass contract gate | Open bead. Restore `contract-verification` context via branch protection API. Re-run audit. | < 1 hour |
+| C3 | HIGH | Strict mode disabled — stale-green merges possible | Open bead. Re-enable strict mode via branch protection API. Re-run audit. | < 1 hour |
+| C4 | CRITICAL | Admin enforcement disabled — admins can bypass all checks | Treat as break-glass-level incident. Follow Section 3 restore sequence. Re-run audit. | < 30 min |
+| C5 | CRITICAL | Force pushes enabled — branch history can be rewritten | Open bead. Disable force pushes via branch protection API. Re-run audit. | < 30 min |
+| C6 | HIGH | Workflow disabled or missing — CI gate not running | Open bead. Re-enable workflow in GitHub Actions settings. Verify trigger config. Re-run audit. | < 1 hour |
+| C7 | MEDIUM | Latest run failed — most recent CI execution did not succeed | Investigate run logs. If contract drift: fix and re-run. If transient: re-trigger and monitor. | < 4 hours |
+
+Severity definitions:
+- **CRITICAL**: Governance bypass is possible right now. Immediate remediation required.
+- **HIGH**: Governance is degraded but not fully bypassed. Remediation within 1 hour.
+- **MEDIUM**: Governance is intact but a recent execution anomaly needs investigation. Normal fix flow.
 
 ## Section 3 — Break-Glass Procedure
 
