@@ -30,6 +30,46 @@ IN PROGRESS
 
 ## Investigation Log
 
+### 2026-02-22 -- Session 11: CI Gate for AggregateScore Contract Enforcement
+
+**Scope**
+
+- Wire `acceptance_test.py` (contract checks) and `monitoring_hooks.py` (drift checks) into GitHub Actions as an unconditional pre-merge gate for `master`.
+- Enforce run-both-then-gate semantics so both scripts execute each run and the workflow fails if either returns non-zero.
+- Persist script stdout as downloadable CI artifacts for post-failure debugging.
+
+**Method**
+
+- Added `.github/workflows/contract-gate.yml` with:
+  - Trigger: `push` and `pull_request` on `master` (no path filters).
+  - Single job: `contract-verification` on `ubuntu-latest` using `actions/setup-python@v5` with Python `3.12`.
+  - `defaults.run.working-directory` set to `research/adversarial-reward/prototypes/aggregation-candidates`.
+  - `acceptance` step: `python acceptance_test.py | tee "$GITHUB_WORKSPACE/acceptance-output.txt"`.
+  - `monitoring` step: `if: always() && steps.acceptance.outcome != 'cancelled'` with `python monitoring_hooks.py | tee "$GITHUB_WORKSPACE/monitoring-output.txt"`.
+  - Artifact step: upload both output files as `contract-gate-output` via `actions/upload-artifact@v4` with `retention-days: 30`.
+  - Final gate step: compares `steps.acceptance.outcome` and `steps.monitoring.outcome` and exits `1` unless both are `success`.
+- Executed local verification from `research/adversarial-reward/prototypes/aggregation-candidates`:
+  - `python acceptance_test.py`
+  - `python monitoring_hooks.py`
+
+**Findings**
+
+- Local acceptance suite passed: `15/15 passed`, exit code `0`.
+- Local monitoring suite passed: `20/20 checks passed`, exit code `0`.
+- Workflow now runs both verification scripts on every `push`/`pull_request` targeting `master` without fail-fast short-circuiting.
+- CI output capture is in place: both script stdout files are uploaded in artifact `contract-gate-output` (30-day retention).
+- Contract drift in either suite now deterministically fails CI through the explicit final gate step.
+
+**Implications**
+
+- AggregateScore contract enforcement moved from manual/local verification to automated repository-level governance.
+- Debuggability is improved for regressions: CI failures include downloadable script transcripts for fast root-cause review.
+- This closes the previously open integration thread from Sessions 9 and 10 to wire acceptance and monitoring checks into CI.
+
+**Open Threads**
+
+- Repository settings should mark `contract-verification` as a required status check for branch protection on `master` (out of scope for in-repo code changes).
+
 ### 2026-02-23 -- Session 10: Continuous Monitoring Hooks for Locked AggregateScore Contract
 
 **Scope**
@@ -607,6 +647,8 @@ IN PROGRESS
 
 ### What We Know
 
+- **AggregateScore contract enforcement now includes automated CI gating.** Workflow `.github/workflows/contract-gate.yml` runs `acceptance_test.py` and `monitoring_hooks.py` on every `push`/`pull_request` to `master`, uploads both stdout logs as artifact `contract-gate-output`, and fails the job unless both checks succeed.
+  Evidence: Investigation Log entry `2026-02-22 -- Session 11`.
 - **Session 7 architecture integration is complete.** The locked recommendation is now encoded in architecture contracts and handoff artifacts: `ARCHITECTURE.md` (Sections 4.4.1, 5.4, 8.1, Appendix), ADR `decisions/002-aggregate-score-contract.md`, acceptance-test spec, and monitoring-trigger spec.
   Evidence: Investigation Log entry `2026-02-23 -- WDK#41 Session 7`.
 - **Core implementation beads are complete and verified.** `athena-4xm` (BF normalization seam), `athena-8b9` (x0 >= 0 guardrail), and `athena-fgo` (decomposition invariant) are implemented and pass 7-scenario evaluation with max margin delta 4.414e-07 against locked baselines. `athena-3lu` (acceptance test suite) is now unblocked; `athena-i4s` (monitoring hooks) remains pending.

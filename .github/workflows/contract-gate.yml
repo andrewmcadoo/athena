@@ -1,0 +1,54 @@
+name: Contract Gate
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  contract-verification:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: research/adversarial-reward/prototypes/aggregation-candidates
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run acceptance contract checks
+        id: acceptance
+        run: |
+          python acceptance_test.py | tee "$GITHUB_WORKSPACE/acceptance-output.txt"
+
+      - name: Run monitoring drift checks
+        id: monitoring
+        if: always() && steps.acceptance.outcome != 'cancelled'
+        run: |
+          python monitoring_hooks.py | tee "$GITHUB_WORKSPACE/monitoring-output.txt"
+
+      - name: Upload contract gate output
+        if: always() && steps.acceptance.outcome != 'cancelled'
+        uses: actions/upload-artifact@v4
+        with:
+          name: contract-gate-output
+          retention-days: 30
+          path: |
+            ${{ github.workspace }}/acceptance-output.txt
+            ${{ github.workspace }}/monitoring-output.txt
+
+      - name: Gate result
+        if: always() && steps.acceptance.outcome != 'cancelled'
+        run: |
+          echo "acceptance: ${{ steps.acceptance.outcome }}"
+          echo "monitoring: ${{ steps.monitoring.outcome }}"
+          if [ "${{ steps.acceptance.outcome }}" != "success" ] || [ "${{ steps.monitoring.outcome }}" != "success" ]; then
+            echo "::error::Contract gate failed. See uploaded artifacts for details."
+            exit 1
+          fi
+          echo "Contract gate passed."
