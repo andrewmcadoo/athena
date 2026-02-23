@@ -30,6 +30,107 @@ IN PROGRESS
 
 ## Investigation Log
 
+### 2026-02-22 -- Session 13: Admin Bypass Closure and Direct-Push Rejection Proof
+
+**Scope**
+
+- Close the remaining governance bypass where repository administrators could push directly to `master` despite required status checks.
+- Preserve existing branch-protection semantics while enabling admin enforcement.
+- Produce empirical evidence that direct pushes are rejected and PR-based flow remains functional.
+- Clean up leftover Session 12 proof PRs/branches and record all evidence in this log.
+
+**Method**
+
+- Resolved repository identity and permissions using `gh`:
+  - `gh repo view --json owner,name` -> `andrewmcadoo/athena`
+  - `gh api repos/andrewmcadoo/athena/collaborators/andrewmcadoo/permission --jq .permission` -> `admin`
+- Captured full pre-change branch protection via:
+  - `gh api repos/andrewmcadoo/athena/branches/master/protection`
+  - Verified `enforce_admins.enabled=false`.
+- Replayed full protection state with a single mutation (`enforce_admins=true`) using `PUT repos/andrewmcadoo/athena/branches/master/protection`, preserving all other fields from the captured state.
+- Proved direct-push rejection:
+  - Created disposable branch `ci-proof/direct-push`.
+  - Committed harmless proof artifact.
+  - Attempted `git push origin ci-proof/direct-push:master`.
+- Proved PR path still works under admin enforcement:
+  - Created disposable branch `ci-proof/pr-path`.
+  - Opened PR `#5`: `https://github.com/andrewmcadoo/athena/pull/5`.
+  - Watched checks with `gh pr checks 5 --watch`, captured run metadata and mergeability.
+  - Closed PR `#5` (unmerged) and deleted remote branch.
+- Cleaned Session 12 leftovers:
+  - Closed PRs `#3` and `#4`.
+  - Deleted remote branches `session12-pass-proof-v2` and `session12-fail-proof-v2`.
+  - Verified legacy candidates `ci-proof/pass` and `ci-proof/fail` were already absent.
+
+**Findings**
+
+- Branch protection before Session 13 change:
+  ```json
+  {
+    "required_status_checks": {
+      "strict": true,
+      "contexts": ["contract-verification"]
+    },
+    "enforce_admins": false,
+    "required_pull_request_reviews": null,
+    "restrictions": null,
+    "required_linear_history": false,
+    "allow_force_pushes": false,
+    "allow_deletions": false,
+    "block_creations": false,
+    "required_conversation_resolution": false,
+    "lock_branch": false,
+    "allow_fork_syncing": false
+  }
+  ```
+- Branch protection after Session 13 change:
+  ```json
+  {
+    "required_status_checks": {
+      "strict": true,
+      "contexts": ["contract-verification"]
+    },
+    "enforce_admins": true,
+    "required_pull_request_reviews": null,
+    "restrictions": null,
+    "required_linear_history": false,
+    "allow_force_pushes": false,
+    "allow_deletions": false,
+    "block_creations": false,
+    "required_conversation_resolution": false,
+    "lock_branch": false,
+    "allow_fork_syncing": false
+  }
+  ```
+- Normalized before/after diff confirmed only one changed field: `enforce_admins.enabled` (`false -> true`).
+- Direct push to `master` was rejected with protected-branch enforcement:
+  - `remote: error: GH006: Protected branch update failed for refs/heads/master.`
+  - `remote: - Required status check "contract-verification" is expected.`
+  - `! [remote rejected] ci-proof/direct-push -> master (protected branch hook declined)`
+- PR path remained functional with admin enforcement enabled:
+  - PR: `#5` (`https://github.com/andrewmcadoo/athena/pull/5`)
+  - `contract-verification`: `SUCCESS` (`COMPLETED`)
+  - Actions run ID: `22295647030`
+  - `mergeStateStatus`: `CLEAN`
+  - PR was intentionally closed (not merged) after evidence capture; branch `ci-proof/pr-path` deleted.
+- Session 12 cleanup is complete:
+  - PR `#3` state: `CLOSED`
+  - PR `#4` state: `CLOSED`
+  - Remote branches deleted: `session12-pass-proof-v2`, `session12-fail-proof-v2`.
+
+**Implications**
+
+- Branch-protection governance is now airtight against administrator direct-push bypass on `master`.
+- Required checks now gate both standard collaborators and administrators on the protected branch.
+- The governance chain is now complete and empirically evidenced end-to-end:
+  - Session 11: workflow gate implementation
+  - Session 12: required-check merge enforcement proof
+  - Session 13: admin bypass closure + direct-push rejection proof
+
+**Open Threads**
+
+- None for this policy-closure scope. Future changes to branch protection should replay full protection state as done here to avoid accidental weakening.
+
 ### 2026-02-23 -- Session 12: Branch Protection Enforcement Proof + Exit-Code Integrity Fix
 
 **Scope**
@@ -698,6 +799,14 @@ IN PROGRESS
 
 ### What We Know
 
+- **Admin enforcement is now active on `master`.** Branch protection now has `enforce_admins=true`, with required status checks unchanged (`contract-verification`, strict mode enabled), closing the administrator direct-push bypass.
+  Evidence: Investigation Log entry `2026-02-22 -- Session 13: Admin Bypass Closure and Direct-Push Rejection Proof`.
+- **Direct push to `master` is rejected under protection policy.** Attempted push `ci-proof/direct-push -> master` failed with `GH006` and required-check enforcement (`Required status check "contract-verification" is expected.`).
+  Evidence: Investigation Log entry `2026-02-22 -- Session 13: Admin Bypass Closure and Direct-Push Rejection Proof`.
+- **PR path remains functional with admin enforcement enabled.** Disposable PR `#5` passed `contract-verification` (run `22295647030`) and reported `mergeStateStatus=CLEAN`, confirming policy tightening did not break normal PR flow.
+  Evidence: Investigation Log entry `2026-02-22 -- Session 13: Admin Bypass Closure and Direct-Push Rejection Proof`.
+- **Governance chain is now complete.** Workflow gate implementation (Session 11) -> required-check PR enforcement proof (Session 12) -> admin bypass closure and direct-push rejection proof (Session 13).
+  Evidence: Investigation Log entries `2026-02-22 -- Session 11`, `2026-02-23 -- Session 12`, and `2026-02-22 -- Session 13: Admin Bypass Closure and Direct-Push Rejection Proof`.
 - **Branch-protection enforcement is now proven with empirical pass/fail evidence.** `master` requires `contract-verification`; PR `#3` passed (`run 22295089577`) and PR `#4` failed (`run 22295105551`), with merge attempt on `#4` blocked by base branch policy.
   Evidence: Investigation Log entry `2026-02-23 -- Session 12`.
 - **The CI gate had an exit-code masking defect that is now fixed.** In Session 12, `python ... | tee ...` was shown to mask non-zero script exits without `set -o pipefail`; workflow steps were updated so contract-check failures now propagate correctly to step outcomes.
