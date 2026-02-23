@@ -24,6 +24,7 @@ These survived two adversarial review passes. Do not weaken, remove, or work aro
 - `ARCHITECTURE.md` — Component architecture, information flow, mode transitions, evaluation strategy, and risk analysis. Source of truth for structural decisions.
 - `decisions/` — Architecture Decision Records. `001-python-rust-core.md` records the Python+Rust language split.
 - `research/*/FINDINGS.md` — Active research investigations. Each contains a research question, architecture references, investigation log, accumulated findings, and next steps.
+- `research/adversarial-reward/governance/GOVERNANCE.md` — Governance baseline, five-minute audit runbook, and break-glass restoration procedure for AggregateScore contract enforcement.
 - `evaluation/hidden-confounder/README.md` — Specification anchor for the end-to-end litmus test.
 
 ## Directory Structure
@@ -33,6 +34,9 @@ athena/
 ├── CLAUDE.md                           # Project governance (this file)
 ├── VISION.md                           # Conceptual vision, source of truth
 ├── ARCHITECTURE.md                     # Component architecture and risks
+├── .github/
+│   └── workflows/
+│       └── contract-gate.yml           # CI gate: runs acceptance + monitoring on every PR
 ├── decisions/
 │   └── 001-python-rust-core.md         # ADR: Rust for perf-critical, Python for orchestration
 ├── research/
@@ -42,6 +46,8 @@ athena/
 │   │   └── prototypes/                 # Throwaway IR prototypes
 │   ├── adversarial-reward/             # Priority 2: Epistemic info gain formalization
 │   │   ├── FINDINGS.md
+│   │   ├── governance/
+│   │   │   └── GOVERNANCE.md           # Branch-protection/CI audit runbook + break-glass procedure
 │   │   └── prototypes/                 # Throwaway reward function prototypes
 │   ├── exploration-convergence/        # Priority 3: Exploration-to-falsification criteria
 │   │   └── FINDINGS.md
