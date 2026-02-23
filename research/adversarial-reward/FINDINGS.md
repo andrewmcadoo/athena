@@ -10,7 +10,7 @@ How should "epistemic information gain within a bounded, deterministic subspace"
 | :--- | :--- | :--- |
 | ARCHITECTURE.md | 4.4 (Adversarial Experiment Designer) | Component definition — maximizes expected epistemic gain within bounded subspaces |
 | ARCHITECTURE.md | 5.4 (Adversarial Calibration Feedback) | Calibration loop: predicted vs. actual surprise, persistent miscalibration triggers |
-| ARCHITECTURE.md | 8.1 (Per-Component Risks) | Severity: High. Reward function formalization is an open research problem |
+| ARCHITECTURE.md | 8.1 (Per-Component Risks) | Severity: Medium. Reward contract is specified; implementation fidelity and monitoring remain |
 | VISION.md | Section 4.2 (Adversarial Experiment Design) | Bounded active learning, Noisy TV constraint |
 | VISION.md | Section 6.2 (Noisy TV Problem) | Pathological adversarial design failure modes |
 | VISION.md | Open Question #3 | "Tuning the Adversarial Reward Function" — must penalize unlearnable stochasticity |
@@ -29,6 +29,48 @@ IN PROGRESS
 - **Boundary-seeking failure**: A failure mode where the adversary clusters experiments at the edge of the valid subspace without yielding theoretical insight, exploiting constraint boundaries rather than probing causal structure.
 
 ## Investigation Log
+
+### 2026-02-23 -- WDK#41 Session 7: Architecture Integration for Locked AggregateScore Contract
+
+**Scope**
+
+- Integrate the locked Session 6 AggregateScore recommendation into architecture-level contracts and handoff artifacts without changing any algorithm decisions.
+- Update `ARCHITECTURE.md` to carry a normative AggregateScore contract section and aligned risk posture.
+- Create implementation-facing artifacts: ADR, implementation beads, acceptance-test spec, and monitoring-trigger spec.
+
+**Method**
+
+- Read in full: `aggregate_score_recommendation.md/.json`, `regime_validity.md`, `guardrail_spec.md`, `ARCHITECTURE.md` Sections 4.4/5.4/8.1, and this FINDINGS log.
+- Added `ARCHITECTURE.md` Section 4.4.1 (locked AggregateScore contract), plus cross-references in Sections 5.4 and 8.1; aligned Appendix priority notes to reflect resolved research formalization and pending implementation.
+- Added ADR `decisions/002-aggregate-score-contract.md` documenting decision scope, locked parameters, and evidence basis.
+- Added integration specs:
+  - `aggregate_score_acceptance_test_spec.md`
+  - `monitoring_triggers.md` (T1-T5 source/threshold/owner/action contract)
+- Created implementation beads and dependency edges:
+  - `athena-4xm` (BF normalization seam)
+  - `athena-8b9` (x0>=0 config guardrail)
+  - `athena-fgo` (decomposition invariant assertion)
+  - `athena-3lu` (acceptance test suite; depends on the three implementation beads)
+  - `athena-i4s` (monitoring hooks)
+
+**Findings**
+
+- AggregateScore is now represented in architecture as a locked contract with explicit pipeline, BF normalization, parameter table, guardrail reference, and output invariant (`sum(contribution_i)=aggregate_score`).
+- `n_terms=1` is now explicitly documented in architecture as intentional (not placeholder), consistent with Session 6 recommendation note 4.
+- Adversarial Experiment Designer risk in `ARCHITECTURE.md` moved from open research framing to "specified, pending implementation and monitoring" with downgraded severity.
+- Acceptance and monitoring requirements are now codified as implementation contracts tied directly to Session 6 evidence, including baseline margins (`1e-6`) and decomposition tolerance (`1e-8`).
+
+**Implications**
+
+- Session 6 recommendation is now consumable by downstream implementation without reopening research scope.
+- Remaining work is implementation fidelity and operational instrumentation (tracked in `athena-4xm`, `athena-8b9`, `athena-fgo`, `athena-3lu`, `athena-i4s`).
+- Any future challenge to constants, normalization family, or guardrail scope should route through revisit triggers (T1-T5), not ad-hoc code changes.
+
+**Open Threads**
+
+- Implement and validate the three locked contract checks (BF seam, guardrail enforcement, decomposition invariant).
+- Wire acceptance tests into CI using `aggregate_score_acceptance_test_spec.md`.
+- Implement telemetry required by `monitoring_triggers.md` so T1-T5 can be enforced post-deployment.
 
 ### 2026-02-22 -- WDK#41 Session 6: AggregateScore Recommendation
 
@@ -447,6 +489,10 @@ IN PROGRESS
 
 ### What We Know
 
+- **Session 7 architecture integration is complete.** The locked recommendation is now encoded in architecture contracts and handoff artifacts: `ARCHITECTURE.md` (Sections 4.4.1, 5.4, 8.1, Appendix), ADR `decisions/002-aggregate-score-contract.md`, acceptance-test spec, and monitoring-trigger spec.
+  Evidence: Investigation Log entry `2026-02-23 -- WDK#41 Session 7`.
+- **Implementation work is decomposed into explicit beads with dependency edges.** Core implementation tasks are tracked as `athena-4xm` (BF seam), `athena-8b9` (guardrail), `athena-fgo` (decomposition invariant), with `athena-3lu` (acceptance suite) depending on all three and `athena-i4s` tracking monitoring hook implementation.
+  Evidence: same Session 7 log entry and bead dependency graph.
 - **AggregateScore recommendation is locked.** The HTG-gated Fisher product hybrid with log-scaled BF normalization (`c=0.083647`, `bf_max_target=10000`) is the recommended aggregation function for architecture integration. Specification: `aggregate_score_recommendation.md` and `aggregate_score_recommendation.json`.
   Evidence: Investigation Log entry `2026-02-22 -- WDK#41 Session 6`.
 - All four previously identified risks are resolved by design changes in the recommendation: S5 BF ceiling (log-scaled normalization), S6 compression failures (same change), S2 sigmoid fragility (x0>=0 guardrail), correlation floor-saturation (S6-based probe).
@@ -534,6 +580,8 @@ IN PROGRESS
 | `research/adversarial-reward/prototypes/aggregation-candidates/guardrail_spec.md` | Session 4.3 architecture-level guardrail specification (`x0 >= 0`) for custom sigmoids | Complete (Session 4.2/4.3) | Constraint statement, rationale, scope, and reject-on-violation enforcement contract for future production integration |
 | `research/adversarial-reward/prototypes/aggregation-candidates/aggregate_score_recommendation.md` | Session 6 canonical AggregateScore specification for architecture integration | Complete (Session 6) | Locked algorithm, parameters, evidence map, operating boundaries, and revisit triggers |
 | `research/adversarial-reward/prototypes/aggregation-candidates/aggregate_score_recommendation.json` | Machine-readable Session 6 locked parameters and spec | Complete (Session 6) | Structured parameters, guardrails, envelope, limitations, and triggers for downstream automation |
+| `research/adversarial-reward/prototypes/aggregation-candidates/aggregate_score_acceptance_test_spec.md` | Session 7 acceptance-gate contract translated from Session 6 evidence | Complete (Session 7) | Blocking/non-blocking test matrix with locked tolerances and evidence-linked assertions |
+| `research/adversarial-reward/prototypes/aggregation-candidates/monitoring_triggers.md` | Session 7 revisit-trigger monitoring contract for T1-T5 | Complete (Session 7) | Source/threshold/owner/action path for reopening locked recommendation under operational drift |
 
 ## Next Steps
 

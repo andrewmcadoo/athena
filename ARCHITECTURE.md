@@ -100,7 +100,78 @@ ATHENA consists of eleven components organized into five functional groups: grap
 
 **Hypothesis Generator.** Generates falsifiable scientific hypotheses constrained to the valid subspace defined by the current causal DAG. Receives the current DAG and accumulated failure history (which hypothesis-space regions have been eliminated). Produces candidate hypotheses with explicit causal claims and testable predictions. The architectural novelty is not the generation mechanism (LLM-based hypothesis generation exists in competing systems) but the constraint: generation is bounded by the DAG rather than free-form.
 
-**Adversarial Experiment Designer.** Designs experiments that maximize expected epistemic information gain within domain-valid, deterministic subspaces. Receives the candidate hypothesis, the current DAG, predicted information gain estimates from the Bayesian Surprise Evaluator, and domain validity constraints from the DSL Environment Interface. Produces a fully specified experiment configuration (parameters, data distribution, boundary conditions, expected observables) engineered to maximally challenge the hypothesis. The predicted-gain estimation requires forward-simulating candidate experiments against the current DAG, a computationally non-trivial sub-responsibility that should not be understated. Formalizing "epistemic information gain within a bounded subspace" is itself an open research problem.
+**Adversarial Experiment Designer.** Designs experiments that maximize expected epistemic information gain within domain-valid, deterministic subspaces. Receives the candidate hypothesis, the current DAG, predicted information gain estimates from the Bayesian Surprise Evaluator, and domain validity constraints from the DSL Environment Interface. Produces a fully specified experiment configuration (parameters, data distribution, boundary conditions, expected observables) engineered to maximally challenge the hypothesis. The predicted-gain estimation requires forward-simulating candidate experiments against the current DAG, a computationally non-trivial sub-responsibility that should not be understated. The aggregation contract for "epistemic information gain within a bounded subspace" is now locked in Section 4.4.1.
+
+#### 4.4.1 AggregateScore Contract (Locked)
+
+The reward-formalization research dependency for adversarial aggregation is now specified by a locked contract: `research/adversarial-reward/prototypes/aggregation-candidates/aggregate_score_recommendation.md` (Version 1.0, 2026-02-22, bead `athena-6ax`). Downstream implementation must treat this as normative.
+
+**Per-component and aggregate pipeline (locked):**
+
+```
+Input: Vec<MetricComponent>
+
+For each component_i:
+  1. score_i        = normalize_component(component_i, normalization_config)
+  2. precision_i    = log1p(sample_size / (standard_error^2 + eps)) when uncertainty exists
+  3. confidence_i   = max(c_floor, sigmoid(precision_i, alpha, tau)) when precision exists
+                      c_missing when uncertainty is absent
+  4. gated_i        = score_i * confidence_i
+  5. p_i            = max(p_eps, 1.0 - gated_i)
+  6. evidence_i     = -2 * log(p_i)
+
+Aggregate:
+  7. T              = sum(evidence_i)
+  8. aggregate      = chi_square_cdf(T, df=2) = 1 - exp(-T/2)   // n_terms=1
+
+Decomposition:
+  9. weight_i       = evidence_i * (aggregate / sum(evidence_j * score_j))
+ 10. contribution_i = weight_i * score_i
+```
+
+**BF normalization branch (locked default):**
+
+- `DivergenceKind.BayesFactor` uses `bf_norm_log_scaled(bf, c) = log1p(bf) / (log1p(bf) + c)`.
+- `c = 0.083647`, calibrated from `bf_max_target=10000`.
+- Other normalization families (`ZScore`, `KLDivergence`, `AbsoluteDifference`, `EffectSize`, `Custom`) remain unchanged from the Session 1 baseline.
+
+**Locked parameters:**
+
+| Parameter | Value |
+| :--- | ---: |
+| `alpha` | 1.5 |
+| `tau` | 5.0 |
+| `c_floor` | 0.1 |
+| `c_missing` | 0.7 |
+| `p_eps` | 1e-12 |
+| `eps` | 1e-12 |
+| `n_terms` | 1 |
+| `bf_norm_c` | 0.083647 |
+| `bf_max_target` | 10000 |
+| `clip_eps` | 1e-12 |
+| `absolute_difference_sigmoid.k` | 1200.0 |
+| `absolute_difference_sigmoid.x0` | 7e-4 |
+
+**Guardrail requirement (locked):**
+
+- `GR-S2-CUSTOM-SIGMOID-X0-NONNEG` applies to all `NormalizationConfig.custom_sigmoids`.
+- Constraint: `x0 >= 0`.
+- Enforcement point: config construction/validation (reject invalid config with explicit error; no silent clamping).
+- Full guardrail specification: `research/adversarial-reward/prototypes/aggregation-candidates/guardrail_spec.md`.
+
+**Output contract (locked):**
+
+```
+AggregateResult:
+  candidate:       "Hybrid"
+  aggregate_score: float in (0,1)
+  contributions:   Vec<ComponentContribution>
+                   // decomposition invariant: sum(contribution_i) = aggregate_score
+  skipped:         Vec<method_ref>
+  warnings:        Vec<str>
+```
+
+`n_terms=1` is intentional (single-term chi-square, `df=2`) and is not a placeholder. This is required to preserve calibration behavior and avoid over-aggregation.
 
 **Experiment Executor.** Executes experiment specifications within the DSL environment and captures complete trace logs, execution pathways, and result data. Receives experiment specifications from the Adversarial Experiment Designer (in falsification mode) or the Epistemic Explorer (in exploration mode). Produces raw experimental results, structured trace logs, and execution metadata. The primary novel requirement is completeness of trace capture -- the logs must be sufficient for downstream causal analysis.
 
@@ -206,6 +277,8 @@ The LFI executes a sequential, outside-in audit. The ordering is deliberate: che
 ### 5.4 Adversarial Calibration Feedback
 
 The Adversarial Experiment Designer maintains a calibration loop. After each experiment, the actual surprise is compared to the predicted surprise. Persistent divergence -- the Designer consistently over-predicts or under-predicts information gain -- signals that either the DAG is inaccurate (the forward simulation model is wrong) or the Designer's candidate generation is biased. This calibration signal feeds to both the Designer and the Mode Controller. Persistent miscalibration is a trigger for re-exploration (Section 6.2).
+
+Predicted and actual surprise values in this loop must be computed against the locked AggregateScore contract in Section 4.4.1, including fixed `n_terms=1`, log-scaled BF normalization (`c=0.083647`), and the decomposition invariant `sum(contribution_i) = aggregate_score`. Calibration diagnostics that violate the decomposition invariant are contract violations, not tuning outcomes.
 
 ---
 
@@ -335,7 +408,7 @@ This test is deliberately designed to be passable by either architecture in prin
 
 **Trace Semantics Engine (Severity: High).** The IR design is an unsolved research problem. If the engine produces an insufficiently resolved IR, the LFI cannot distinguish between failure categories, and the system's core differentiator is disabled. The DSL constraint improves tractability relative to arbitrary code, but the gap between "structured trace logs" and "semantically parsed causal narratives" remains wide. Risk classification: requires novel research.
 
-**Adversarial Experiment Designer (Severity: High).** The reward function formalizing "epistemic information gain within a bounded subspace" is an open research problem. If the function is poorly specified, the Designer either (a) degenerates toward safe, uninformative experiments (conservatism) or (b) clusters at the boundary of the valid subspace without yielding theoretical insight (boundary-seeking). The forward-simulation of predicted information gain over a causal DAG adds computational complexity that could create bottlenecks. Risk classification: requires novel research for the reward function; engineering for the forward simulation.
+**Adversarial Experiment Designer (Severity: Medium, downgraded from High after Session 6 contract lock).** The reward aggregation contract is now specified (Section 4.4.1 and `aggregate_score_recommendation.md` v1.0), so the primary risk is no longer research uncertainty but implementation drift from the locked contract. Residual failure modes are: (a) contract-violating implementation (wrong normalization branch, wrong `n_terms`, missing guardrail, broken decomposition invariant), (b) calibration degradation when operating data moves outside validated ranges, and (c) forward-simulation compute bottlenecks over large DAGs. Risk classification: specified, pending implementation and operational monitoring.
 
 **Epistemic Explorer (Severity: Medium).** Convergence criteria are undefined and domain-dependent. A premature transition delivers a bad graph to the falsification loop; a late transition wastes budget. Risk classification: open research question, but bounded -- the failure mode is performance degradation, not silent corruption.
 
@@ -412,11 +485,11 @@ This architecture identifies five components or sub-responsibilities that requir
 | Priority | Component/Sub-Responsibility | Research Question | Dependency |
 | :--- | :--- | :--- | :--- |
 | 1 | Trace Semantics Engine | IR design for translating DSL traces to semantic failure representations | Blocks LFI effectiveness |
-| 2 | Adversarial Experiment Designer reward function | Formalizing epistemic info gain within bounded subspaces | Blocks adversarial design |
+| 2 | Adversarial Experiment Designer AggregateScore contract | Session 6 locked formalization complete (Section 4.4.1); remaining work is implementation against fixed parameters, guardrail, and invariant checks | Implementation blocker for production adversarial design |
 | 3 | Epistemic Explorer convergence criteria | Defining "good enough" for exploration-to-falsification transition | Blocks reliable mode transitions |
 | 4 | Structural Prior Generator internals | Generating accurate enough initial DAGs from LLM priors | Blocks bootstrapping quality |
 | 5 | Bayesian Surprise Evaluator over DAGs | Computing predicted KL divergence over causal graph structures | Blocks experiment selection |
 
-**A note on priority vs. severity.** The ordering above reflects resolution urgency, not failure severity. Item 4 (Structural Prior Generator) is rated Critical severity in Section 8.1 -- its failure mode is catastrophic silent corruption that propagates through every downstream component. It ranks #4 in resolution priority because the warm-start approach provides a usable, if imperfect, starting point that defers the failure rather than preventing it. This is a deliberate architectural bet: the system can operate with imperfect priors (the Epistemic Explorer and re-exploration transitions exist to compensate), but it cannot operate at all without a working Trace Semantics Engine or adversarial reward function. A collaborator should read this as: items 1-2 block the system from functioning; item 4 determines whether the functioning system produces correct results.
+**A note on priority vs. severity.** The ordering above reflects resolution urgency, not failure severity. Item 4 (Structural Prior Generator) is rated Critical severity in Section 8.1 -- its failure mode is catastrophic silent corruption that propagates through every downstream component. It ranks #4 in resolution priority because the warm-start approach provides a usable, if imperfect, starting point that defers the failure rather than preventing it. This is a deliberate architectural bet: the system can operate with imperfect priors (the Epistemic Explorer and re-exploration transitions exist to compensate), but it cannot operate at all without a working Trace Semantics Engine. Item 2's research formalization is now locked in Section 4.4.1; its remaining blocker is implementation fidelity. A collaborator should read this as: item 1 remains the immediate research blocker; item 2 is now an implementation blocker; item 4 determines whether the functioning system produces correct results.
 
 Items 3 and 5 affect system performance and calibration but do not block core functionality.
