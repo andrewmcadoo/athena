@@ -268,12 +268,12 @@ Guardrails:
   2. Open the `master` protection rule details.
   3. Capture a full screenshot showing all toggle states and required-check names before any override action.
 - Override action:
-  1. Uncheck **Include administrators** (this is `enforce_admins=false`).
+  1. Uncheck the admin-bypass control (current GitHub label: **Do not allow bypassing the above settings**; older wording: **Include administrators**). Unchecked state is `enforce_admins=false`.
   2. Save rule changes.
   3. Execute the emergency repository recovery change.
 - Restore action:
   1. Re-open the same `master` protection rule.
-  2. Re-check **Include administrators** (`enforce_admins=true`).
+  2. Re-check the same admin-bypass control so `enforce_admins=true`.
   3. Save rule changes.
 - Deferred machine verification:
   - Run `bash research/adversarial-reward/governance/audit.sh` within 1 hour after API recovery.
@@ -281,8 +281,12 @@ Guardrails:
     - API recovery detected at (UTC)
     - `audit.sh` execution at (UTC)
 - Evidence requirements:
-  - Screenshot set: before override, after override, after restore.
+  - Evidence hierarchy:
+    1. Screenshot set (preferred): before override, after override, after restore.
+    2. If screenshots are unavailable, terminal evidence via `gh api repos/andrewmcadoo/athena/branches/master/protection --jq '.enforce_admins.enabled'` at each phase.
+    3. Minimum fallback: operator verbal confirmation with UTC timestamp at each phase.
   - UTC timestamp logged at each phase transition (backup captured, override applied, emergency change complete, restore complete).
+  - If operator provides local time, convert to UTC immediately before recording durations.
   - Bead entry explicitly labeled `Mode B`.
 
 ### 3.3 Mode C — Both Down (Containment)
