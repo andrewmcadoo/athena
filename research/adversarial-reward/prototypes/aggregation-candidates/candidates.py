@@ -465,6 +465,12 @@ def aggregate_hybrid(
             )
         )
 
+    discrepancy = abs(sum(c.contribution for c in contributions) - aggregate)
+    if discrepancy > 1e-8:
+        raise RuntimeError(
+            f"Hybrid decomposition invariant violated: discrepancy={discrepancy:.12e}"
+        )
+
     return AggregateResult(
         candidate="Hybrid",
         aggregate_score=aggregate,

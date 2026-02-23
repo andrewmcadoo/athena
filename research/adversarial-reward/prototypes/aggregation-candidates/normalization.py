@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Callable, Optional
 
 from models import (
     DivergenceKind,
@@ -13,16 +13,33 @@ from models import (
 )
 
 
+BF_NORM_LOG_SCALED_C = 0.083647
+
+
+def bf_norm_log_scaled(bf: float, c: float = BF_NORM_LOG_SCALED_C) -> float:
+    log_term = math.log1p(bf)
+    return log_term / (log_term + c)
+
+
 @dataclass(frozen=True)
 class NormalizationConfig:
     absolute_difference_sigmoid: SigmoidParams = field(
         default_factory=lambda: SigmoidParams(k=1200.0, x0=7e-4)
     )
     custom_sigmoids: dict[str, SigmoidParams] = field(default_factory=dict)
+    bf_norm_fn: Callable[[float], float] = field(default_factory=lambda: bf_norm_log_scaled)
     clip_eps: float = 1e-12
     se_dampen_enabled: bool = False
     se_dampen_k: float = 5.0
     se_dampen_x0: float = 2.0
+
+    def __post_init__(self) -> None:
+        for key, params in self.custom_sigmoids.items():
+            if params.x0 < 0:
+                raise ValueError(
+                    "GR-S2-CUSTOM-SIGMOID-X0-NONNEG: "
+                    f"custom_sigmoids['{key}'] has x0={params.x0}; expected x0 >= 0"
+                )
 
 
 @dataclass(frozen=True)
@@ -135,7 +152,7 @@ def normalize_component(
         raw_score = 2.0 * normal_cdf(abs(transformed_value)) - 1.0
     elif kind is DivergenceKind.BayesFactor:
         bf = max(transformed_value, 0.0)
-        raw_score = 1.0 - 1.0 / (1.0 + bf)
+        raw_score = config.bf_norm_fn(bf)
     elif kind is DivergenceKind.KLDivergence:
         kl = max(transformed_value, 0.0)
         raw_score = 1.0 - math.exp(-kl)

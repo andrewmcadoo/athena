@@ -17,6 +17,7 @@ from models import (
     MetricComponent,
 )
 from normalization import (
+    bf_norm_log_scaled,
     bounded_unit_interval,
     direction_is_agreement,
     direction_is_none_variant,
@@ -90,11 +91,6 @@ class S6DecompositionCheck:
 
 def bf_norm_current(bf: float) -> float:
     return 1.0 - 1.0 / (1.0 + bf)
-
-
-def bf_norm_log_scaled(bf: float, c: float) -> float:
-    log_term = math.log1p(bf)
-    return log_term / (log_term + c)
 
 
 def bf_norm_power_law(bf: float, alpha: float) -> float:

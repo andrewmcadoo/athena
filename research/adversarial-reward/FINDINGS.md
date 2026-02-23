@@ -30,6 +30,42 @@ IN PROGRESS
 
 ## Investigation Log
 
+### 2026-02-22 -- Session 8: BF Normalization Seam + Contract Enforcement Implementation
+
+**Scope**
+
+- Implement three locked-recommendation changes in `aggregation-candidates/`: BF normalization seam (athena-4xm), x0 >= 0 config-time guardrail (athena-8b9), decomposition invariant assertion (athena-fgo).
+- Verify against 7-scenario suite with baseline margin parity within 1e-6.
+
+**Method**
+
+- Read in full: `normalization.py`, `ceiling_analysis.py`, `candidates.py`, `aggregate_score_recommendation.json`, Session 7 log entry.
+- `normalization.py`: Added `bf_norm_log_scaled(bf, c=0.083647)` with `BF_NORM_LOG_SCALED_C` constant. Added `bf_norm_fn: Callable[[float], float]` field to `NormalizationConfig` (frozen dataclass) with `default_factory=lambda: bf_norm_log_scaled`. Replaced hard-coded BayesFactor branch (`1 - 1/(1+bf)`) with `config.bf_norm_fn(bf)`. Non-BF branches untouched.
+- `normalization.py`: Added `NormalizationConfig.__post_init__` that iterates `custom_sigmoids` and raises `ValueError` with guardrail ID `GR-S2-CUSTOM-SIGMOID-X0-NONNEG` if any `x0 < 0`. No silent clamping.
+- `ceiling_analysis.py`: Imported `bf_norm_log_scaled` from `normalization` and removed local duplicate definition. Kept `bf_norm_current`, `bf_norm_power_law`, `bf_norm_exp_decay` (research candidates).
+- `candidates.py`: Added decomposition invariant at end of `aggregate_hybrid()`: `abs(sum(c.contribution for c in contributions) - aggregate) <= 1e-8`, raising `RuntimeError` if violated.
+- Ran `evaluate.py` and margin parity script against `aggregate_score_recommendation.json::baseline_margins`.
+
+**Findings**
+
+- 7/7 scenarios PASS for Hybrid with all three changes applied.
+- Margin parity confirmed: max absolute delta across 7 scenarios = 4.414e-07 (well within 1e-6 tolerance).
+- Guardrail correctly rejects `NormalizationConfig(custom_sigmoids={"test": SigmoidParams(k=1.0, x0=-0.2)})` with descriptive `ValueError`.
+- No `RuntimeError` from decomposition invariant during normal evaluation; S6 margin of 1.000e-08 confirms the invariant is tight.
+- The BF normalization seam is fully transparent to existing callers: `candidates.py`, `scenarios.py`, `evaluate.py` required no changes.
+
+**Implications**
+
+- The locked AggregateScore recommendation (athena-6ax) is now implemented at the prototype level with `bf_norm_log_scaled` as the configurable default.
+- Contract enforcement (guardrail + decomposition invariant) is in-place; the acceptance test suite (athena-3lu) can now be authored against these seams.
+- Ceiling analysis can still be run with all BF norm research candidates since only the duplicate `bf_norm_log_scaled` was removed.
+
+**Open Threads**
+
+- athena-3lu (acceptance test suite): Now unblocked. Should formalize the margin parity checks, guardrail rejection test, and decomposition invariant test into a standalone script.
+- athena-i4s (monitoring hooks): Still pending; requires production instrumentation decisions.
+- `bf_norm_fn` configurability has not been exercised with non-default callables yet. Future calibration work should test alternate BF norms injected via config.
+
 ### 2026-02-23 -- WDK#41 Session 7: Architecture Integration for Locked AggregateScore Contract
 
 **Scope**
@@ -491,8 +527,8 @@ IN PROGRESS
 
 - **Session 7 architecture integration is complete.** The locked recommendation is now encoded in architecture contracts and handoff artifacts: `ARCHITECTURE.md` (Sections 4.4.1, 5.4, 8.1, Appendix), ADR `decisions/002-aggregate-score-contract.md`, acceptance-test spec, and monitoring-trigger spec.
   Evidence: Investigation Log entry `2026-02-23 -- WDK#41 Session 7`.
-- **Implementation work is decomposed into explicit beads with dependency edges.** Core implementation tasks are tracked as `athena-4xm` (BF seam), `athena-8b9` (guardrail), `athena-fgo` (decomposition invariant), with `athena-3lu` (acceptance suite) depending on all three and `athena-i4s` tracking monitoring hook implementation.
-  Evidence: same Session 7 log entry and bead dependency graph.
+- **Core implementation beads are complete and verified.** `athena-4xm` (BF normalization seam), `athena-8b9` (x0 >= 0 guardrail), and `athena-fgo` (decomposition invariant) are implemented and pass 7-scenario evaluation with max margin delta 4.414e-07 against locked baselines. `athena-3lu` (acceptance test suite) is now unblocked; `athena-i4s` (monitoring hooks) remains pending.
+  Evidence: Investigation Log entry `2026-02-22 -- Session 8`.
 - **AggregateScore recommendation is locked.** The HTG-gated Fisher product hybrid with log-scaled BF normalization (`c=0.083647`, `bf_max_target=10000`) is the recommended aggregation function for architecture integration. Specification: `aggregate_score_recommendation.md` and `aggregate_score_recommendation.json`.
   Evidence: Investigation Log entry `2026-02-22 -- WDK#41 Session 6`.
 - All four previously identified risks are resolved by design changes in the recommendation: S5 BF ceiling (log-scaled normalization), S6 compression failures (same change), S2 sigmoid fragility (x0>=0 guardrail), correlation floor-saturation (S6-based probe).

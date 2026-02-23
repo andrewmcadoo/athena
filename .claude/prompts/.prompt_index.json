@@ -135,6 +135,14 @@
       "slug": "aggregate-score-architecture-integration",
       "goal": "Integrate the locked AggregateScore contract into ATHENA architecture: update ARCHITECTURE.md, create implementation beads, define acceptance tests, wire revisit triggers into monitoring \u2014 no retuning of parameters",
       "framework": "RISEN"
+    },
+    {
+      "sequence": 18,
+      "filename": "prompt_018_2026-02-22_bf-norm-seam-contract-enforcement.md",
+      "created": "2026-02-22T17:21:44.669438",
+      "slug": "bf-norm-seam-contract-enforcement",
+      "goal": "Implement BF normalization seam, x0 guardrail, and decomposition invariant in adversarial-reward aggregation prototype with 7-scenario baseline margin parity verification",
+      "framework": "RISEN"
     }
   ]
 }
