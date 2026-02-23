@@ -24,12 +24,14 @@ jobs:
       - name: Run acceptance contract checks
         id: acceptance
         run: |
+          set -o pipefail
           python acceptance_test.py | tee "$GITHUB_WORKSPACE/acceptance-output.txt"
 
       - name: Run monitoring drift checks
         id: monitoring
         if: always() && steps.acceptance.outcome != 'cancelled'
         run: |
+          set -o pipefail
           python monitoring_hooks.py | tee "$GITHUB_WORKSPACE/monitoring-output.txt"
 
       - name: Upload contract gate output
