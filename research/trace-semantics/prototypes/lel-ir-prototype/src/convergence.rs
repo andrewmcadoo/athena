@@ -4,6 +4,7 @@ use crate::common::{
 };
 use crate::event_kinds::EventKind;
 use crate::lel::{LayeredEventLog, TraceEvent, TraceEventBuilder};
+use std::collections::BTreeMap;
 
 pub const MIN_CONVERGENCE_WINDOW: usize = 4;
 pub const REL_DELTA_THRESHOLD: f64 = 1.0e-4;
@@ -153,6 +154,115 @@ pub fn derive_energy_convergence_summary(
     )
 }
 
+pub fn derive_vasp_scf_convergence_summary(
+    events: &[TraceEvent],
+    source_file: &str,
+) -> Vec<TraceEvent> {
+    struct DeEntry<'a> {
+        event: &'a TraceEvent,
+        iteration: u64,
+        de_value: f64,
+        converged: Option<bool>,
+    }
+
+    let mut groups: BTreeMap<u64, Vec<DeEntry<'_>>> = BTreeMap::new();
+
+    for event in events {
+        if let EventKind::ConvergencePoint {
+            iteration,
+            metric_name,
+            metric_value: Value::Known(metric_value, _),
+            converged,
+        } = &event.kind
+        {
+            if metric_name == "dE" {
+                groups.entry(event.temporal.simulation_step).or_default().push(
+                    DeEntry {
+                        event,
+                        iteration: *iteration,
+                        de_value: *metric_value,
+                        converged: *converged,
+                    },
+                );
+            }
+        }
+    }
+
+    let mut logical_sequence = events
+        .last()
+        .map(|event| event.temporal.logical_sequence + 1)
+        .unwrap_or(1);
+    let mut derived_events = Vec::new();
+
+    for (simulation_step, group) in groups {
+        if group.iter().any(|entry| entry.converged == Some(true)) {
+            continue;
+        }
+        if group.len() < MIN_CONVERGENCE_WINDOW {
+            continue;
+        }
+
+        let d_e_values: Vec<f64> = group.iter().map(|entry| entry.de_value).collect();
+        let sign_changes = d_e_values
+            .windows(2)
+            .filter(|pair| pair[0] * pair[1] < 0.0)
+            .count();
+
+        let (metric_name, note) = if sign_changes >= 2 {
+            (
+                "derived_vasp_oscillation_dE",
+                "OSZICAR dE sign changes indicate oscillating SCF behavior",
+            )
+        } else {
+            (
+                "derived_vasp_stall_dE",
+                "OSZICAR dE series remains non-oscillatory with no SCF convergence marker",
+            )
+        };
+
+        let causal_refs = group.iter().map(|entry| entry.event.id).collect();
+        let from_elements = group
+            .iter()
+            .map(|entry| ElementId(entry.event.id.0))
+            .collect();
+        let iteration = group
+            .last()
+            .map(|entry| entry.iteration)
+            .unwrap_or(simulation_step);
+
+        let event = TraceEventBuilder::new()
+            .layer(Layer::Methodology)
+            .kind(EventKind::ConvergencePoint {
+                iteration,
+                metric_name: metric_name.to_string(),
+                metric_value: Value::Known(sign_changes as f64, "count".to_string()),
+                converged: Some(false),
+            })
+            .temporal(TemporalCoord {
+                simulation_step,
+                wall_clock_ns: None,
+                logical_sequence,
+            })
+            .causal_refs(causal_refs)
+            .provenance(ProvenanceAnchor {
+                source_file: source_file.to_string(),
+                source_location: SourceLocation::ExternalInput,
+                raw_hash: 0,
+            })
+            .confidence(ConfidenceMeta {
+                completeness: Completeness::Derived { from_elements },
+                field_coverage: 1.0,
+                notes: vec![note.to_string()],
+            })
+            .build();
+
+        logical_sequence += 1;
+        derived_events.push(event);
+    }
+
+    derived_events
+}
+
 fn confidence_from_completeness(completeness: &Completeness) -> ConvergenceConfidence {
     match completeness {
         Completeness::FullyObserved => ConvergenceConfidence::Direct,
@@ -234,6 +344,16 @@ pub fn classify_convergence(
         (ConvergencePattern::Converged, completeness_confidence)
     } else if framework_is_vasp && metric_name == "dE" && converged.is_none() {
         (ConvergencePattern::InsufficientData, completeness_confidence)
+    } else if framework_is_vasp
+        && metric_name == "derived_vasp_oscillation_dE"
+        && *converged == Some(false)
+    {
+        (ConvergencePattern::Oscillating, completeness_confidence)
+    } else if framework_is_vasp
+        && metric_name == "derived_vasp_stall_dE"
+        && *converged == Some(false)
+    {
+        (ConvergencePattern::Stalled, completeness_confidence)
     } else {
         (
             ConvergencePattern::InsufficientData,

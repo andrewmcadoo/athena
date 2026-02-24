@@ -1,5 +1,6 @@
 use crate::adapter::{AdapterError, DslAdapter};
 use crate::common::*;
+use crate::convergence;
 use crate::event_kinds::EventKind;
 use crate::lel::*;
 
@@ -583,6 +584,9 @@ impl DslAdapter for VaspAdapter {
             }
         }
 
+        let mut derived_events =
+            convergence::derive_vasp_scf_convergence_summary(&oszicar_events, "OSZICAR");
+
         let experiment_ref = ExperimentRef {
             experiment_id: "vasp-trace".to_string(),
             cycle_id: 0,
@@ -611,6 +615,9 @@ impl DslAdapter for VaspAdapter {
             builder = builder.add_event(event);
         }
         for event in outcar_events.drain(..) {
+            builder = builder.add_event(event);
+        }
+        for event in derived_events.drain(..) {
             builder = builder.add_event(event);
         }
 

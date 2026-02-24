@@ -4350,6 +4350,8 @@ const VASP_FILE_CONVERGED_RELAXATION: &str =
     include_str!("../../testdata/vasp/converged_relaxation.vasp");
 const VASP_FILE_NONCONVERGED_SCF: &str =
     include_str!("../../testdata/vasp/nonconverged_scf.vasp");
+const VASP_FILE_OSCILLATING_SCF: &str =
+    include_str!("../../testdata/vasp/oscillating_scf.vasp");
 const VASP_FILE_MIXED_SCF_DAV_RMM: &str =
     include_str!("../../testdata/vasp/mixed_scf_dav_rmm.vasp");
 const VASP_FILE_T1_HONEYCOMB_PT52: &str = include_str!("../../testdata/vasp/t1_honeycomb_pt52.vasp");
@@ -5169,6 +5171,31 @@ fn test_vasp_variant_nonconverged_scf() {
 }
 
 #[test]
+fn test_vasp_variant_nonconverged_scf_produces_stalled() {
+    setup();
+    let adapter = VaspAdapter;
+    let log = adapter.parse_trace(VASP_FILE_NONCONVERGED_SCF).unwrap();
+    let patterns: Vec<ConvergencePattern> = classify_all_convergence(&log, "vasp")
+        .into_iter()
+        .map(|canonical| canonical.pattern)
+        .collect();
+
+    assert!(patterns.contains(&ConvergencePattern::InsufficientData));
+    assert!(patterns.contains(&ConvergencePattern::Stalled));
+}
+
+#[test]
+fn test_vasp_variant_oscillating_scf() {
+    setup();
+    assert_vasp_variant(
+        VASP_FILE_OSCILLATING_SCF,
+        &[],
+        &[ConvergencePattern::Oscillating],
+    );
+    assert_vasp_execution_status(VASP_FILE_OSCILLATING_SCF, ExecutionOutcome::Timeout);
+}
+
+#[test]
 fn test_vasp_variant_mixed_scf_dav_rmm() {
     setup();
     let oszicar = VASP_FILE_MIXED_SCF_DAV_RMM
@@ -5502,6 +5529,44 @@ fn test_classify_convergence_vasp_de_insufficient_direct() {
 }
 
 #[test]
+fn test_classify_convergence_vasp_oscillation_derived() {
+    setup();
+    let convergence = test_convergence_event(
+        "derived_vasp_oscillation_dE",
+        Some(false),
+        Completeness::Derived {
+            from_elements: vec![ElementId(52)],
+        },
+        52,
+    );
+    let log = test_log_from_events(vec![convergence]);
+    let event = log.events.first().expect("Expected ConvergencePoint");
+
+    let canonical = classify_convergence(event, "vasp", &log);
+    assert_eq!(canonical.pattern, ConvergencePattern::Oscillating);
+    assert_eq!(canonical.confidence, ConvergenceConfidence::Derived);
+}
+
+#[test]
+fn test_classify_convergence_vasp_stall_derived() {
+    setup();
+    let convergence = test_convergence_event(
+        "derived_vasp_stall_dE",
+        Some(false),
+        Completeness::Derived {
+            from_elements: vec![ElementId(53)],
+        },
+        53,
+    );
+    let log = test_log_from_events(vec![convergence]);
+    let event = log.events.first().expect("Expected ConvergencePoint");
+
+    let canonical = classify_convergence(event, "vasp", &log);
+    assert_eq!(canonical.pattern, ConvergencePattern::Stalled);
+    assert_eq!(canonical.confidence, ConvergenceConfidence::Derived);
+}
+
+#[test]
 fn test_classify_convergence_divergent_override_priority() {
     setup();
     let convergence = test_convergence_event(
@@ -5673,8 +5738,9 @@ fn test_equivalence_scenario_b_oscillating() {
         first_pattern_or_insufficient(&openmm_log, "openmm"),
         ConvergencePattern::Oscillating
     );
-    // VASP is intentionally N/A: oscillation detection here is ionic-level for MD,
-    // while VASP convergence semantics are SCF-level and represented differently.
+    // VASP SCF oscillation is covered separately via
+    // test_vasp_variant_oscillating_scf and test_classify_convergence_vasp_oscillation_derived.
+    // This equivalence scenario remains ionic-level for MD frameworks.
 }
 
 #[test]
@@ -5698,8 +5764,10 @@ fn test_equivalence_scenario_c_stalled() {
         first_pattern_or_insufficient(&openmm_log, "openmm"),
         ConvergencePattern::Stalled
     );
-    // VASP is intentionally N/A: stall detection in this prototype is not mapped
-    // from ionic-level patterns for VASP traces.
+    // VASP SCF stall is covered separately via
+    // test_vasp_variant_nonconverged_scf_produces_stalled and
+    // test_classify_convergence_vasp_stall_derived.
+    // This equivalence scenario remains ionic-level for MD frameworks.
 }
 
 #[test]
