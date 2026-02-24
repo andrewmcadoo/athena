@@ -3749,6 +3749,35 @@ fn test_gromacs_log_variant_standard_nvt_md() {
         &expected_pairs,
         ConvergencePattern::Converged,
     );
+
+    let components = parse_log(GROMACS_FILE_NVT_MD_LOG, 0)
+        .unwrap()
+        .into_iter()
+        .find_map(|event| match event.kind {
+            EventKind::EnergyRecord { components, .. } => Some(components),
+            _ => None,
+        })
+        .expect("Expected at least one EnergyRecord in NVT fixture");
+    assert_eq!(components.len(), 11);
+    for expected_name in [
+        "Bond",
+        "Angle",
+        "Proper_Dih.",
+        "LJ-14",
+        "Coulomb-14",
+        "LJ_(SR)",
+        "Coulomb_(SR)",
+        "Coul._recip.",
+        "Potential",
+        "Kinetic_En.",
+        "Pressure_(bar)",
+    ] {
+        assert!(
+            components.iter().any(|(name, _)| name == expected_name),
+            "Missing NVT component header: {}",
+            expected_name
+        );
+    }
 }
 
 /// Tier 2 (source-derived): no local Tier 1 md.log files were available; NPT terms are
