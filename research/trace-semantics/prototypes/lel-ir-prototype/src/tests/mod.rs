@@ -2526,6 +2526,53 @@ fn assert_openmm_csv_variant(
     assert_eq!(first_pattern, expected_pattern);
 }
 
+fn parse_gromacs_log_energy_pairs(log_content: &str) -> Vec<(u64, f64)> {
+    parse_log(log_content, 0)
+        .unwrap()
+        .into_iter()
+        .filter_map(|event| match event.kind {
+            EventKind::EnergyRecord {
+                total: Value::Known(total, _),
+                ..
+            } => Some((event.temporal.simulation_step, total)),
+            _ => None,
+        })
+        .collect()
+}
+
+fn assert_gromacs_log_variant(
+    log: &str,
+    expected_pairs: &[(u64, f64)],
+    expected_pattern: ConvergencePattern,
+) {
+    let parsed_pairs = parse_gromacs_log_energy_pairs(log);
+    assert_eq!(parsed_pairs.len(), expected_pairs.len());
+    for ((actual_step, actual_energy), (expected_step, expected_energy)) in
+        parsed_pairs.iter().zip(expected_pairs.iter())
+    {
+        assert_eq!(*actual_step, *expected_step);
+        assert!((*actual_energy - *expected_energy).abs() < 1e-6);
+    }
+
+    let adapter = GromacsAdapter;
+    let parsed_log = adapter.parse_trace(log).unwrap();
+    let first_pattern = classify_all_convergence(&parsed_log, "gromacs")
+        .into_iter()
+        .map(|entry| entry.pattern)
+        .next()
+        .unwrap_or(ConvergencePattern::InsufficientData);
+    assert_eq!(first_pattern, expected_pattern);
+}
+
+fn assert_gromacs_log_parses_energy_count(log: &str, count: usize) {
+    let energy_count = parse_log(log, 0)
+        .unwrap()
+        .into_iter()
+        .filter(|event| matches!(event.kind, EventKind::EnergyRecord { .. }))
+        .count();
+    assert_eq!(energy_count, count);
+}
+
 #[test]
 fn test_mock_adapter() {
     setup();
@@ -3196,6 +3243,163 @@ Energies (kJ/mol)
 Finished mdrun on rank 0
 "#;
 
+const GROMACS_FILE_NVT_MD_LOG: &str =
+    include_str!("../../testdata/gromacs_md_log/gromacs2023_nvt_md.log");
+const GROMACS_FILE_NPT_EQUILIBRATION_LOG: &str =
+    include_str!("../../testdata/gromacs_md_log/gromacs2023_npt_equilibration.log");
+const GROMACS_FILE_ENERGY_MINIMIZATION_LOG: &str =
+    include_str!("../../testdata/gromacs_md_log/gromacs2023_energy_minimization.log");
+
+const GROMACS_LOG_COMPACT_BLOCK: &str = r#"
+             :-) GROMACS - gmx mdrun, 2023.3 (-:
+Using 1 CPU
+   Step           Time
+      0        0.00000
+Energies (kJ/mol)
+   Potential   Total Energy
+-9000.0      -10000.0000
+   Step           Time
+      100        0.20000
+Energies (kJ/mol)
+   Potential   Total Energy
+-9000.3      -10000.5000
+   Step           Time
+      200        0.40000
+Energies (kJ/mol)
+   Potential   Total Energy
+-9000.5      -10000.8000
+   Step           Time
+      300        0.60000
+Energies (kJ/mol)
+   Potential   Total Energy
+-9000.6      -10000.9000
+Finished mdrun on rank 0
+"#;
+
+const GROMACS_LOG_WIDE_BLOCK: &str = r#"
+             :-) GROMACS - gmx mdrun, 2023.3 (-:
+Using 1 CPU
+   Step           Time
+      0        0.00000
+Energies (kJ/mol)
+   Bond      Angle   Proper Dih.      LJ-14   Coulomb-14      LJ (SR)
+100.0      200.0      10.0      20.0      30.0      -400.0
+   Coulomb (SR)   Coul. recip.   Potential   Kinetic En.   Total Energy   Pressure (bar)
+-500.0      50.0      -800.0      300.0      -5000.0      1.0000
+Finished mdrun on rank 0
+"#;
+
+const GROMACS_LOG_SCIENTIFIC_NOTATION: &str = r#"
+             :-) GROMACS - gmx mdrun, 2023.3 (-:
+Using 1 CPU
+   Step           Time
+      0        0.00000
+Energies (kJ/mol)
+   Potential   Total Energy
+-1.10000e+05   -1.234560e+05
+   Step           Time
+      100        0.20000
+Energies (kJ/mol)
+   Potential   Total Energy
+-1.10001e+05   -1.234570e+05
+   Step           Time
+      200        0.40000
+Energies (kJ/mol)
+   Potential   Total Energy
+-1.10002e+05   -1.234575e+05
+   Step           Time
+      300        0.60000
+Energies (kJ/mol)
+   Potential   Total Energy
+-1.10003e+05   -1.234578e+05
+Finished mdrun on rank 0
+"#;
+
+const GROMACS_LOG_TRUNCATED_MID_BLOCK: &str = r#"
+             :-) GROMACS - gmx mdrun, 2023.3 (-:
+Using 1 CPU
+   Step           Time
+      0        0.00000
+Energies (kJ/mol)
+   Potential   Total Energy
+-2000.0      -3000.0
+   Step           Time
+      100        0.20000
+Energies (kJ/mol)
+   Potential   Total Energy
+"#;
+
+const GROMACS_LOG_TAB_WHITESPACE: &str = "             :-) GROMACS - gmx mdrun, 2023.3 (-:\n\
+Using 1 CPU\n\
+   Step           Time\n\
+      0        0.00000\n\
+Energies (kJ/mol)\n\
+\tPotential\tTotal Energy\n\
+-5000.0\t-10000.0000\n\
+   Step           Time\n\
+      100        0.20000\n\
+Energies (kJ/mol)\n\
+\tPotential\tTotal Energy\n\
+-5000.1\t-10000.5000\n\
+   Step           Time\n\
+      200        0.40000\n\
+Energies (kJ/mol)\n\
+\tPotential\tTotal Energy\n\
+-5000.2\t-10000.8000\n\
+   Step           Time\n\
+      300        0.60000\n\
+Energies (kJ/mol)\n\
+\tPotential\tTotal Energy\n\
+-5000.3\t-10000.9000\n\
+Finished mdrun on rank 0\n";
+
+const GROMACS_LOG_DOUBLE_PRECISION: &str = r#"
+             :-) GROMACS - gmx mdrun, 2023.3 (-:
+Using 1 CPU
+   Step           Time
+      0        0.00000
+Energies (kJ/mol)
+   Potential   Total Energy
+-11111.123456789   -12345.123456789
+   Step           Time
+      100        0.20000
+Energies (kJ/mol)
+   Potential   Total Energy
+-11111.123556789   -12345.123956789
+   Step           Time
+      200        0.40000
+Energies (kJ/mol)
+   Potential   Total Energy
+-11111.123606789   -12345.124156789
+   Step           Time
+      300        0.60000
+Energies (kJ/mol)
+   Potential   Total Energy
+-11111.123626789   -12345.124256789
+Finished mdrun on rank 0
+"#;
+
+const GROMACS_LOG_EM_NO_TOTAL_ENERGY: &str = r#"
+             :-) GROMACS - gmx mdrun, 2023.3 (-:
+Using 1 CPU
+   Step           Time
+      0        0.00000
+Energies (kJ/mol)
+   Potential
+-180000.0
+   Step           Time
+      1        0.00000
+Energies (kJ/mol)
+   Potential
+-180050.0
+   Step           Time
+      2        0.00000
+Energies (kJ/mol)
+   Potential
+-180080.0
+Finished mdrun on rank 0
+"#;
+
 #[test]
 fn test_classify_theory_params() {
     setup();
@@ -3527,6 +3731,276 @@ fn test_parse_log_truncated() {
         other => panic!("Expected PartiallyInferred completeness, got {:?}", other),
     }
     assert!((timeout_event.confidence.field_coverage - 0.5).abs() < f32::EPSILON);
+}
+
+/// Tier 2 (source-derived): no local Tier 1 md.log files were available; fixture follows
+/// GROMACS 2023.x documented block shape and parser normalization table conventions.
+#[test]
+fn test_gromacs_log_variant_standard_nvt_md() {
+    setup();
+    let expected_pairs = [
+        (0, -10000.0000),
+        (100, -10000.5000),
+        (200, -10000.8000),
+        (300, -10000.9000),
+    ];
+    assert_gromacs_log_variant(
+        GROMACS_FILE_NVT_MD_LOG,
+        &expected_pairs,
+        ConvergencePattern::Converged,
+    );
+
+    let components = parse_log(GROMACS_FILE_NVT_MD_LOG, 0)
+        .unwrap()
+        .into_iter()
+        .find_map(|event| match event.kind {
+            EventKind::EnergyRecord { components, .. } => Some(components),
+            _ => None,
+        })
+        .expect("Expected at least one EnergyRecord in NVT fixture");
+    assert_eq!(components.len(), 11);
+    for expected_name in [
+        "Bond",
+        "Angle",
+        "Proper_Dih.",
+        "LJ-14",
+        "Coulomb-14",
+        "LJ_(SR)",
+        "Coulomb_(SR)",
+        "Coul._recip.",
+        "Potential",
+        "Kinetic_En.",
+        "Pressure_(bar)",
+    ] {
+        assert!(
+            components.iter().any(|(name, _)| name == expected_name),
+            "Missing NVT component header: {}",
+            expected_name
+        );
+    }
+}
+
+/// Tier 2 (source-derived): no local Tier 1 md.log files were available; NPT terms are
+/// hyphenated single-token headers consistent with GROMACS 2023.x log formatting.
+#[test]
+fn test_gromacs_log_variant_npt_equilibration() {
+    setup();
+    let expected_pairs = [
+        (0, -9000.0000),
+        (100, -9000.4500),
+        (200, -9000.7000),
+        (300, -9000.8500),
+    ];
+    assert_gromacs_log_variant(
+        GROMACS_FILE_NPT_EQUILIBRATION_LOG,
+        &expected_pairs,
+        ConvergencePattern::Converged,
+    );
+
+    let events = parse_log(GROMACS_FILE_NPT_EQUILIBRATION_LOG, 0).unwrap();
+    let components = events
+        .iter()
+        .find_map(|event| match &event.kind {
+            EventKind::EnergyRecord { components, .. } => Some(components),
+            _ => None,
+        })
+        .expect("Expected at least one EnergyRecord in NPT fixture");
+
+    for expected_name in [
+        "Volume", "Density", "Pres-XX", "Pres-YY", "Pres-ZZ", "Pres-XY", "Pres-XZ", "Pres-YZ",
+        "Box-XX", "Box-YY", "Box-ZZ",
+    ] {
+        assert!(
+            components.iter().any(|(name, _)| name == expected_name),
+            "Missing NPT component header: {}",
+            expected_name
+        );
+    }
+}
+
+/// Tier 2 (source-derived): no local Tier 1 md.log files were available; fixture models
+/// steep minimization blocks where Potential is present and Total Energy is absent.
+#[test]
+fn test_gromacs_log_variant_energy_minimization() {
+    setup();
+    assert_gromacs_log_parses_energy_count(GROMACS_FILE_ENERGY_MINIMIZATION_LOG, 0);
+    assert_gromacs_log_variant(
+        GROMACS_FILE_ENERGY_MINIMIZATION_LOG,
+        &[],
+        ConvergencePattern::InsufficientData,
+    );
+
+    let warning_count = parse_log(GROMACS_FILE_ENERGY_MINIMIZATION_LOG, 0)
+        .unwrap()
+        .into_iter()
+        .filter(|event| {
+            matches!(
+                event.kind,
+                EventKind::NumericalStatus {
+                    event_type: NumericalEventType::ConvergenceFailure,
+                    severity: Severity::Warning,
+                    ..
+                }
+            )
+        })
+        .count();
+    assert!(warning_count >= 1);
+}
+
+/// Tier 2 (source-derived): compact two-column energy block variant synthesized from
+/// canonical GROMACS 2023.x energy block structure.
+#[test]
+fn test_gromacs_log_variant_compact_block() {
+    setup();
+    let expected_pairs = [
+        (0, -10000.0000),
+        (100, -10000.5000),
+        (200, -10000.8000),
+        (300, -10000.9000),
+    ];
+    assert_gromacs_log_variant(
+        GROMACS_LOG_COMPACT_BLOCK,
+        &expected_pairs,
+        ConvergencePattern::Converged,
+    );
+}
+
+/// Tier 2 (source-derived): wide multi-row energy block synthesized from canonical
+/// GROMACS 2023.x block formatting to stress header/value alignment.
+#[test]
+fn test_gromacs_log_variant_wide_block() {
+    setup();
+    assert_gromacs_log_parses_energy_count(GROMACS_LOG_WIDE_BLOCK, 1);
+    assert_gromacs_log_variant(
+        GROMACS_LOG_WIDE_BLOCK,
+        &[(0, -5000.0)],
+        ConvergencePattern::InsufficientData,
+    );
+
+    let components = parse_log(GROMACS_LOG_WIDE_BLOCK, 0)
+        .unwrap()
+        .into_iter()
+        .find_map(|event| match event.kind {
+            EventKind::EnergyRecord { components, .. } => Some(components),
+            _ => None,
+        })
+        .expect("Expected wide-block EnergyRecord");
+    assert_eq!(components.len(), 11);
+    for expected_name in [
+        "Bond",
+        "Angle",
+        "Proper_Dih.",
+        "LJ-14",
+        "Coulomb-14",
+        "LJ_(SR)",
+        "Coulomb_(SR)",
+        "Coul._recip.",
+        "Potential",
+        "Kinetic_En.",
+        "Pressure_(bar)",
+    ] {
+        assert!(
+            components.iter().any(|(name, _)| name == expected_name),
+            "Missing component {} in wide block",
+            expected_name
+        );
+    }
+}
+
+/// Tier 2 (source-derived): scientific notation values synthesized to match GROMACS
+/// numeric formatting and verify f64 parsing behavior.
+#[test]
+fn test_gromacs_log_variant_scientific_notation() {
+    setup();
+    let expected_pairs = [
+        (0, -1.234560e+05),
+        (100, -1.234570e+05),
+        (200, -1.234575e+05),
+        (300, -1.234578e+05),
+    ];
+    assert_gromacs_log_variant(
+        GROMACS_LOG_SCIENTIFIC_NOTATION,
+        &expected_pairs,
+        ConvergencePattern::Converged,
+    );
+}
+
+/// Tier 2 (source-derived): truncated block fixture synthesized to verify parser recovery
+/// when EOF occurs after headers but before value rows.
+#[test]
+fn test_gromacs_log_variant_truncated_mid_block() {
+    setup();
+    assert_gromacs_log_parses_energy_count(GROMACS_LOG_TRUNCATED_MID_BLOCK, 1);
+    assert_gromacs_log_variant(
+        GROMACS_LOG_TRUNCATED_MID_BLOCK,
+        &[(0, -3000.0)],
+        ConvergencePattern::InsufficientData,
+    );
+}
+
+/// Tier 2 (source-derived): tab-delimited header spacing synthesized from canonical
+/// GROMACS headers to verify non-space whitespace tokenization.
+#[test]
+fn test_gromacs_log_variant_tab_whitespace() {
+    setup();
+    let expected_pairs = [
+        (0, -10000.0000),
+        (100, -10000.5000),
+        (200, -10000.8000),
+        (300, -10000.9000),
+    ];
+    assert_gromacs_log_variant(
+        GROMACS_LOG_TAB_WHITESPACE,
+        &expected_pairs,
+        ConvergencePattern::Converged,
+    );
+}
+
+/// Tier 2 (source-derived): double-precision decimal fixture synthesized from canonical
+/// GROMACS block formatting to verify 9+ decimal-place parsing.
+#[test]
+fn test_gromacs_log_variant_double_precision() {
+    setup();
+    let expected_pairs = [
+        (0, -12345.123456789),
+        (100, -12345.123956789),
+        (200, -12345.124156789),
+        (300, -12345.124256789),
+    ];
+    assert_gromacs_log_variant(
+        GROMACS_LOG_DOUBLE_PRECISION,
+        &expected_pairs,
+        ConvergencePattern::Converged,
+    );
+}
+
+/// Tier 2 (source-derived): EM-style no-total-energy fixture synthesized from canonical
+/// energy block format; documents current prototype limitation for EM convergence.
+#[test]
+fn test_gromacs_log_variant_em_no_total_energy() {
+    setup();
+    assert_gromacs_log_parses_energy_count(GROMACS_LOG_EM_NO_TOTAL_ENERGY, 0);
+    assert_gromacs_log_variant(
+        GROMACS_LOG_EM_NO_TOTAL_ENERGY,
+        &[],
+        ConvergencePattern::InsufficientData,
+    );
+
+    let warning_count = parse_log(GROMACS_LOG_EM_NO_TOTAL_ENERGY, 0)
+        .unwrap()
+        .into_iter()
+        .filter(|event| {
+            matches!(
+                event.kind,
+                EventKind::NumericalStatus {
+                    event_type: NumericalEventType::ConvergenceFailure,
+                    severity: Severity::Warning,
+                    ..
+                }
+            )
+        })
+        .count();
+    assert!(warning_count >= 1);
 }
 
 #[test]

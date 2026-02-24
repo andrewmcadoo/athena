@@ -45,7 +45,7 @@ athena/
 │   │   ├── FINDINGS.md
 │   │   ├── dsl-evaluation/             # DSL trace format surveys
 │   │   └── prototypes/
-│   │       └── lel-ir-prototype/       # LEL+DGR Hybrid IR Rust crate (100/100 tests)
+│   │       └── lel-ir-prototype/       # LEL+DGR Hybrid IR Rust crate
 │   ├── adversarial-reward/             # Priority 2: Epistemic info gain formalization
 │   │   ├── FINDINGS.md
 │   │   ├── governance/

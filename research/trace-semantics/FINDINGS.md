@@ -17,7 +17,7 @@ What intermediate representation (IR) can translate raw DSL trace logs from stru
 
 ## Status
 
-IN PROGRESS — Steps 1-7 and all synthesis steps (1d, 2c, 3b) complete. Step 5a (candidate IR schemas) complete: Hybrid LEL+DGR recommended (94/100). Step 5b (LEL prototype) complete. Step 5c (open thread resolution) complete: 5/5 threads resolved/narrowed/deferred with evidence. Step 6 (Hybrid LEL+DGR Phase 2 prototype) complete: `by_id` index implemented, `CausalOverlay` + R14 confounder query implemented. Step 7 (R17+R18 query implementation) complete: `compare_predictions` + `implicate_causal_nodes` implemented with depth-aware BFS helper. Step 9 complete: GROMACS adapter implemented on existing LEL types (`src/gromacs_adapter.rs`). Step 10 complete: VASP adapter implemented on existing LEL types (`src/vasp_adapter.rs`) with first adapter-level use of `ConvergencePoint` and `StateSnapshot`. Step 11 complete: hidden confounder prototype litmus validated end-to-end on VASP-derived traces. Step 12 complete: R17 quantitative comparison formalization narrowed with a trace-semantics-to-adversarial-reward interface contract. Step 13 complete (NARROWED): convergence trajectory representation recommends a hybrid raw-plus-summary design (Option D) with ComparisonProfileV1-compatible outputs and explicit WDK#40 hook. Step 14 complete (NARROWED): minimal `UncertaintySummary` schema direction selected (layered point summary + optional tagged distribution payload) with six-consumer trace and cross-adapter feasibility evidence. Session 19 added WDK#41 bookkeeping closure and WDK#43 prototype derivation rules for GROMACS/OpenMM convergence summaries. Session 20 resolved WDK#42 and WDK#44 in prototype scope via shared convergence derivation extraction, canonical taxonomy projection, OpenMM CSV support, and cross-framework equivalence tests. Session 21 validated OpenMM CSV parser behavior against real StateDataReporter variant fixtures and closed Session 20 open thread #1. Crate now passes 128/128 tests with strict clippy clean.
+IN PROGRESS — Steps 1-7 and all synthesis steps (1d, 2c, 3b) complete. Step 5a (candidate IR schemas) complete: Hybrid LEL+DGR recommended (94/100). Step 5b (LEL prototype) complete. Step 5c (open thread resolution) complete: 5/5 threads resolved/narrowed/deferred with evidence. Step 6 (Hybrid LEL+DGR Phase 2 prototype) complete: `by_id` index implemented, `CausalOverlay` + R14 confounder query implemented. Step 7 (R17+R18 query implementation) complete: `compare_predictions` + `implicate_causal_nodes` implemented with depth-aware BFS helper. Step 9 complete: GROMACS adapter implemented on existing LEL types (`src/gromacs_adapter.rs`). Step 10 complete: VASP adapter implemented on existing LEL types (`src/vasp_adapter.rs`) with first adapter-level use of `ConvergencePoint` and `StateSnapshot`. Step 11 complete: hidden confounder prototype litmus validated end-to-end on VASP-derived traces. Step 12 complete: R17 quantitative comparison formalization narrowed with a trace-semantics-to-adversarial-reward interface contract. Step 13 complete (NARROWED): convergence trajectory representation recommends a hybrid raw-plus-summary design (Option D) with ComparisonProfileV1-compatible outputs and explicit WDK#40 hook. Step 14 complete (NARROWED): minimal `UncertaintySummary` schema direction selected (layered point summary + optional tagged distribution payload) with six-consumer trace and cross-adapter feasibility evidence. Session 19 added WDK#41 bookkeeping closure and WDK#43 prototype derivation rules for GROMACS/OpenMM convergence summaries. Session 20 resolved WDK#42 and WDK#44 in prototype scope via shared convergence derivation extraction, canonical taxonomy projection, OpenMM CSV support, and cross-framework equivalence tests. Session 21 validated OpenMM CSV parser behavior against real StateDataReporter variant fixtures and closed Session 20 open thread #1. Session 22 validated GROMACS md.log parser behavior against a Tier 2 source-derived variant corpus (file and inline fixtures), including NPT and EM-no-total-energy cases. Crate now passes 138/138 tests with strict clippy clean.
 
 ## Key Definitions
 
@@ -64,37 +64,86 @@ IN PROGRESS — Steps 1-7 and all synthesis steps (1d, 2c, 3b) complete. Step 5a
 
 ## Investigation Log
 
-> **Investigation Log Index** — 27 entries, reverse chronological.
+> **Investigation Log Index** — 28 entries, reverse chronological.
 >
 > | # | Date | Identifier | Scope |
 > | :--- | :--- | :--- | :--- |
-> | 1 | 2026-02-24 | Session 21 | OpenMM StateDataReporter CSV reality-check variants |
-> | 2 | 2026-02-23 | Session 20 | WDK#42 canonical taxonomy + WDK#44 placement decision + OpenMM CSV validation |
-> | 3 | 2026-02-24 | Session 19 | WDK#41 closure + WDK#43 convergence-summary derivation |
-> | 4 | 2026-02-21 | WDK#26 | INCAR classification table completeness |
-> | 5 | 2026-02-21 | WDK#25 | VASP closed-source observability ceiling |
-> | 6 | 2026-02-21 | WDK#39 | prediction_id type harmonization |
-> | 7 | 2026-02-21 | WDK#35 + WDK#36 | ContractTerm value extensions for VASP |
-> | 8 | 2026-02-22 | Step 14 | UncertaintySummary schema for divergence metrics |
-> | 9 | 2026-02-22 | Step 13 | Convergence trajectory representation |
-> | 10 | 2026-02-22 | Step 12 | R17 comparison formalization and interface contract |
-> | 11 | 2026-02-22 | Step 11 | Hidden confounder prototype litmus test |
-> | 12 | 2026-02-22 | Step 10 | VASP adapter implementation |
-> | 13 | 2026-02-21 | Step 9 | GROMACS adapter for cross-framework validation |
-> | 14 | 2026-02-21 | Step 7 | R17+R18 query implementation |
-> | 15 | 2026-02-21 | Step 6 | Hybrid LEL+DGR Phase 2 prototype |
-> | 16 | 2026-02-21 | Step 5c | Open thread resolution |
-> | 17 | 2026-02-20 | Step 5a | Candidate IR schemas with Hybrid recommendation |
-> | 18 | 2026-02-20 | Step 3b | Requirements coverage matrix and gap analysis |
-> | 19 | 2026-02-20 | Step 2c | Comparative IR synthesis |
-> | 20 | 2026-02-20 | Step 1d | Cross-framework trace synthesis |
-> | 21 | 2026-02-20 | — | 21% RCA baseline characterization |
-> | 22 | 2026-02-20 | — | LFI audit to IR requirements mapping |
-> | 23 | 2026-02-20 | — | Provenance and scientific workflow IR survey |
-> | 24 | 2026-02-20 | Entry 1 | RCA and formal verification IR survey |
-> | 25 | 2026-02-20 | Entry 001 | VASP trace output system survey |
-> | 26 | 2026-02-20 | — | GROMACS trace format characterization |
-> | 27 | 2026-02-20 | — | OpenMM trace format characterization |
+> | 1 | 2026-02-23 | Session 22 | GROMACS md.log reality-check variants |
+> | 2 | 2026-02-24 | Session 21 | OpenMM StateDataReporter CSV reality-check variants |
+> | 3 | 2026-02-23 | Session 20 | WDK#42 canonical taxonomy + WDK#44 placement decision + OpenMM CSV validation |
+> | 4 | 2026-02-24 | Session 19 | WDK#41 closure + WDK#43 convergence-summary derivation |
+> | 5 | 2026-02-21 | WDK#26 | INCAR classification table completeness |
+> | 6 | 2026-02-21 | WDK#25 | VASP closed-source observability ceiling |
+> | 7 | 2026-02-21 | WDK#39 | prediction_id type harmonization |
+> | 8 | 2026-02-21 | WDK#35 + WDK#36 | ContractTerm value extensions for VASP |
+> | 9 | 2026-02-22 | Step 14 | UncertaintySummary schema for divergence metrics |
+> | 10 | 2026-02-22 | Step 13 | Convergence trajectory representation |
+> | 11 | 2026-02-22 | Step 12 | R17 comparison formalization and interface contract |
+> | 12 | 2026-02-22 | Step 11 | Hidden confounder prototype litmus test |
+> | 13 | 2026-02-22 | Step 10 | VASP adapter implementation |
+> | 14 | 2026-02-21 | Step 9 | GROMACS adapter for cross-framework validation |
+> | 15 | 2026-02-21 | Step 7 | R17+R18 query implementation |
+> | 16 | 2026-02-21 | Step 6 | Hybrid LEL+DGR Phase 2 prototype |
+> | 17 | 2026-02-21 | Step 5c | Open thread resolution |
+> | 18 | 2026-02-20 | Step 5a | Candidate IR schemas with Hybrid recommendation |
+> | 19 | 2026-02-20 | Step 3b | Requirements coverage matrix and gap analysis |
+> | 20 | 2026-02-20 | Step 2c | Comparative IR synthesis |
+> | 21 | 2026-02-20 | Step 1d | Cross-framework trace synthesis |
+> | 22 | 2026-02-20 | — | 21% RCA baseline characterization |
+> | 23 | 2026-02-20 | — | LFI audit to IR requirements mapping |
+> | 24 | 2026-02-20 | — | Provenance and scientific workflow IR survey |
+> | 25 | 2026-02-20 | Entry 1 | RCA and formal verification IR survey |
+> | 26 | 2026-02-20 | Entry 001 | VASP trace output system survey |
+> | 27 | 2026-02-20 | — | GROMACS trace format characterization |
+> | 28 | 2026-02-20 | — | OpenMM trace format characterization |
+
+### 2026-02-23: Session 22 — GROMACS md.log Reality-Check Variants
+**Date:** 2026-02-23
+**Scope:** Validate `gromacs_adapter::parse_log` and end-to-end convergence classification against a format-variant corpus for GROMACS 2023.x `md.log` energy blocks, using Session 21 reality-check methodology and minimal-fix discipline.
+**Method:** (1) Re-ran baseline gates (`cargo test`, `cargo clippy -- -D warnings`) and confirmed 128/128 pass pre-change, (2) searched local filesystem for real GROMACS logs under repo paths and common local locations and found none suitable for reuse, (3) added three file fixtures under `testdata/gromacs_md_log/` and seven inline variant fixtures in `src/tests/mod.rs`, (4) added helper assertions for parser-tier extraction and adapter-tier convergence classification, (5) added ten `test_gromacs_log_variant_*` tests with explicit source-tier provenance in doc comments, (6) ran full gates after each modification.
+
+**Findings:**
+
+1. **No Tier 1 local real md.log fixtures were discoverable; Session 22 executed with Tier 2 source-derived fixtures only.** Local search across repository paths and common temp/home locations produced no reusable real GROMACS md.log traces.  
+   Evidence: local search commands in session shell history; fixture provenance notes in `research/trace-semantics/prototypes/lel-ir-prototype/src/tests/mod.rs`.
+
+2. **Tier 2 `standard_nvt_md` variant passed parser extraction and end-to-end convergence classification.** `parse_log` extracted expected `(step,total_energy)` pairs and `GromacsAdapter.parse_trace` + `classify_all_convergence` produced `Converged`.  
+   Evidence: fixture `research/trace-semantics/prototypes/lel-ir-prototype/testdata/gromacs_md_log/gromacs2023_nvt_md.log`; test `.../src/tests/mod.rs::test_gromacs_log_variant_standard_nvt_md`.
+
+3. **Tier 2 `npt_equilibration` variant passed with NPT-specific components present.** Extraction/classification passed (`Converged`), and parsed components explicitly include `Volume`, `Density`, `Pres-*`, and `Box-*` headers.  
+   Evidence: fixture `research/trace-semantics/prototypes/lel-ir-prototype/testdata/gromacs_md_log/gromacs2023_npt_equilibration.log`; test `.../src/tests/mod.rs::test_gromacs_log_variant_npt_equilibration`.
+
+4. **Tier 2 energy-minimization variants confirm current EM limitation behavior without semantic reinterpretation.** For both file fixture and inline EM fixture, parser emits zero `EnergyRecord` events when `Total Energy` is absent and emits `NumericalStatus::ConvergenceFailure` warnings; end-to-end canonical output remains `InsufficientData`.  
+   Evidence: fixture `research/trace-semantics/prototypes/lel-ir-prototype/testdata/gromacs_md_log/gromacs2023_energy_minimization.log`; inline fixture `GROMACS_LOG_EM_NO_TOTAL_ENERGY`; tests `...::test_gromacs_log_variant_energy_minimization`, `...::test_gromacs_log_variant_em_no_total_energy`.
+
+5. **Tier 2 compact/scientific/double-precision variants passed extraction + convergence checks.** Compact two-column blocks, scientific notation (`e` format), and 9+ decimal values all parse to expected pairs and classify as `Converged`.  
+   Evidence: inline fixtures `GROMACS_LOG_COMPACT_BLOCK`, `GROMACS_LOG_SCIENTIFIC_NOTATION`, `GROMACS_LOG_DOUBLE_PRECISION`; tests `...::test_gromacs_log_variant_compact_block`, `...::test_gromacs_log_variant_scientific_notation`, `...::test_gromacs_log_variant_double_precision`.
+
+6. **Tier 2 wide-block variant passed multi-row header alignment checks.** A 12-header (2x6) block yields one energy record and retains expected component labels across both rows.  
+   Evidence: inline fixture `GROMACS_LOG_WIDE_BLOCK`; test `...::test_gromacs_log_variant_wide_block`.
+
+7. **Tier 2 truncated-mid-block variant passed incomplete-block recovery behavior.** Parser preserves first complete block, ignores trailing incomplete block, and end-to-end classification is `InsufficientData`.  
+   Evidence: inline fixture `GROMACS_LOG_TRUNCATED_MID_BLOCK`; test `...::test_gromacs_log_variant_truncated_mid_block`.
+
+8. **Tier 2 tab-whitespace variant passed without parser changes.** Header parsing with tab-separated columns succeeded in current implementation under this corpus; expected pairs and `Converged` classification matched.  
+   Evidence: inline fixture `GROMACS_LOG_TAB_WHITESPACE`; test `...::test_gromacs_log_variant_tab_whitespace`.
+
+9. **No parser fix was required in Session 22; `gromacs_adapter.rs` changed by 0 lines.** The anticipated tab normalization patch was not needed based on observed test outcomes in this corpus.  
+   Evidence: git diff for `research/trace-semantics/prototypes/lel-ir-prototype/src/gromacs_adapter.rs` (no changes); full test pass.
+
+10. **Prototype gates remained clean with expanded GROMACS reality-check coverage.** Test suite now passes 138/138 with strict clippy warning-free.  
+    Evidence: `cargo test`; `cargo clippy -- -D warnings`.
+
+**Implications:**
+
+- Session 22 closes the GROMACS parser reality-check thread for prototype scope with explicit Tier 2 provenance.
+- GROMACS variant coverage now matches Session 21 dual-tier methodology expectations (parser extraction + end-to-end canonical pattern checks).
+- EM no-total-energy handling remains intentionally unchanged and explicitly documented as a semantic-design open thread.
+
+**Open Threads:**
+
+1. If Tier 1 real-world GROMACS logs become available, rerun the same variant matrix with real fixtures and update source-tier provenance.
+2. EM semantics decision remains deferred: whether `Potential` should substitute for missing `Total Energy` in convergence derivation requires explicit design approval.
 
 ### 2026-02-24: Session 21 — OpenMM StateDataReporter CSV Reality-Check Variants
 **Date:** 2026-02-24
@@ -1880,6 +1929,10 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 
 83. **Session 20 open thread #1 is closed: OpenMM CSV parsing is now validated against a real- and source-backed variant corpus covering reordered columns, optional/minimal columns, quoting variants, BOM/CRLF, and trailing-column edge behavior.** Real OpenMM 8.4 fixtures demonstrate reporter-native behavior for reordered/optional/minimal/quoted/CRLF/BOM cases; source-derived fixtures document non-native variants (`kcal/mol`, unquoted header, empty trailing columns). Minimal parser hardening for BOM and unquoted-header detection keeps the dual-mode CSV/whitespace architecture intact. [Session 21 log 2026-02-24; `lel-ir-prototype/testdata/openmm_state_datareporter/*.csv`; `lel-ir-prototype/src/adapter.rs`; `lel-ir-prototype/src/tests/mod.rs`; `https://docs.openmm.org/latest/api-python/generated/openmm.app.statedatareporter.StateDataReporter.html`; `https://raw.githubusercontent.com/openmm/openmm/master/wrappers/python/openmm/app/statedatareporter.py`]
 
+84. **GROMACS md.log parser behavior is now validated against a source-derived variant corpus spanning standard NVT, NPT-expanded blocks, compact/wide blocks, scientific notation, truncated blocks, tab whitespace, and double-precision numeric formats.** All Session 22 variants passed parser extraction and canonical end-to-end convergence checks under current adapter logic. [Session 22 log 2026-02-23; `lel-ir-prototype/testdata/gromacs_md_log/*.log`; `lel-ir-prototype/src/tests/mod.rs`]
+
+85. **Energy minimization runs without `Total Energy` are now explicitly characterized as a known limitation path rather than silent parser loss.** Current behavior emits `NumericalStatus::ConvergenceFailure` warnings and no convergence-summary `EnergyRecord` points; canonical output is `InsufficientData` until semantics are intentionally revised. [Session 22 log 2026-02-23; `lel-ir-prototype/src/gromacs_adapter.rs`; `lel-ir-prototype/src/tests/mod.rs`]
+
 ### What We Suspect
 
 **DSL Trace Architecture**
@@ -1935,6 +1988,8 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 22. **Classification tables for new DSL frameworks may be partially automatable** via LLM-assisted documentation analysis, reducing the per-DSL engineering cost. Untested. [Cross-framework synthesis log 2026-02-20; cross-framework-synthesis.md §6.4]
 
 23. **The adapter optional methods (validate_silent_failures, extract_scf_convergence, etc.) may evolve into mandatory requirements** as empirical testing reveals which framework-specific data is essential for correct fault classification. [Cross-framework synthesis log 2026-02-20; cross-framework-synthesis.md §5.3]
+
+24. **Treating GROMACS EM `Potential` as a convergence surrogate for missing `Total Energy` may improve practical convergence classification, but risks semantic drift across frameworks.** Current evidence supports documenting the gap, not changing semantics without explicit cross-framework contract review. [Session 22 log 2026-02-23; `lel-ir-prototype/src/gromacs_adapter.rs`; `lel-ir-prototype/src/tests/mod.rs`]
 
 
 ### What We Don't Know
