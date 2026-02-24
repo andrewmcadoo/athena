@@ -17,7 +17,7 @@ What intermediate representation (IR) can translate raw DSL trace logs from stru
 
 ## Status
 
-IN PROGRESS — Steps 1-7 and all synthesis steps (1d, 2c, 3b) complete. Step 5a (candidate IR schemas) complete: Hybrid LEL+DGR recommended (94/100). Step 5b (LEL prototype) complete. Step 5c (open thread resolution) complete: 5/5 threads resolved/narrowed/deferred with evidence. Step 6 (Hybrid LEL+DGR Phase 2 prototype) complete: `by_id` index implemented, `CausalOverlay` + R14 confounder query implemented. Step 7 (R17+R18 query implementation) complete: `compare_predictions` + `implicate_causal_nodes` implemented with depth-aware BFS helper. Step 9 complete: GROMACS adapter implemented on existing LEL types (`src/gromacs_adapter.rs`). Step 10 complete: VASP adapter implemented on existing LEL types (`src/vasp_adapter.rs`) with first adapter-level use of `ConvergencePoint` and `StateSnapshot`. Step 11 complete: hidden confounder prototype litmus validated end-to-end on VASP-derived traces. Step 12 complete: R17 quantitative comparison formalization narrowed with a trace-semantics-to-adversarial-reward interface contract. Step 13 complete (NARROWED): convergence trajectory representation recommends a hybrid raw-plus-summary design (Option D) with ComparisonProfileV1-compatible outputs and explicit WDK#40 hook. Step 14 complete (NARROWED): minimal `UncertaintySummary` schema direction selected (layered point summary + optional tagged distribution payload) with six-consumer trace and cross-adapter feasibility evidence. Session 19 added WDK#41 bookkeeping closure and WDK#43 prototype derivation rules for GROMACS/OpenMM convergence summaries. Session 20 resolved WDK#42 and WDK#44 in prototype scope via shared convergence derivation extraction, canonical taxonomy projection, OpenMM CSV support, and cross-framework equivalence tests. Session 21 validated OpenMM CSV parser behavior against real StateDataReporter variant fixtures and closed Session 20 open thread #1. Session 22 validated GROMACS md.log parser behavior against a Tier 2 source-derived variant corpus (file and inline fixtures), including NPT and EM-no-total-energy cases. Crate now passes 138/138 tests with strict clippy clean.
+IN PROGRESS — Steps 1-7 and all synthesis steps (1d, 2c, 3b) complete. Step 5a (candidate IR schemas) complete: Hybrid LEL+DGR recommended (94/100). Step 5b (LEL prototype) complete. Step 5c (open thread resolution) complete: 5/5 threads resolved/narrowed/deferred with evidence. Step 6 (Hybrid LEL+DGR Phase 2 prototype) complete: `by_id` index implemented, `CausalOverlay` + R14 confounder query implemented. Step 7 (R17+R18 query implementation) complete: `compare_predictions` + `implicate_causal_nodes` implemented with depth-aware BFS helper. Step 9 complete: GROMACS adapter implemented on existing LEL types (`src/gromacs_adapter.rs`). Step 10 complete: VASP adapter implemented on existing LEL types (`src/vasp_adapter.rs`) with first adapter-level use of `ConvergencePoint` and `StateSnapshot`. Step 11 complete: hidden confounder prototype litmus validated end-to-end on VASP-derived traces. Step 12 complete: R17 quantitative comparison formalization narrowed with a trace-semantics-to-adversarial-reward interface contract. Step 13 complete (NARROWED): convergence trajectory representation recommends a hybrid raw-plus-summary design (Option D) with ComparisonProfileV1-compatible outputs and explicit WDK#40 hook. Step 14 complete (NARROWED): minimal `UncertaintySummary` schema direction selected (layered point summary + optional tagged distribution payload) with six-consumer trace and cross-adapter feasibility evidence. Session 19 added WDK#41 bookkeeping closure and WDK#43 prototype derivation rules for GROMACS/OpenMM convergence summaries. Session 20 resolved WDK#42 and WDK#44 in prototype scope via shared convergence derivation extraction, canonical taxonomy projection, OpenMM CSV support, and cross-framework equivalence tests. Session 21 validated OpenMM CSV parser behavior against real StateDataReporter variant fixtures and closed Session 20 open thread #1. Session 22 validated GROMACS md.log parser behavior against a Tier 2 source-derived variant corpus (file and inline fixtures), including NPT and EM-no-total-energy cases. Session 23 validated VASP INCAR/OSZICAR/OUTCAR parser behavior against a Tier 2 variant corpus and completed cross-framework parser reality-check coverage (OpenMM -> GROMACS -> VASP). Crate now passes 148/148 tests with strict clippy clean.
 
 ## Key Definitions
 
@@ -64,38 +64,88 @@ IN PROGRESS — Steps 1-7 and all synthesis steps (1d, 2c, 3b) complete. Step 5a
 
 ## Investigation Log
 
-> **Investigation Log Index** — 28 entries, reverse chronological.
+> **Investigation Log Index** — 29 entries, reverse chronological.
 >
 > | # | Date | Identifier | Scope |
 > | :--- | :--- | :--- | :--- |
-> | 1 | 2026-02-23 | Session 22 | GROMACS md.log reality-check variants |
-> | 2 | 2026-02-24 | Session 21 | OpenMM StateDataReporter CSV reality-check variants |
-> | 3 | 2026-02-23 | Session 20 | WDK#42 canonical taxonomy + WDK#44 placement decision + OpenMM CSV validation |
-> | 4 | 2026-02-24 | Session 19 | WDK#41 closure + WDK#43 convergence-summary derivation |
-> | 5 | 2026-02-21 | WDK#26 | INCAR classification table completeness |
-> | 6 | 2026-02-21 | WDK#25 | VASP closed-source observability ceiling |
-> | 7 | 2026-02-21 | WDK#39 | prediction_id type harmonization |
-> | 8 | 2026-02-21 | WDK#35 + WDK#36 | ContractTerm value extensions for VASP |
-> | 9 | 2026-02-22 | Step 14 | UncertaintySummary schema for divergence metrics |
-> | 10 | 2026-02-22 | Step 13 | Convergence trajectory representation |
-> | 11 | 2026-02-22 | Step 12 | R17 comparison formalization and interface contract |
-> | 12 | 2026-02-22 | Step 11 | Hidden confounder prototype litmus test |
-> | 13 | 2026-02-22 | Step 10 | VASP adapter implementation |
-> | 14 | 2026-02-21 | Step 9 | GROMACS adapter for cross-framework validation |
-> | 15 | 2026-02-21 | Step 7 | R17+R18 query implementation |
-> | 16 | 2026-02-21 | Step 6 | Hybrid LEL+DGR Phase 2 prototype |
-> | 17 | 2026-02-21 | Step 5c | Open thread resolution |
-> | 18 | 2026-02-20 | Step 5a | Candidate IR schemas with Hybrid recommendation |
-> | 19 | 2026-02-20 | Step 3b | Requirements coverage matrix and gap analysis |
-> | 20 | 2026-02-20 | Step 2c | Comparative IR synthesis |
-> | 21 | 2026-02-20 | Step 1d | Cross-framework trace synthesis |
-> | 22 | 2026-02-20 | — | 21% RCA baseline characterization |
-> | 23 | 2026-02-20 | — | LFI audit to IR requirements mapping |
-> | 24 | 2026-02-20 | — | Provenance and scientific workflow IR survey |
-> | 25 | 2026-02-20 | Entry 1 | RCA and formal verification IR survey |
-> | 26 | 2026-02-20 | Entry 001 | VASP trace output system survey |
-> | 27 | 2026-02-20 | — | GROMACS trace format characterization |
-> | 28 | 2026-02-20 | — | OpenMM trace format characterization |
+> | 1 | 2026-02-23 | Session 23 | VASP parser reality-check variants |
+> | 2 | 2026-02-23 | Session 22 | GROMACS md.log reality-check variants |
+> | 3 | 2026-02-24 | Session 21 | OpenMM StateDataReporter CSV reality-check variants |
+> | 4 | 2026-02-23 | Session 20 | WDK#42 canonical taxonomy + WDK#44 placement decision + OpenMM CSV validation |
+> | 5 | 2026-02-24 | Session 19 | WDK#41 closure + WDK#43 convergence-summary derivation |
+> | 6 | 2026-02-21 | WDK#26 | INCAR classification table completeness |
+> | 7 | 2026-02-21 | WDK#25 | VASP closed-source observability ceiling |
+> | 8 | 2026-02-21 | WDK#39 | prediction_id type harmonization |
+> | 9 | 2026-02-21 | WDK#35 + WDK#36 | ContractTerm value extensions for VASP |
+> | 10 | 2026-02-22 | Step 14 | UncertaintySummary schema for divergence metrics |
+> | 11 | 2026-02-22 | Step 13 | Convergence trajectory representation |
+> | 12 | 2026-02-22 | Step 12 | R17 comparison formalization and interface contract |
+> | 13 | 2026-02-22 | Step 11 | Hidden confounder prototype litmus test |
+> | 14 | 2026-02-22 | Step 10 | VASP adapter implementation |
+> | 15 | 2026-02-21 | Step 9 | GROMACS adapter for cross-framework validation |
+> | 16 | 2026-02-21 | Step 7 | R17+R18 query implementation |
+> | 17 | 2026-02-21 | Step 6 | Hybrid LEL+DGR Phase 2 prototype |
+> | 18 | 2026-02-21 | Step 5c | Open thread resolution |
+> | 19 | 2026-02-20 | Step 5a | Candidate IR schemas with Hybrid recommendation |
+> | 20 | 2026-02-20 | Step 3b | Requirements coverage matrix and gap analysis |
+> | 21 | 2026-02-20 | Step 2c | Comparative IR synthesis |
+> | 22 | 2026-02-20 | Step 1d | Cross-framework trace synthesis |
+> | 23 | 2026-02-20 | — | 21% RCA baseline characterization |
+> | 24 | 2026-02-20 | — | LFI audit to IR requirements mapping |
+> | 25 | 2026-02-20 | — | Provenance and scientific workflow IR survey |
+> | 26 | 2026-02-20 | Entry 1 | RCA and formal verification IR survey |
+> | 27 | 2026-02-20 | Entry 001 | VASP trace output system survey |
+> | 28 | 2026-02-20 | — | GROMACS trace format characterization |
+> | 29 | 2026-02-20 | — | OpenMM trace format characterization |
+
+### 2026-02-23: Session 23 — VASP Parser Reality-Check Variants
+**Date:** 2026-02-23
+**Scope:** Validate `vasp_adapter` (`parse_incar`, `parse_oszicar`, `parse_outcar`, `parse_trace`) against realistic VASP format variants and complete cross-framework parser validation across OpenMM (Session 21), GROMACS (Session 22), and VASP (Session 23).
+**Method:** (1) Ran pre-flight gates in `research/trace-semantics/prototypes/lel-ir-prototype` (`cargo test`, `cargo clippy -- -D warnings`), (2) searched local workspace for Tier 1 real `INCAR`/`OSZICAR`/`OUTCAR` logs and found none, (3) created Tier 2 file fixtures in `testdata/vasp/` and Tier 2 inline variant fixtures in `src/tests/mod.rs`, (4) added parser-level and adapter-level VASP helper assertions, (5) added ten additive `test_vasp_variant_*` tests, (6) ran `cargo test` + `cargo clippy -- -D warnings` after each creation/modification gate.
+
+**Findings:**
+
+1. **Tier classification outcome:** no local Tier 1 VASP logs were discoverable; Session 23 used Tier 2 source-derived fixtures only.  
+   Evidence: local search in session (`find`/`rg` across repo returned no `INCAR`/`OSZICAR`/`OUTCAR` artifacts); fixtures under `research/trace-semantics/prototypes/lel-ir-prototype/testdata/vasp/` and inline constants in `.../src/tests/mod.rs`.
+
+2. **`converged_relaxation` (Tier 2 file fixture) passed.** Three ionic `F=` energies parsed from OSZICAR, both `d E =` and `dE =` spacing variants accepted, canonical pattern includes `Converged`, and execution status is `Success`.  
+   Evidence: fixture `research/trace-semantics/prototypes/lel-ir-prototype/testdata/vasp/converged_relaxation.vasp`; tests `.../src/tests/mod.rs::test_vasp_variant_converged_relaxation`, `...::test_vasp_variant_energy_count_cross_source`.
+
+3. **`nonconverged_scf` (Tier 2 file fixture) passed.** Five DAV convergence points parsed, no OSZICAR `F=` energies, all convergence points remain `converged: None`, canonical pattern includes `InsufficientData`, and execution status is `Timeout`.  
+   Evidence: fixture `research/trace-semantics/prototypes/lel-ir-prototype/testdata/vasp/nonconverged_scf.vasp`; tests `.../src/tests/mod.rs::test_vasp_variant_nonconverged_scf`, `...::test_vasp_variant_energy_count_cross_source`.
+
+4. **`mixed_scf_dav_rmm` (Tier 2 file fixture) passed.** Mixed DAV/RMM lines produce eight convergence points, two ionic `F=` energies parse from OSZICAR, canonical pattern includes `Converged`, and execution status is `Success`.  
+   Evidence: fixture `research/trace-semantics/prototypes/lel-ir-prototype/testdata/vasp/mixed_scf_dav_rmm.vasp`; tests `.../src/tests/mod.rs::test_vasp_variant_mixed_scf_dav_rmm`, `...::test_vasp_variant_energy_count_cross_source`.
+
+5. **Crash/error variants passed in combined context.** `EDDDAV` variant and `VERY BAD NEWS` variant both yield `ExecutionOutcome::CrashDivergent` and canonical convergence pattern `Divergent`.  
+   Evidence: inline fixture `VASP_VARIANT_ERROR_EDDDAV`; composed fixture using `VASP_OUTCAR_ERROR`; tests `.../src/tests/mod.rs::test_vasp_variant_error_edddav`, `...::test_vasp_variant_error_very_bad_news`.
+
+6. **Compatibility variants passed.** Scientific-notation ENCUT (`ENCUT = 1.200E+03`) parses as `Value::Known(1200.0, "eV")`; static single-point setup (`IBRION=-1`, `NSW=0`) produces one `F=` energy with `Converged` + `Success`; VASP 5.x banner parsing records resource status containing `"vasp.5"`.  
+   Evidence: inline fixtures `VASP_VARIANT_LARGE_ENCUT_SCINOTATION`, `VASP_VARIANT_STATIC_CALC`, `VASP_VARIANT_V5_VERSION`; tests `.../src/tests/mod.rs::test_vasp_variant_large_encut_scinotation`, `...::test_vasp_variant_static_calc`, `...::test_vasp_variant_v5_version`.
+
+7. **Truncation behavior passed.** OUTCAR without completion marker yields timeout with `Completeness::PartiallyInferred { inference_method: "no completion marker in OUTCAR" }`.  
+   Evidence: composed fixture in `.../src/tests/mod.rs::test_vasp_variant_truncated_outcar`.
+
+8. **Cross-source energy counting passed.** Total merged `EnergyRecord` counts from `VaspAdapter.parse_trace` are: `converged_relaxation = 4` (`3` OSZICAR `F=` + `1` OUTCAR TOTEN), `nonconverged_scf = 1` (`0` OSZICAR + `1` TOTEN), `mixed_scf_dav_rmm = 3` (`2` OSZICAR + `1` TOTEN).  
+   Evidence: `.../src/tests/mod.rs::test_vasp_variant_energy_count_cross_source`.
+
+9. **No parser code changes were required in Session 23.** All new VASP-variant tests passed without edits to `src/vasp_adapter.rs` (parser-fix budget usage: `0` lines).  
+   Evidence: git diff and passing test run after test additions.
+
+10. **Session quality gates are clean at target scale.** Crate passes `148/148` tests with strict clippy warning-free.  
+    Evidence: `cargo test`; `cargo clippy -- -D warnings`.
+
+**Note:** VASP convergence semantics are intentionally different from GROMACS/OpenMM in this prototype: `parse_oszicar()` emits direct `ConvergencePoint` events (`metric_name = "dE"`) and sets `converged` from `F=` line presence; canonical VASP mapping is handled in `convergence.rs` (`classify_convergence`, VASP branch at lines 233-236 in current file context), rather than via `derive_energy_convergence_summary()`.
+
+**Implications:**
+
+- Cross-framework parser reality-check validation is now complete for all three adapters: OpenMM (Session 21), GROMACS (Session 22), VASP (Session 23).
+- VASP format-variant behavior is now evidence-backed at both parser-level extraction and adapter-level canonical labeling/execution-status layers.
+
+**Open Threads:**
+
+1. Add Tier 1 real VASP fixture corpus when accessible and rerun the same matrix with source-tier upgrade notes.
+2. VASP canonical taxonomy still lacks oscillation/stall detection mappings (currently only direct `dE` converged/insufficient plus divergence override).
 
 ### 2026-02-23: Session 22 — GROMACS md.log Reality-Check Variants
 **Date:** 2026-02-23
