@@ -2,8 +2,8 @@ use std::fmt;
 
 use crate::common::{
     BoundaryClassification, Completeness, ConfidenceMeta, ControlledVariable, ExecutionOutcome,
-    ExperimentRef, Layer, ObservationMode, ProvenanceAnchor, SourceLocation, SpecElementId,
-    TemporalCoord, Value,
+    ElementId, ExperimentRef, Layer, ObservationMode, ProvenanceAnchor, SourceLocation,
+    SpecElementId, TemporalCoord, Value,
 };
 use crate::event_kinds::EventKind;
 use crate::lel::{
@@ -37,12 +37,154 @@ pub trait DslAdapter {
     fn parse_trace(&self, raw: &str) -> Result<LayeredEventLog, AdapterError>;
 }
 
+const OPENMM_MIN_CONVERGENCE_WINDOW: usize = 4;
+const OPENMM_REL_DELTA_THRESHOLD: f64 = 1.0e-4;
+
+fn parse_openmm_energy_series(raw: &str) -> Vec<(u64, f64)> {
+    raw.lines()
+        .filter_map(|line| {
+            let trimmed = line.trim();
+            if trimmed.is_empty() || trimmed.starts_with('#') {
+                return None;
+            }
+
+            let mut tokens = trimmed.split_whitespace();
+            let step = tokens.next()?.parse::<u64>().ok()?;
+            let energy = tokens.next()?.parse::<f64>().ok()?;
+            Some((step, energy))
+        })
+        .collect()
+}
+
+fn openmm_energy_total(event: &crate::lel::TraceEvent) -> Option<f64> {
+    match &event.kind {
+        EventKind::EnergyRecord {
+            total: Value::Known(total, _),
+            ..
+        } => Some(*total),
+        _ => None,
+    }
+}
+
+fn derive_openmm_convergence_summary(
+    events: &[crate::lel::TraceEvent],
+) -> Option<crate::lel::TraceEvent> {
+    let energy_events: Vec<(&crate::lel::TraceEvent, f64)> = events
+        .iter()
+        .filter_map(|event| openmm_energy_total(event).map(|total| (event, total)))
+        .collect();
+
+    if energy_events.len() < OPENMM_MIN_CONVERGENCE_WINDOW {
+        return None;
+    }
+
+    let window = &energy_events[energy_events.len() - OPENMM_MIN_CONVERGENCE_WINDOW..];
+    let deltas: Vec<f64> = window.windows(2).map(|pair| pair[1].1 - pair[0].1).collect();
+    if deltas.is_empty() {
+        return None;
+    }
+
+    let energy_scale =
+        (window.iter().map(|(_, value)| value.abs()).sum::<f64>() / window.len() as f64).max(1.0);
+    let rel_abs_deltas: Vec<f64> = deltas
+        .iter()
+        .map(|delta| delta.abs() / energy_scale)
+        .collect();
+    let max_rel_delta = rel_abs_deltas
+        .iter()
+        .copied()
+        .fold(0.0_f64, f64::max);
+    let mean_rel_delta = rel_abs_deltas.iter().sum::<f64>() / rel_abs_deltas.len() as f64;
+    let sign_changes = deltas
+        .windows(2)
+        .filter(|pair| pair[0] * pair[1] < 0.0)
+        .count();
+
+    let (metric_name, metric_value, converged, note) =
+        if sign_changes >= 2 && mean_rel_delta > OPENMM_REL_DELTA_THRESHOLD {
+            (
+                "derived_oscillation_rel_delta_mean",
+                mean_rel_delta,
+                Some(false),
+                "energy deltas alternate sign across the derivation window",
+            )
+        } else if max_rel_delta <= OPENMM_REL_DELTA_THRESHOLD {
+            (
+                "derived_convergence_rel_delta_max",
+                max_rel_delta,
+                Some(true),
+                "max relative energy delta is below convergence threshold",
+            )
+        } else {
+            (
+                "derived_stall_rel_delta_mean",
+                mean_rel_delta,
+                Some(false),
+                "energy deltas remain above threshold without oscillation",
+            )
+        };
+
+    let mut causal_refs = window
+        .iter()
+        .map(|(event, _)| event.id)
+        .collect::<Vec<_>>();
+    if let Some(exec_event) = events
+        .iter()
+        .rev()
+        .find(|event| matches!(event.kind, EventKind::ExecutionStatus { .. }))
+    {
+        causal_refs.push(exec_event.id);
+    }
+    if let Some(numerical_event) = events
+        .iter()
+        .rev()
+        .find(|event| matches!(event.kind, EventKind::NumericalStatus { .. }))
+    {
+        causal_refs.push(numerical_event.id);
+    }
+
+    let from_elements = causal_refs.iter().map(|id| ElementId(id.0)).collect();
+    let simulation_step = window.last().map(|(event, _)| event.temporal.simulation_step)?;
+    let logical_sequence = events
+        .last()
+        .map(|event| event.temporal.logical_sequence + 1)
+        .unwrap_or(1);
+
+    Some(
+        TraceEventBuilder::new()
+            .layer(Layer::Methodology)
+            .kind(EventKind::ConvergencePoint {
+                iteration: simulation_step,
+                metric_name: metric_name.to_string(),
+                metric_value: Value::Known(metric_value, "relative".to_string()),
+                converged,
+            })
+            .temporal(TemporalCoord {
+                simulation_step,
+                wall_clock_ns: None,
+                logical_sequence,
+            })
+            .causal_refs(causal_refs)
+            .provenance(ProvenanceAnchor {
+                source_file: "simulation.log".to_string(),
+                source_location: SourceLocation::ExternalInput,
+                raw_hash: 0,
+            })
+            .confidence(ConfidenceMeta {
+                completeness: Completeness::Derived { from_elements },
+                field_coverage: 1.0,
+                notes: vec![note.to_string()],
+            })
+            .build(),
+    )
+}
+
 /// Mock OpenMM adapter that produces hardcoded sample events.
 /// Demonstrates layer diversity, temporal ordering, and Hybrid upgrade fields.
 pub struct MockOpenMmAdapter;
 
 impl DslAdapter for MockOpenMmAdapter {
-    fn parse_trace(&self, _raw: &str) -> Result<LayeredEventLog, AdapterError> {
+    fn parse_trace(&self, raw: &str) -> Result<LayeredEventLog, AdapterError> {
         let experiment_ref = ExperimentRef {
             experiment_id: "openmm-mock-001".to_string(),
             cycle_id: 0,
@@ -142,35 +284,53 @@ impl DslAdapter for MockOpenMmAdapter {
             .confidence(default_confidence.clone())
             .build();
 
-        // Event 4: Implementation layer — energy record at step 1000
-        let event3_id = event3.id;
-        let event4 = TraceEventBuilder::new()
-            .layer(Layer::Implementation)
-            .kind(EventKind::EnergyRecord {
-                total: Value::Known(-45023.7, "kJ/mol".to_string()),
-                components: vec![
-                    (
-                        "kinetic".to_string(),
-                        Value::Known(12500.3, "kJ/mol".to_string()),
-                    ),
-                    (
-                        "potential".to_string(),
-                        Value::Known(-57524.0, "kJ/mol".to_string()),
-                    ),
-                ],
-            })
-            .temporal(TemporalCoord {
-                simulation_step: 1000,
-                wall_clock_ns: Some(1_500_000),
-                logical_sequence: 4,
-            })
-            .causal_refs(vec![event3_id])
-            .provenance(default_provenance.clone())
-            .confidence(default_confidence.clone())
-            .build();
+        let mut events = Vec::new();
+        events.push(event1);
+        events.push(event2);
+        events.push(event3);
 
-        // Event 5: Implementation layer — execution completed successfully
-        let event5 = TraceEventBuilder::new()
+        // Mock reporter stream: if `raw` contains lines in "<step> <energy>" format,
+        // use them as the energy series; otherwise fall back to the single baseline sample.
+        let parsed_series = parse_openmm_energy_series(raw);
+        let energy_series = if parsed_series.is_empty() {
+            vec![(1000_u64, -45023.7_f64)]
+        } else {
+            parsed_series
+        };
+
+        let resource_event_id = events[2].id;
+        let mut logical_sequence = 4_u64;
+        for (step, total_energy) in energy_series {
+            let energy_event = TraceEventBuilder::new()
+                .layer(Layer::Implementation)
+                .kind(EventKind::EnergyRecord {
+                    total: Value::Known(total_energy, "kJ/mol".to_string()),
+                    components: vec![
+                        (
+                            "kinetic".to_string(),
+                            Value::Known(12500.3, "kJ/mol".to_string()),
+                        ),
+                        (
+                            "potential".to_string(),
+                            Value::Known(total_energy - 12500.3, "kJ/mol".to_string()),
+                        ),
+                    ],
+                })
+                .temporal(TemporalCoord {
+                    simulation_step: step,
+                    wall_clock_ns: Some(step.saturating_mul(1500)),
+                    logical_sequence,
+                })
+                .causal_refs(vec![resource_event_id])
+                .provenance(default_provenance.clone())
+                .confidence(default_confidence.clone())
+                .build();
+            logical_sequence += 1;
+            events.push(energy_event);
+        }
+
+        // Execution completed successfully (mock default path).
+        let mut execution_builder = TraceEventBuilder::new()
             .layer(Layer::Implementation)
             .kind(EventKind::ExecutionStatus {
                 status: ExecutionOutcome::Success,
@@ -179,19 +339,31 @@ impl DslAdapter for MockOpenMmAdapter {
             .temporal(TemporalCoord {
                 simulation_step: 10000,
                 wall_clock_ns: Some(15_000_000),
-                logical_sequence: 5,
+                logical_sequence,
             })
             .provenance(default_provenance)
-            .confidence(default_confidence)
-            .build();
+            .confidence(default_confidence);
 
-        let log = LayeredEventLogBuilder::new(experiment_ref, spec)
-            .add_event(event1)
-            .add_event(event2)
-            .add_event(event3)
-            .add_event(event4)
-            .add_event(event5)
-            .build();
+        if let Some(last_energy_id) = events
+            .iter()
+            .rev()
+            .find(|event| matches!(event.kind, EventKind::EnergyRecord { .. }))
+            .map(|event| event.id)
+        {
+            execution_builder = execution_builder.causal_refs(vec![last_energy_id]);
+        }
+
+        events.push(execution_builder.build());
+
+        if let Some(summary_event) = derive_openmm_convergence_summary(&events) {
+            events.push(summary_event);
+        }
+
+        let mut log_builder = LayeredEventLogBuilder::new(experiment_ref, spec);
+        for event in events {
+            log_builder = log_builder.add_event(event);
+        }
+        let log = log_builder.build();
 
         Ok(log)
     }
