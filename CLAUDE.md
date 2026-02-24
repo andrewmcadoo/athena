@@ -22,9 +22,10 @@ These survived two adversarial review passes. Do not weaken, remove, or work aro
 
 - `VISION.md` — Stress-tested conceptual vision (8 sections). Source of truth for all claims, limitations, and open questions. Read this first for any ATHENA work.
 - `ARCHITECTURE.md` — Component architecture, information flow, mode transitions, evaluation strategy, and risk analysis. Source of truth for structural decisions.
-- `decisions/` — Architecture Decision Records. `001-python-rust-core.md` records the Python+Rust language split.
+- `decisions/` — Architecture Decision Records. `001-python-rust-core.md` records the Python+Rust language split. `002-aggregate-score-contract.md` records the locked AggregateScore recommendation.
 - `research/*/FINDINGS.md` — Active research investigations. Each contains a research question, architecture references, investigation log, accumulated findings, and next steps.
-- `research/adversarial-reward/governance/GOVERNANCE.md` — Governance baseline, five-minute audit runbook, and break-glass restoration procedure for AggregateScore contract enforcement.
+- `research/adversarial-reward/governance/GOVERNANCE.md` — Governance baseline, five-minute audit runbook, escalation thresholds, and break-glass restoration procedure for AggregateScore contract enforcement.
+- `research/adversarial-reward/governance/audit.sh` — Read-only audit automation script. Runs C1-C7 checks and prints filled evidence template. Supports `--dry-run`.
 - `evaluation/hidden-confounder/README.md` — Specification anchor for the end-to-end litmus test.
 
 ## Directory Structure
@@ -43,11 +44,13 @@ athena/
 │   ├── trace-semantics/                # Priority 1: IR design for DSL traces
 │   │   ├── FINDINGS.md
 │   │   ├── dsl-evaluation/             # DSL trace format surveys
-│   │   └── prototypes/                 # Throwaway IR prototypes
+│   │   └── prototypes/
+│   │       └── lel-ir-prototype/       # LEL+DGR Hybrid IR Rust crate (100/100 tests)
 │   ├── adversarial-reward/             # Priority 2: Epistemic info gain formalization
 │   │   ├── FINDINGS.md
 │   │   ├── governance/
-│   │   │   └── GOVERNANCE.md           # Branch-protection/CI audit runbook + break-glass procedure
+│   │   │   ├── GOVERNANCE.md           # Branch-protection/CI audit runbook + break-glass procedure
+│   │   │   └── audit.sh               # Read-only audit automation (C1-C7 + evidence template)
 │   │   └── prototypes/                 # Throwaway reward function prototypes
 │   ├── exploration-convergence/        # Priority 3: Exploration-to-falsification criteria
 │   │   └── FINDINGS.md

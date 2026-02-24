@@ -146,6 +146,34 @@
       "created": "2026-02-22T19:45:10.042420",
       "slug": "ci-gate-contract-enforcement",
       "directive": "Wire acceptance_test.py and monitoring_hooks.py into a CI/pre-merge gate so the locked AggregateScore contract is continuously enforced on every change"
+    },
+    {
+      "sequence": 22,
+      "filename": "handoff_022_2026-02-22_governance-audit-runbook-session14.md",
+      "created": "2026-02-22T23:02:30.308735",
+      "slug": "governance-audit-runbook-session14",
+      "directive": "Turn the one-time enforcement proof (Sessions 11-13) into a repeatable governance routine: codified baseline, 5-minute audit runbook, break-glass procedure, bd list panic fix"
+    },
+    {
+      "sequence": 23,
+      "filename": "handoff_023_2026-02-23_first-live-audit-drill-session15.md",
+      "created": "2026-02-23T10:23:54.497218",
+      "slug": "first-live-audit-drill-session15",
+      "directive": "Run the first real governance audit from GOVERNANCE.md, fill evidence template with live outputs, log as Session 15, and establish audit cadence"
+    },
+    {
+      "sequence": 24,
+      "filename": "handoff_024_2026-02-23_break-glass-outage-resilience.md",
+      "created": "2026-02-23T12:51:34.268150",
+      "slug": "break-glass-outage-resilience",
+      "directive": "Session 17: break-glass outage resilience \u2014 fallback paths for API/UI/both-down scenarios, evidence capture, operator decision tree, tabletop drill"
+    },
+    {
+      "sequence": 25,
+      "filename": "handoff_025_2026-02-23_cross-framework-convergence-standardizat.md",
+      "created": "2026-02-23T16:35:38.357871",
+      "slug": "cross-framework-convergence-standardization",
+      "directive": "Session 20: standardize convergence taxonomy (WDK#42), decide placement (WDK#44), validate on real OpenMM traces"
     }
   ]
 }
