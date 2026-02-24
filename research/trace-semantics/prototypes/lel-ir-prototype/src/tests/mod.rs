@@ -4352,6 +4352,10 @@ const VASP_FILE_NONCONVERGED_SCF: &str =
     include_str!("../../testdata/vasp/nonconverged_scf.vasp");
 const VASP_FILE_MIXED_SCF_DAV_RMM: &str =
     include_str!("../../testdata/vasp/mixed_scf_dav_rmm.vasp");
+const VASP_FILE_T1_HONEYCOMB_PT52: &str = include_str!("../../testdata/vasp/t1_honeycomb_pt52.vasp");
+const VASP_FILE_T1_LARGE_APPROX: &str = include_str!("../../testdata/vasp/t1_large_approx.vasp");
+const VASP_FILE_T1_SIGMA_PT56_SUBSTRATE: &str =
+    include_str!("../../testdata/vasp/t1_sigma_pt56_substrate.vasp");
 
 const VASP_VARIANT_ERROR_EDDDAV: &str = r#"--- INCAR ---
 GGA = PE
@@ -5338,6 +5342,45 @@ fn test_vasp_variant_energy_count_cross_source() {
     assert_vasp_parses_energy_count(VASP_FILE_CONVERGED_RELAXATION, 4);
     assert_vasp_parses_energy_count(VASP_FILE_NONCONVERGED_SCF, 1);
     assert_vasp_parses_energy_count(VASP_FILE_MIXED_SCF_DAV_RMM, 3);
+}
+
+#[test]
+fn test_vasp_t1_honeycomb_pt52() {
+    setup();
+    assert_vasp_variant(
+        VASP_FILE_T1_HONEYCOMB_PT52,
+        &[(1, -957.02531)],
+        &[ConvergencePattern::Converged],
+    );
+    assert_vasp_execution_status(VASP_FILE_T1_HONEYCOMB_PT52, ExecutionOutcome::Success);
+    assert_vasp_parses_energy_count(VASP_FILE_T1_HONEYCOMB_PT52, 2);
+}
+
+#[test]
+fn test_vasp_t1_large_approx() {
+    setup();
+    assert_vasp_variant(
+        VASP_FILE_T1_LARGE_APPROX,
+        &[(1, -3279.8853)],
+        &[ConvergencePattern::Converged],
+    );
+    assert_vasp_execution_status(VASP_FILE_T1_LARGE_APPROX, ExecutionOutcome::Success);
+    assert_vasp_parses_energy_count(VASP_FILE_T1_LARGE_APPROX, 2);
+}
+
+#[test]
+fn test_vasp_t1_sigma_pt56_substrate() {
+    setup();
+    assert_vasp_variant(
+        VASP_FILE_T1_SIGMA_PT56_SUBSTRATE,
+        &[(1, -561.68546)],
+        &[ConvergencePattern::Converged],
+    );
+    assert_vasp_execution_status(
+        VASP_FILE_T1_SIGMA_PT56_SUBSTRATE,
+        ExecutionOutcome::Success,
+    );
+    assert_vasp_parses_energy_count(VASP_FILE_T1_SIGMA_PT56_SUBSTRATE, 2);
 }
 
 fn test_convergence_event(
