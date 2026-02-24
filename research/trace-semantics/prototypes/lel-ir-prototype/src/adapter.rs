@@ -2,9 +2,10 @@ use std::fmt;
 
 use crate::common::{
     BoundaryClassification, Completeness, ConfidenceMeta, ControlledVariable, ExecutionOutcome,
-    ElementId, ExperimentRef, Layer, ObservationMode, ProvenanceAnchor, SourceLocation,
-    SpecElementId, TemporalCoord, Value,
+    ExperimentRef, Layer, NumericalEventType, ObservationMode, ProvenanceAnchor, Severity,
+    SourceLocation, SpecElementId, TemporalCoord, Value,
 };
+use crate::convergence;
 use crate::event_kinds::EventKind;
 use crate::lel::{
     ExperimentSpec, LayeredEventLog, LayeredEventLogBuilder, TraceEventBuilder,
@@ -37,10 +38,18 @@ pub trait DslAdapter {
     fn parse_trace(&self, raw: &str) -> Result<LayeredEventLog, AdapterError>;
 }
 
-const OPENMM_MIN_CONVERGENCE_WINDOW: usize = 4;
-const OPENMM_REL_DELTA_THRESHOLD: f64 = 1.0e-4;
-
 fn parse_openmm_energy_series(raw: &str) -> Vec<(u64, f64)> {
+    let non_empty_lines: Vec<&str> = raw
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .collect();
+    if let Some(first_line) = non_empty_lines.first().copied() {
+        if first_line.starts_with("#\"Step\"") || first_line.starts_with("#\"") {
+            return parse_openmm_csv_energy_series(&non_empty_lines);
+        }
+    }
+
     raw.lines()
         .filter_map(|line| {
             let trimmed = line.trim();
@@ -56,127 +65,54 @@ fn parse_openmm_energy_series(raw: &str) -> Vec<(u64, f64)> {
         .collect()
 }
 
-fn openmm_energy_total(event: &crate::lel::TraceEvent) -> Option<f64> {
-    match &event.kind {
-        EventKind::EnergyRecord {
-            total: Value::Known(total, _),
-            ..
-        } => Some(*total),
-        _ => None,
-    }
+fn parse_openmm_csv_fields(line: &str) -> Vec<String> {
+    line.split(',')
+        .map(|field| {
+            field
+                .trim()
+                .trim_start_matches('#')
+                .trim()
+                .trim_matches('"')
+                .to_string()
+        })
+        .collect()
 }
 
-fn derive_openmm_convergence_summary(
-    events: &[crate::lel::TraceEvent],
-) -> Option<crate::lel::TraceEvent> {
-    let energy_events: Vec<(&crate::lel::TraceEvent, f64)> = events
+fn parse_openmm_csv_energy_series(lines: &[&str]) -> Vec<(u64, f64)> {
+    let Some(header_line) = lines.first().copied() else {
+        return Vec::new();
+    };
+    let header = parse_openmm_csv_fields(header_line);
+    let Some(step_idx) = header
         .iter()
-        .filter_map(|event| openmm_energy_total(event).map(|total| (event, total)))
-        .collect();
-
-    if energy_events.len() < OPENMM_MIN_CONVERGENCE_WINDOW {
-        return None;
-    }
-
-    let window = &energy_events[energy_events.len() - OPENMM_MIN_CONVERGENCE_WINDOW..];
-    let deltas: Vec<f64> = window.windows(2).map(|pair| pair[1].1 - pair[0].1).collect();
-    if deltas.is_empty() {
-        return None;
-    }
-
-    let energy_scale =
-        (window.iter().map(|(_, value)| value.abs()).sum::<f64>() / window.len() as f64).max(1.0);
-    let rel_abs_deltas: Vec<f64> = deltas
+        .position(|column| column.eq_ignore_ascii_case("Step"))
+    else {
+        return Vec::new();
+    };
+    let Some(energy_idx) = header
         .iter()
-        .map(|delta| delta.abs() / energy_scale)
-        .collect();
-    let max_rel_delta = rel_abs_deltas
-        .iter()
-        .copied()
-        .fold(0.0_f64, f64::max);
-    let mean_rel_delta = rel_abs_deltas.iter().sum::<f64>() / rel_abs_deltas.len() as f64;
-    let sign_changes = deltas
-        .windows(2)
-        .filter(|pair| pair[0] * pair[1] < 0.0)
-        .count();
+        .position(|column| column.contains("Potential Energy"))
+    else {
+        return Vec::new();
+    };
 
-    let (metric_name, metric_value, converged, note) =
-        if sign_changes >= 2 && mean_rel_delta > OPENMM_REL_DELTA_THRESHOLD {
-            (
-                "derived_oscillation_rel_delta_mean",
-                mean_rel_delta,
-                Some(false),
-                "energy deltas alternate sign across the derivation window",
-            )
-        } else if max_rel_delta <= OPENMM_REL_DELTA_THRESHOLD {
-            (
-                "derived_convergence_rel_delta_max",
-                max_rel_delta,
-                Some(true),
-                "max relative energy delta is below convergence threshold",
-            )
-        } else {
-            (
-                "derived_stall_rel_delta_mean",
-                mean_rel_delta,
-                Some(false),
-                "energy deltas remain above threshold without oscillation",
-            )
-        };
-
-    let mut causal_refs = window
+    lines[1..]
         .iter()
-        .map(|(event, _)| event.id)
-        .collect::<Vec<_>>();
-    if let Some(exec_event) = events
-        .iter()
-        .rev()
-        .find(|event| matches!(event.kind, EventKind::ExecutionStatus { .. }))
-    {
-        causal_refs.push(exec_event.id);
-    }
-    if let Some(numerical_event) = events
-        .iter()
-        .rev()
-        .find(|event| matches!(event.kind, EventKind::NumericalStatus { .. }))
-    {
-        causal_refs.push(numerical_event.id);
-    }
+        .filter_map(|line| {
+            let fields: Vec<&str> = line.split(',').collect();
+            if step_idx >= fields.len() || energy_idx >= fields.len() {
+                return None;
+            }
 
-    let from_elements = causal_refs.iter().map(|id| ElementId(id.0)).collect();
-    let simulation_step = window.last().map(|(event, _)| event.temporal.simulation_step)?;
-    let logical_sequence = events
-        .last()
-        .map(|event| event.temporal.logical_sequence + 1)
-        .unwrap_or(1);
-
-    Some(
-        TraceEventBuilder::new()
-            .layer(Layer::Methodology)
-            .kind(EventKind::ConvergencePoint {
-                iteration: simulation_step,
-                metric_name: metric_name.to_string(),
-                metric_value: Value::Known(metric_value, "relative".to_string()),
-                converged,
-            })
-            .temporal(TemporalCoord {
-                simulation_step,
-                wall_clock_ns: None,
-                logical_sequence,
-            })
-            .causal_refs(causal_refs)
-            .provenance(ProvenanceAnchor {
-                source_file: "simulation.log".to_string(),
-                source_location: SourceLocation::ExternalInput,
-                raw_hash: 0,
-            })
-            .confidence(ConfidenceMeta {
-                completeness: Completeness::Derived { from_elements },
-                field_coverage: 1.0,
-                notes: vec![note.to_string()],
-            })
-            .build(),
-    )
+            let step = fields[step_idx].trim().trim_matches('"').parse::<u64>().ok()?;
+            let energy = fields[energy_idx]
+                .trim()
+                .trim_matches('"')
+                .parse::<f64>()
+                .ok()?;
+            Some((step, energy))
+        })
+        .collect()
 }
 
 /// Mock OpenMM adapter that produces hardcoded sample events.
@@ -326,7 +262,42 @@ impl DslAdapter for MockOpenMmAdapter {
                 .confidence(default_confidence.clone())
                 .build();
             logical_sequence += 1;
+            let energy_event_id = energy_event.id;
             events.push(energy_event);
+
+            if !total_energy.is_finite() {
+                let (event_type, detail) = if total_energy.is_nan() {
+                    (
+                        NumericalEventType::NaNDetected,
+                        "NaN detected in potential energy".to_string(),
+                    )
+                } else {
+                    (
+                        NumericalEventType::InfDetected,
+                        "Inf detected in potential energy".to_string(),
+                    )
+                };
+
+                let numerical_event = TraceEventBuilder::new()
+                    .layer(Layer::Implementation)
+                    .kind(EventKind::NumericalStatus {
+                        event_type,
+                        affected_quantity: "Potential Energy".to_string(),
+                        severity: Severity::Warning,
+                        detail: Value::KnownCat(detail),
+                    })
+                    .temporal(TemporalCoord {
+                        simulation_step: step,
+                        wall_clock_ns: Some(step.saturating_mul(1500)),
+                        logical_sequence,
+                    })
+                    .causal_refs(vec![energy_event_id])
+                    .provenance(default_provenance.clone())
+                    .confidence(default_confidence.clone())
+                    .build();
+                logical_sequence += 1;
+                events.push(numerical_event);
+            }
         }
 
         // Execution completed successfully (mock default path).
@@ -355,7 +326,9 @@ impl DslAdapter for MockOpenMmAdapter {
 
         events.push(execution_builder.build());
 
-        if let Some(summary_event) = derive_openmm_convergence_summary(&events) {
+        if let Some(summary_event) =
+            convergence::derive_energy_convergence_summary(&events, "simulation.log")
+        {
             events.push(summary_event);
         }
 

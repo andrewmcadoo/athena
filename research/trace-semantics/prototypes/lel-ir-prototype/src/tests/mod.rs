@@ -2,6 +2,9 @@ use std::sync::Once;
 
 use crate::adapter::{DslAdapter, MockOpenMmAdapter};
 use crate::common::*;
+use crate::convergence::{
+    classify_all_convergence, classify_convergence, ConvergenceConfidence, ConvergencePattern,
+};
 use crate::event_kinds::EventKind;
 use crate::gromacs_adapter::{
     classify_mdp_parameter, parse_log, parse_mdp, GromacsAdapter,
@@ -2412,6 +2415,47 @@ const OPENMM_SHORT_ENERGY_SERIES: &str = r#"
 200 -1000.4
 "#;
 
+const OPENMM_CSV_STABLE: &str = r#"
+#"Step","Time (ps)","Potential Energy (kJ/mol)","Temperature (K)"
+0,0.000,-45023.7000,300.00
+1000,2.000,-45023.9000,300.10
+2000,4.000,-45024.0100,299.90
+3000,6.000,-45024.0500,300.20
+"#;
+
+const OPENMM_CSV_OSCILLATING: &str = r#"
+#"Step","Time (ps)","Potential Energy (kJ/mol)","Temperature (K)"
+0,0.000,-1000.0,300.00
+100,0.200,-998.0,300.10
+200,0.400,-1001.0,299.90
+300,0.600,-997.5,300.20
+400,0.800,-1002.0,300.00
+"#;
+
+const OPENMM_CSV_DRIFTING: &str = r#"
+#"Step","Time (ps)","Potential Energy (kJ/mol)","Temperature (K)"
+0,0.000,0.000,300.00
+100,0.200,0.010,300.10
+200,0.400,0.020,299.90
+300,0.600,0.030,300.20
+"#;
+
+const OPENMM_CSV_DIVERGENT_NAN: &str = r#"
+#"Step","Time (ps)","Potential Energy (kJ/mol)","Temperature (K)"
+0,0.000,-1000.0,300.00
+100,0.200,-999.9,300.10
+200,0.400,nan,299.90
+300,0.600,-999.7,300.20
+"#;
+
+const OPENMM_CSV_BOUNDARY: &str = r#"
+#"Step","Time (ps)","Potential Energy (kJ/mol)","Temperature (K)"
+0,0.000,0.0000,300.00
+100,0.200,0.0001,300.10
+200,0.400,0.0002,299.90
+300,0.600,0.0003,300.20
+"#;
+
 #[test]
 fn test_mock_adapter() {
     setup();
@@ -2546,6 +2590,121 @@ fn test_mock_adapter_convergence_summary_provenance_refs() {
         "ConvergencePoint missing source ExecutionStatus {:?}",
         execution_id
     );
+}
+
+#[test]
+fn test_mock_adapter_parses_openmm_statedatareporter_csv_pairs() {
+    setup();
+    let adapter = MockOpenMmAdapter;
+    let log = adapter.parse_trace(OPENMM_CSV_STABLE).unwrap();
+
+    let energy_records: Vec<(u64, f64)> = log
+        .events
+        .iter()
+        .filter_map(|event| match &event.kind {
+            EventKind::EnergyRecord {
+                total: Value::Known(total, _),
+                ..
+            } => Some((event.temporal.simulation_step, *total)),
+            _ => None,
+        })
+        .collect();
+
+    assert_eq!(energy_records.len(), 4);
+    assert_eq!(energy_records[0].0, 0);
+    assert_eq!(energy_records[1].0, 1000);
+    assert_eq!(energy_records[2].0, 2000);
+    assert_eq!(energy_records[3].0, 3000);
+    assert!((energy_records[0].1 + 45023.7000).abs() < 1e-9);
+    assert!((energy_records[3].1 + 45024.0500).abs() < 1e-9);
+}
+
+#[test]
+fn test_mock_adapter_csv_derives_convergence_summary_for_stable_series() {
+    setup();
+    let adapter = MockOpenMmAdapter;
+    let log = adapter.parse_trace(OPENMM_CSV_STABLE).unwrap();
+
+    let convergence = log
+        .events
+        .iter()
+        .find_map(|event| match &event.kind {
+            EventKind::ConvergencePoint {
+                metric_name,
+                converged,
+                ..
+            } => Some((metric_name, converged)),
+            _ => None,
+        })
+        .expect("Expected derived ConvergencePoint event");
+
+    assert_eq!(convergence.0, "derived_convergence_rel_delta_max");
+    assert_eq!(convergence.1, &Some(true));
+}
+
+#[test]
+fn test_mock_adapter_csv_derives_oscillation_summary_for_non_converging_series() {
+    setup();
+    let adapter = MockOpenMmAdapter;
+    let log = adapter.parse_trace(OPENMM_CSV_OSCILLATING).unwrap();
+
+    let convergence = log
+        .events
+        .iter()
+        .find_map(|event| match &event.kind {
+            EventKind::ConvergencePoint {
+                metric_name,
+                converged,
+                ..
+            } => Some((metric_name, converged)),
+            _ => None,
+        })
+        .expect("Expected derived ConvergencePoint event");
+
+    assert_eq!(convergence.0, "derived_oscillation_rel_delta_mean");
+    assert_eq!(convergence.1, &Some(false));
+}
+
+#[test]
+fn test_mock_adapter_whitespace_parser_backward_compat() {
+    setup();
+    let adapter = MockOpenMmAdapter;
+    let log = adapter.parse_trace(OPENMM_STABLE_ENERGY_SERIES).unwrap();
+
+    let energy_records: Vec<(u64, f64)> = log
+        .events
+        .iter()
+        .filter_map(|event| match &event.kind {
+            EventKind::EnergyRecord {
+                total: Value::Known(total, _),
+                ..
+            } => Some((event.temporal.simulation_step, *total)),
+            _ => None,
+        })
+        .collect();
+
+    assert_eq!(energy_records.len(), 4);
+    assert_eq!(energy_records[0].0, 0);
+    assert_eq!(energy_records[3].0, 3000);
+    assert!((energy_records[0].1 + 45023.7000).abs() < 1e-9);
+    assert!((energy_records[3].1 + 45024.0500).abs() < 1e-9);
+}
+
+#[test]
+fn test_openmm_csv_divergent_fixture_emits_nan_status() {
+    setup();
+    let adapter = MockOpenMmAdapter;
+    let log = adapter.parse_trace(OPENMM_CSV_DIVERGENT_NAN).unwrap();
+
+    assert!(log.events.iter().any(|event| {
+        matches!(
+            event.kind,
+            EventKind::NumericalStatus {
+                event_type: NumericalEventType::NaNDetected,
+                ..
+            }
+        )
+    }));
 }
 
 #[test]
@@ -2788,6 +2947,92 @@ Energies (kJ/mol)
 Energies (kJ/mol)
    Total Energy
 -1000.080
+Finished mdrun on rank 0
+"#;
+
+const GROMACS_LOG_DRIFTING_SERIES: &str = r#"
+             :-) GROMACS - gmx mdrun, 2023.3 (-:
+Using 1 CPU
+   Step           Time
+      0        0.00000
+Energies (kJ/mol)
+   Total Energy
+0.000
+   Step           Time
+      100        0.20000
+Energies (kJ/mol)
+   Total Energy
+0.010
+   Step           Time
+      200        0.40000
+Energies (kJ/mol)
+   Total Energy
+0.020
+   Step           Time
+      300        0.60000
+Energies (kJ/mol)
+   Total Energy
+0.030
+Finished mdrun on rank 0
+"#;
+
+const GROMACS_LOG_DIVERGENT_NAN_SERIES: &str = r#"
+             :-) GROMACS - gmx mdrun, 2023.3 (-:
+Using 1 CPU
+   Step           Time
+      0        0.00000
+Energies (kJ/mol)
+   Bond          Angle
+1.0            2.0
+   Total Energy
+-1000.0
+   Step           Time
+      100        0.20000
+Energies (kJ/mol)
+   Bond          Angle
+1.1            2.1
+   Total Energy
+-999.9
+   Step           Time
+      200        0.40000
+Energies (kJ/mol)
+   Bond          Angle
+1.2            NaN
+   Total Energy
+-999.8
+   Step           Time
+      300        0.60000
+Energies (kJ/mol)
+   Bond          Angle
+1.3            2.3
+   Total Energy
+-999.7
+Finished mdrun on rank 0
+"#;
+
+const GROMACS_LOG_BOUNDARY_SERIES: &str = r#"
+             :-) GROMACS - gmx mdrun, 2023.3 (-:
+Using 1 CPU
+   Step           Time
+      0        0.00000
+Energies (kJ/mol)
+   Total Energy
+0.0000
+   Step           Time
+      100        0.20000
+Energies (kJ/mol)
+   Total Energy
+0.0001
+   Step           Time
+      200        0.40000
+Energies (kJ/mol)
+   Total Energy
+0.0002
+   Step           Time
+      300        0.60000
+Energies (kJ/mol)
+   Total Energy
+0.0003
 Finished mdrun on rank 0
 "#;
 
@@ -3437,6 +3682,36 @@ POSITION                                       TOTAL-FORCE (eV/Angst)
 General timing and accounting
 "#;
 
+const VASP_OSZICAR_NO_F_SAMPLE: &str = r#"
+DAV:   1    0.400E+03    0.400E+03   -0.500E+00   200   0.200E+02
+DAV:   2   -0.200E+02   -0.100E+01   -0.200E+00   220   0.120E+02
+DAV:   3   -0.100E+01   -0.500E+00   -0.100E-01   240   0.800E+01
+"#;
+
+const VASP_COMBINED_DIVERGENT_SAMPLE: &str = r#"--- INCAR ---
+GGA = PE
+ENCUT = 520 ! cutoff energy
+PREC = Accurate
+SIGMA = 0.05 # smearing width
+ISMEAR = 0
+IBRION = 2
+NSW = 50
+ISIF = 3
+EDIFF = 1E-6
+EDIFFG = -0.01
+NCORE = 4
+KPAR = 2
+ALGO = Fast
+--- OSZICAR ---
+DAV:   1    0.400E+03    0.400E+03   -0.500E+00   200   0.200E+02
+DAV:   2   -0.200E+02   -0.100E+01   -0.200E+00   220   0.120E+02
+DAV:   3   -0.100E+01   -0.500E+00   -0.100E-01   240   0.800E+01
+   1 F= -.11401725E+03 E0= -.11400000E+03  d E =-.11401725E+03
+--- OUTCAR ---
+vasp.6.4.2 18Apr23 complex
+VERY BAD NEWS
+"#;
+
 fn test_vasp_rebuild_log(log: &LayeredEventLog) -> LayeredEventLog {
     let mut builder = LayeredEventLogBuilder::new(log.experiment_ref.clone(), log.spec.clone());
     for event in log.events.clone() {
@@ -3994,4 +4269,414 @@ fn test_vasp_adapter_error_execution() {
         .expect("Expected ExecutionStatus event");
 
     assert_eq!(*execution, ExecutionOutcome::CrashDivergent);
+}
+
+fn test_convergence_event(
+    metric_name: &str,
+    converged: Option<bool>,
+    completeness: Completeness,
+    logical_sequence: u64,
+) -> TraceEvent {
+    TraceEventBuilder::new()
+        .layer(Layer::Methodology)
+        .kind(EventKind::ConvergencePoint {
+            iteration: logical_sequence,
+            metric_name: metric_name.to_string(),
+            metric_value: Value::Known(1.0, "relative".to_string()),
+            converged,
+        })
+        .temporal(TemporalCoord {
+            simulation_step: logical_sequence,
+            wall_clock_ns: None,
+            logical_sequence,
+        })
+        .provenance(test_provenance())
+        .confidence(ConfidenceMeta {
+            completeness,
+            field_coverage: 1.0,
+            notes: vec![],
+        })
+        .build()
+}
+
+fn test_log_from_events(events: Vec<TraceEvent>) -> LayeredEventLog {
+    let mut builder = LayeredEventLogBuilder::new(test_experiment_ref(), test_spec());
+    for event in events {
+        builder = builder.add_event(event);
+    }
+    builder.build()
+}
+
+#[test]
+fn test_classify_convergence_converged_derived() {
+    setup();
+    let convergence = test_convergence_event(
+        "derived_convergence_rel_delta_max",
+        Some(true),
+        Completeness::Derived {
+            from_elements: vec![ElementId(1)],
+        },
+        1,
+    );
+    let log = test_log_from_events(vec![convergence]);
+    let event = log.events.first().expect("Expected ConvergencePoint");
+
+    let canonical = classify_convergence(event, "openmm", &log);
+    assert_eq!(canonical.pattern, ConvergencePattern::Converged);
+    assert_eq!(canonical.confidence, ConvergenceConfidence::Derived);
+}
+
+#[test]
+fn test_classify_convergence_oscillating_derived() {
+    setup();
+    let convergence = test_convergence_event(
+        "derived_oscillation_rel_delta_mean",
+        Some(false),
+        Completeness::Derived {
+            from_elements: vec![ElementId(2)],
+        },
+        2,
+    );
+    let log = test_log_from_events(vec![convergence]);
+    let event = log.events.first().expect("Expected ConvergencePoint");
+
+    let canonical = classify_convergence(event, "gromacs", &log);
+    assert_eq!(canonical.pattern, ConvergencePattern::Oscillating);
+    assert_eq!(canonical.confidence, ConvergenceConfidence::Derived);
+}
+
+#[test]
+fn test_classify_convergence_stalled_derived() {
+    setup();
+    let convergence = test_convergence_event(
+        "derived_stall_rel_delta_mean",
+        Some(false),
+        Completeness::Derived {
+            from_elements: vec![ElementId(3)],
+        },
+        3,
+    );
+    let log = test_log_from_events(vec![convergence]);
+    let event = log.events.first().expect("Expected ConvergencePoint");
+
+    let canonical = classify_convergence(event, "openmm", &log);
+    assert_eq!(canonical.pattern, ConvergencePattern::Stalled);
+    assert_eq!(canonical.confidence, ConvergenceConfidence::Derived);
+}
+
+#[test]
+fn test_classify_convergence_vasp_de_converged_direct() {
+    setup();
+    let convergence =
+        test_convergence_event("dE", Some(true), Completeness::FullyObserved, 4);
+    let log = test_log_from_events(vec![convergence]);
+    let event = log.events.first().expect("Expected ConvergencePoint");
+
+    let canonical = classify_convergence(event, "vasp", &log);
+    assert_eq!(canonical.pattern, ConvergencePattern::Converged);
+    assert_eq!(canonical.confidence, ConvergenceConfidence::Direct);
+}
+
+#[test]
+fn test_classify_convergence_vasp_de_insufficient_direct() {
+    setup();
+    let convergence = test_convergence_event("dE", None, Completeness::FullyObserved, 5);
+    let log = test_log_from_events(vec![convergence]);
+    let event = log.events.first().expect("Expected ConvergencePoint");
+
+    let canonical = classify_convergence(event, "vasp", &log);
+    assert_eq!(canonical.pattern, ConvergencePattern::InsufficientData);
+    assert_eq!(canonical.confidence, ConvergenceConfidence::Direct);
+}
+
+#[test]
+fn test_classify_convergence_divergent_override_priority() {
+    setup();
+    let convergence = test_convergence_event(
+        "derived_convergence_rel_delta_max",
+        Some(true),
+        Completeness::Derived {
+            from_elements: vec![ElementId(6)],
+        },
+        6,
+    );
+    let numerical = TraceEventBuilder::new()
+        .layer(Layer::Implementation)
+        .kind(EventKind::NumericalStatus {
+            event_type: NumericalEventType::NaNDetected,
+            affected_quantity: "potential_energy".to_string(),
+            severity: Severity::Error,
+            detail: Value::KnownCat("NaN in simulation".to_string()),
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 6,
+            wall_clock_ns: None,
+            logical_sequence: 7,
+        })
+        .provenance(test_provenance())
+        .confidence(ConfidenceMeta {
+            completeness: Completeness::FullyObserved,
+            field_coverage: 1.0,
+            notes: vec![],
+        })
+        .build();
+    let log = test_log_from_events(vec![convergence, numerical]);
+    let event = log
+        .events
+        .iter()
+        .find(|entry| matches!(entry.kind, EventKind::ConvergencePoint { .. }))
+        .expect("Expected ConvergencePoint");
+
+    let canonical = classify_convergence(event, "openmm", &log);
+    assert_eq!(canonical.pattern, ConvergencePattern::Divergent);
+    assert_eq!(canonical.confidence, ConvergenceConfidence::Derived);
+}
+
+#[test]
+fn test_classify_convergence_unknown_metric_absent() {
+    setup();
+    let convergence = test_convergence_event(
+        "unknown_metric",
+        Some(false),
+        Completeness::FullyObserved,
+        8,
+    );
+    let log = test_log_from_events(vec![convergence]);
+    let event = log.events.first().expect("Expected ConvergencePoint");
+
+    let canonical = classify_convergence(event, "gromacs", &log);
+    assert_eq!(canonical.pattern, ConvergencePattern::InsufficientData);
+    assert_eq!(canonical.confidence, ConvergenceConfidence::Absent);
+}
+
+#[test]
+fn test_classify_all_convergence_filters_convergence_points() {
+    setup();
+    let convergence_one = test_convergence_event(
+        "derived_convergence_rel_delta_max",
+        Some(true),
+        Completeness::Derived {
+            from_elements: vec![ElementId(9)],
+        },
+        9,
+    );
+    let parameter = TraceEventBuilder::new()
+        .layer(Layer::Methodology)
+        .kind(EventKind::ParameterRecord {
+            name: "dt".to_string(),
+            specified_value: None,
+            actual_value: Value::Known(0.002, "ps".to_string()),
+            units: Some("ps".to_string()),
+            observation_mode: ObservationMode::Observational,
+        })
+        .temporal(TemporalCoord {
+            simulation_step: 9,
+            wall_clock_ns: None,
+            logical_sequence: 10,
+        })
+        .provenance(test_provenance())
+        .confidence(ConfidenceMeta {
+            completeness: Completeness::FullyObserved,
+            field_coverage: 1.0,
+            notes: vec![],
+        })
+        .build();
+    let convergence_two = test_convergence_event(
+        "derived_stall_rel_delta_mean",
+        Some(false),
+        Completeness::Derived {
+            from_elements: vec![ElementId(10)],
+        },
+        11,
+    );
+    let log = test_log_from_events(vec![convergence_one, parameter, convergence_two]);
+
+    let all = classify_all_convergence(&log, "openmm");
+    assert_eq!(all.len(), 2);
+    assert_eq!(all[0].pattern, ConvergencePattern::Converged);
+    assert_eq!(all[1].pattern, ConvergencePattern::Stalled);
+}
+
+fn first_pattern_or_insufficient(
+    log: &LayeredEventLog,
+    framework: &str,
+) -> ConvergencePattern {
+    classify_all_convergence(log, framework)
+        .into_iter()
+        .map(|canonical| canonical.pattern)
+        .next()
+        .unwrap_or(ConvergencePattern::InsufficientData)
+}
+
+#[test]
+fn test_equivalence_scenario_a_steady_state_converged() {
+    setup();
+    let gromacs_adapter = GromacsAdapter;
+    let gromacs_raw = format!(
+        "--- MDP ---\n{}\n--- LOG ---\n{}",
+        GROMACS_MDP_SAMPLE, GROMACS_LOG_STABLE_SERIES
+    );
+    let gromacs_log = gromacs_adapter.parse_trace(&gromacs_raw).unwrap();
+
+    let openmm_adapter = MockOpenMmAdapter;
+    let openmm_log = openmm_adapter.parse_trace(OPENMM_CSV_STABLE).unwrap();
+
+    let vasp_adapter = VaspAdapter;
+    let vasp_log = vasp_adapter.parse_trace(VASP_COMBINED_SAMPLE).unwrap();
+
+    assert_eq!(
+        first_pattern_or_insufficient(&gromacs_log, "gromacs"),
+        ConvergencePattern::Converged
+    );
+    assert_eq!(
+        first_pattern_or_insufficient(&openmm_log, "openmm"),
+        ConvergencePattern::Converged
+    );
+    let vasp_patterns: Vec<ConvergencePattern> =
+        classify_all_convergence(&vasp_log, "vasp")
+            .into_iter()
+            .map(|canonical| canonical.pattern)
+            .collect();
+    assert!(vasp_patterns.contains(&ConvergencePattern::Converged));
+}
+
+#[test]
+fn test_equivalence_scenario_b_oscillating() {
+    setup();
+    let gromacs_adapter = GromacsAdapter;
+    let gromacs_raw = format!(
+        "--- MDP ---\n{}\n--- LOG ---\n{}",
+        GROMACS_MDP_SAMPLE, GROMACS_LOG_OSCILLATING_SERIES
+    );
+    let gromacs_log = gromacs_adapter.parse_trace(&gromacs_raw).unwrap();
+
+    let openmm_adapter = MockOpenMmAdapter;
+    let openmm_log = openmm_adapter.parse_trace(OPENMM_CSV_OSCILLATING).unwrap();
+
+    assert_eq!(
+        first_pattern_or_insufficient(&gromacs_log, "gromacs"),
+        ConvergencePattern::Oscillating
+    );
+    assert_eq!(
+        first_pattern_or_insufficient(&openmm_log, "openmm"),
+        ConvergencePattern::Oscillating
+    );
+    // VASP is intentionally N/A: oscillation detection here is ionic-level for MD,
+    // while VASP convergence semantics are SCF-level and represented differently.
+}
+
+#[test]
+fn test_equivalence_scenario_c_stalled() {
+    setup();
+    let gromacs_adapter = GromacsAdapter;
+    let gromacs_raw = format!(
+        "--- MDP ---\n{}\n--- LOG ---\n{}",
+        GROMACS_MDP_SAMPLE, GROMACS_LOG_DRIFTING_SERIES
+    );
+    let gromacs_log = gromacs_adapter.parse_trace(&gromacs_raw).unwrap();
+
+    let openmm_adapter = MockOpenMmAdapter;
+    let openmm_log = openmm_adapter.parse_trace(OPENMM_CSV_DRIFTING).unwrap();
+
+    assert_eq!(
+        first_pattern_or_insufficient(&gromacs_log, "gromacs"),
+        ConvergencePattern::Stalled
+    );
+    assert_eq!(
+        first_pattern_or_insufficient(&openmm_log, "openmm"),
+        ConvergencePattern::Stalled
+    );
+    // VASP is intentionally N/A: stall detection in this prototype is not mapped
+    // from ionic-level patterns for VASP traces.
+}
+
+#[test]
+fn test_equivalence_scenario_d_divergent_nan() {
+    setup();
+    let gromacs_adapter = GromacsAdapter;
+    let gromacs_raw = format!(
+        "--- MDP ---\n{}\n--- LOG ---\n{}",
+        GROMACS_MDP_SAMPLE, GROMACS_LOG_DIVERGENT_NAN_SERIES
+    );
+    let gromacs_log = gromacs_adapter.parse_trace(&gromacs_raw).unwrap();
+
+    let openmm_adapter = MockOpenMmAdapter;
+    let openmm_log = openmm_adapter.parse_trace(OPENMM_CSV_DIVERGENT_NAN).unwrap();
+
+    let vasp_adapter = VaspAdapter;
+    let vasp_log = vasp_adapter
+        .parse_trace(VASP_COMBINED_DIVERGENT_SAMPLE)
+        .unwrap();
+
+    assert_eq!(
+        first_pattern_or_insufficient(&gromacs_log, "gromacs"),
+        ConvergencePattern::Divergent
+    );
+    assert_eq!(
+        first_pattern_or_insufficient(&openmm_log, "openmm"),
+        ConvergencePattern::Divergent
+    );
+    let vasp_patterns: Vec<ConvergencePattern> =
+        classify_all_convergence(&vasp_log, "vasp")
+            .into_iter()
+            .map(|canonical| canonical.pattern)
+            .collect();
+    assert!(vasp_patterns.contains(&ConvergencePattern::Divergent));
+}
+
+#[test]
+fn test_equivalence_scenario_e_insufficient_data() {
+    setup();
+    let gromacs_adapter = GromacsAdapter;
+    let gromacs_raw = format!(
+        "--- MDP ---\n{}\n--- LOG ---\n{}",
+        GROMACS_MDP_SAMPLE, GROMACS_LOG_SHORT_SERIES
+    );
+    let gromacs_log = gromacs_adapter.parse_trace(&gromacs_raw).unwrap();
+
+    let openmm_adapter = MockOpenMmAdapter;
+    let openmm_log = openmm_adapter.parse_trace(OPENMM_SHORT_ENERGY_SERIES).unwrap();
+
+    let vasp_adapter = VaspAdapter;
+    let vasp_raw = format!(
+        "--- INCAR ---\n{}\n--- OSZICAR ---\n{}\n--- OUTCAR ---\n{}",
+        VASP_INCAR_SAMPLE, VASP_OSZICAR_NO_F_SAMPLE, VASP_OUTCAR_SAMPLE
+    );
+    let vasp_log = vasp_adapter.parse_trace(&vasp_raw).unwrap();
+
+    assert_eq!(
+        first_pattern_or_insufficient(&gromacs_log, "gromacs"),
+        ConvergencePattern::InsufficientData
+    );
+    assert_eq!(
+        first_pattern_or_insufficient(&openmm_log, "openmm"),
+        ConvergencePattern::InsufficientData
+    );
+    assert_eq!(
+        first_pattern_or_insufficient(&vasp_log, "vasp"),
+        ConvergencePattern::InsufficientData
+    );
+}
+
+#[test]
+fn test_equivalence_scenario_f_threshold_boundary() {
+    setup();
+    let gromacs_adapter = GromacsAdapter;
+    let gromacs_raw = format!(
+        "--- MDP ---\n{}\n--- LOG ---\n{}",
+        GROMACS_MDP_SAMPLE, GROMACS_LOG_BOUNDARY_SERIES
+    );
+    let gromacs_log = gromacs_adapter.parse_trace(&gromacs_raw).unwrap();
+
+    let openmm_adapter = MockOpenMmAdapter;
+    let openmm_log = openmm_adapter.parse_trace(OPENMM_CSV_BOUNDARY).unwrap();
+
+    assert_eq!(
+        first_pattern_or_insufficient(&gromacs_log, "gromacs"),
+        ConvergencePattern::Converged
+    );
+    assert_eq!(
+        first_pattern_or_insufficient(&openmm_log, "openmm"),
+        ConvergencePattern::Converged
+    );
 }
