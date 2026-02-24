@@ -4346,12 +4346,185 @@ vasp.6.4.2 18Apr23 complex
 VERY BAD NEWS
 "#;
 
+const VASP_FILE_CONVERGED_RELAXATION: &str =
+    include_str!("../../testdata/vasp/converged_relaxation.vasp");
+const VASP_FILE_NONCONVERGED_SCF: &str =
+    include_str!("../../testdata/vasp/nonconverged_scf.vasp");
+const VASP_FILE_MIXED_SCF_DAV_RMM: &str =
+    include_str!("../../testdata/vasp/mixed_scf_dav_rmm.vasp");
+
+const VASP_VARIANT_ERROR_EDDDAV: &str = r#"--- INCAR ---
+GGA = PE
+ENCUT = 520
+PREC = Accurate
+ISMEAR = 0
+IBRION = 2
+NSW = 2
+EDIFF = 1E-6
+ALGO = Fast
+--- OSZICAR ---
+DAV:   1    0.100E+02    0.100E+02   -0.500E+00   200   0.200E+02
+   1 F= -.10000000E+03 E0= -.99900000E+02  d E =-.10000000E-01
+--- OUTCAR ---
+vasp.6.4.2 18Apr23 complex
+EDDDAV: Call to ZHEGV failed
+"#;
+
+const VASP_VARIANT_LARGE_ENCUT_SCINOTATION: &str = r#"--- INCAR ---
+GGA = PE
+ENCUT = 1.200E+03
+PREC = Accurate
+ISMEAR = 0
+IBRION = 2
+NSW = 1
+EDIFF = 1E-6
+ALGO = Fast
+--- OSZICAR ---
+DAV:   1    0.200E+02    0.200E+02   -0.100E+00   220   0.120E+02
+   1 F= -.20000000E+03 E0= -.19990000E+03  dE = -.10000000E-01
+--- OUTCAR ---
+vasp.6.4.2 18Apr23 complex
+running on     4 total cores
+free  energy   TOTEN  =     -200.00000000 eV
+General timing and accounting
+"#;
+
+const VASP_VARIANT_STATIC_CALC: &str = r#"--- INCAR ---
+GGA = PE
+ENCUT = 520
+PREC = Accurate
+ISMEAR = 0
+IBRION = -1
+NSW = 0
+EDIFF = 1E-6
+ALGO = Normal
+--- OSZICAR ---
+DAV:   1    0.150E+02    0.150E+02   -0.700E-01   200   0.900E+01
+   1 F= -.50000000E+02 E0= -.49950000E+02  d E =-.50000000E-02
+--- OUTCAR ---
+vasp.6.4.2 18Apr23 complex
+free  energy   TOTEN  =      -50.00000000 eV
+General timing and accounting
+"#;
+
+const VASP_VARIANT_V5_VERSION: &str = r#"--- INCAR ---
+GGA = PE
+ENCUT = 520
+PREC = Accurate
+ISMEAR = 0
+IBRION = 2
+NSW = 1
+EDIFF = 1E-6
+ALGO = Fast
+--- OSZICAR ---
+DAV:   1    0.100E+02    0.100E+02   -0.500E-01   200   0.800E+01
+   1 F= -.75000000E+02 E0= -.74990000E+02  dE = -.10000000E-02
+--- OUTCAR ---
+vasp.5.4.4.18Apr17-6-g9f103f2a35
+running on     2 total cores
+free  energy   TOTEN  =      -75.00000000 eV
+General timing and accounting
+"#;
+
 fn test_vasp_rebuild_log(log: &LayeredEventLog) -> LayeredEventLog {
     let mut builder = LayeredEventLogBuilder::new(log.experiment_ref.clone(), log.spec.clone());
     for event in log.events.clone() {
         builder = builder.add_event(event);
     }
     builder.build()
+}
+
+fn parse_vasp_oszicar_energy_pairs(oszicar: &str) -> Vec<(u64, f64)> {
+    parse_oszicar(oszicar, 0)
+        .unwrap()
+        .into_iter()
+        .filter_map(|event| match event.kind {
+            EventKind::EnergyRecord {
+                total: Value::Known(total, _),
+                ..
+            } => Some((event.temporal.simulation_step, total)),
+            _ => None,
+        })
+        .collect()
+}
+
+fn parse_vasp_oszicar_convergence_pairs(oszicar: &str) -> Vec<(u64, f64)> {
+    parse_oszicar(oszicar, 0)
+        .unwrap()
+        .into_iter()
+        .filter_map(|event| match event.kind {
+            EventKind::ConvergencePoint {
+                iteration,
+                metric_value: Value::Known(metric_value, _),
+                ..
+            } => Some((iteration, metric_value)),
+            _ => None,
+        })
+        .collect()
+}
+
+fn assert_vasp_variant(
+    combined: &str,
+    expected_energies: &[(u64, f64)],
+    expected_patterns: &[ConvergencePattern],
+) {
+    let adapter = VaspAdapter;
+    let log = adapter.parse_trace(combined).unwrap();
+
+    let oszicar_pairs: Vec<(u64, f64)> = log
+        .events
+        .iter()
+        .filter_map(|event| match &event.kind {
+            EventKind::EnergyRecord {
+                total: Value::Known(total, _),
+                ..
+            } if event.provenance.source_file == "OSZICAR" => {
+                Some((event.temporal.simulation_step, *total))
+            }
+            _ => None,
+        })
+        .collect();
+
+    assert_eq!(oszicar_pairs.len(), expected_energies.len());
+    for ((actual_step, actual_energy), (expected_step, expected_energy)) in
+        oszicar_pairs.iter().zip(expected_energies.iter())
+    {
+        assert_eq!(*actual_step, *expected_step);
+        assert!((*actual_energy - *expected_energy).abs() < 1e-6);
+    }
+
+    let actual_patterns: Vec<ConvergencePattern> = classify_all_convergence(&log, "vasp")
+        .into_iter()
+        .map(|canonical| canonical.pattern)
+        .collect();
+    for expected_pattern in expected_patterns {
+        assert!(actual_patterns.contains(expected_pattern));
+    }
+}
+
+fn assert_vasp_parses_energy_count(combined: &str, count: usize) {
+    let adapter = VaspAdapter;
+    let log = adapter.parse_trace(combined).unwrap();
+    let energy_count = log
+        .events
+        .iter()
+        .filter(|event| matches!(event.kind, EventKind::EnergyRecord { .. }))
+        .count();
+    assert_eq!(energy_count, count);
+}
+
+fn assert_vasp_execution_status(combined: &str, expected: ExecutionOutcome) {
+    let adapter = VaspAdapter;
+    let log = adapter.parse_trace(combined).unwrap();
+    let status = log
+        .events
+        .iter()
+        .find_map(|event| match &event.kind {
+            EventKind::ExecutionStatus { status, .. } => Some(status),
+            _ => None,
+        })
+        .expect("Expected ExecutionStatus event");
+    assert_eq!(status, &expected);
 }
 
 #[test]
@@ -4903,6 +5076,268 @@ fn test_vasp_adapter_error_execution() {
         .expect("Expected ExecutionStatus event");
 
     assert_eq!(*execution, ExecutionOutcome::CrashDivergent);
+}
+
+#[test]
+fn test_vasp_variant_converged_relaxation() {
+    setup();
+    let oszicar = VASP_FILE_CONVERGED_RELAXATION
+        .split("--- OSZICAR ---")
+        .nth(1)
+        .and_then(|section| section.split("--- OUTCAR ---").next())
+        .expect("Expected OSZICAR section");
+    let expected_pairs = vec![(1, -100.0), (2, -100.1), (3, -100.12)];
+    let parsed_pairs = parse_vasp_oszicar_energy_pairs(oszicar);
+    assert_eq!(parsed_pairs, expected_pairs);
+
+    let oszicar_events = parse_oszicar(oszicar, 0).unwrap();
+    let component_names: Vec<Vec<String>> = oszicar_events
+        .iter()
+        .filter_map(|event| match &event.kind {
+            EventKind::EnergyRecord { components, .. } => Some(
+                components
+                    .iter()
+                    .map(|(name, _)| name.clone())
+                    .collect::<Vec<String>>(),
+            ),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(component_names.len(), 3);
+    assert!(component_names
+        .iter()
+        .all(|names| names == &vec!["E0".to_string(), "dE".to_string()]));
+
+    assert_vasp_variant(
+        VASP_FILE_CONVERGED_RELAXATION,
+        &expected_pairs,
+        &[ConvergencePattern::Converged],
+    );
+    assert_vasp_execution_status(
+        VASP_FILE_CONVERGED_RELAXATION,
+        ExecutionOutcome::Success,
+    );
+}
+
+#[test]
+fn test_vasp_variant_nonconverged_scf() {
+    setup();
+    let oszicar = VASP_FILE_NONCONVERGED_SCF
+        .split("--- OSZICAR ---")
+        .nth(1)
+        .and_then(|section| section.split("--- OUTCAR ---").next())
+        .expect("Expected OSZICAR section");
+
+    let energy_pairs = parse_vasp_oszicar_energy_pairs(oszicar);
+    assert!(energy_pairs.is_empty());
+
+    let convergence_pairs = parse_vasp_oszicar_convergence_pairs(oszicar);
+    let expected_pairs = vec![(1, 50.0), (2, 20.0), (3, 10.0), (4, 5.0), (5, 2.0)];
+    assert_eq!(convergence_pairs.len(), expected_pairs.len());
+    for ((actual_iteration, actual_value), (expected_iteration, expected_value)) in
+        convergence_pairs.iter().zip(expected_pairs.iter())
+    {
+        assert_eq!(*actual_iteration, *expected_iteration);
+        assert!((*actual_value - *expected_value).abs() < 1e-6);
+    }
+
+    let oszicar_events = parse_oszicar(oszicar, 0).unwrap();
+    let unconverged_count = oszicar_events
+        .iter()
+        .filter(|event| {
+            matches!(
+                event.kind,
+                EventKind::ConvergencePoint {
+                    converged: None,
+                    ..
+                }
+            )
+        })
+        .count();
+    assert_eq!(unconverged_count, 5);
+
+    assert_vasp_variant(
+        VASP_FILE_NONCONVERGED_SCF,
+        &[],
+        &[ConvergencePattern::InsufficientData],
+    );
+    assert_vasp_execution_status(VASP_FILE_NONCONVERGED_SCF, ExecutionOutcome::Timeout);
+}
+
+#[test]
+fn test_vasp_variant_mixed_scf_dav_rmm() {
+    setup();
+    let oszicar = VASP_FILE_MIXED_SCF_DAV_RMM
+        .split("--- OSZICAR ---")
+        .nth(1)
+        .and_then(|section| section.split("--- OUTCAR ---").next())
+        .expect("Expected OSZICAR section");
+
+    let expected_energy_pairs = vec![(1, -21.0), (2, -21.1)];
+    let parsed_energy_pairs = parse_vasp_oszicar_energy_pairs(oszicar);
+    assert_eq!(parsed_energy_pairs, expected_energy_pairs);
+
+    let convergence_pairs = parse_vasp_oszicar_convergence_pairs(oszicar);
+    let expected_convergence_pairs = vec![
+        (1, 6.0),
+        (2, 3.0),
+        (3, 2.0),
+        (4, 1.0),
+        (1, 5.0),
+        (2, 2.5),
+        (3, 1.2),
+        (4, 0.6),
+    ];
+    assert_eq!(convergence_pairs.len(), expected_convergence_pairs.len());
+    for ((actual_iteration, actual_value), (expected_iteration, expected_value)) in
+        convergence_pairs.iter().zip(expected_convergence_pairs.iter())
+    {
+        assert_eq!(*actual_iteration, *expected_iteration);
+        assert!((*actual_value - *expected_value).abs() < 1e-6);
+    }
+
+    assert_vasp_variant(
+        VASP_FILE_MIXED_SCF_DAV_RMM,
+        &expected_energy_pairs,
+        &[ConvergencePattern::Converged],
+    );
+    assert_vasp_execution_status(VASP_FILE_MIXED_SCF_DAV_RMM, ExecutionOutcome::Success);
+}
+
+#[test]
+fn test_vasp_variant_error_edddav() {
+    setup();
+    assert_vasp_variant(
+        VASP_VARIANT_ERROR_EDDDAV,
+        &[(1, -100.0)],
+        &[ConvergencePattern::Divergent],
+    );
+    assert_vasp_execution_status(
+        VASP_VARIANT_ERROR_EDDDAV,
+        ExecutionOutcome::CrashDivergent,
+    );
+}
+
+#[test]
+fn test_vasp_variant_large_encut_scinotation() {
+    setup();
+    assert_vasp_variant(
+        VASP_VARIANT_LARGE_ENCUT_SCINOTATION,
+        &[(1, -200.0)],
+        &[ConvergencePattern::Converged],
+    );
+    assert_vasp_execution_status(
+        VASP_VARIANT_LARGE_ENCUT_SCINOTATION,
+        ExecutionOutcome::Success,
+    );
+
+    let adapter = VaspAdapter;
+    let log = adapter
+        .parse_trace(VASP_VARIANT_LARGE_ENCUT_SCINOTATION)
+        .unwrap();
+    let encut = log
+        .events
+        .iter()
+        .find(|event| {
+            matches!(
+                &event.kind,
+                EventKind::ParameterRecord { name, .. } if name == "ENCUT"
+            )
+        })
+        .expect("Expected ENCUT parameter");
+    match &encut.kind {
+        EventKind::ParameterRecord { actual_value, .. } => {
+            assert_eq!(actual_value, &Value::Known(1200.0, "eV".to_string()));
+        }
+        other => panic!("Expected ParameterRecord for ENCUT, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_vasp_variant_static_calc() {
+    setup();
+    assert_vasp_variant(
+        VASP_VARIANT_STATIC_CALC,
+        &[(1, -50.0)],
+        &[ConvergencePattern::Converged],
+    );
+    assert_vasp_execution_status(VASP_VARIANT_STATIC_CALC, ExecutionOutcome::Success);
+}
+
+#[test]
+fn test_vasp_variant_v5_version() {
+    setup();
+    assert_vasp_variant(
+        VASP_VARIANT_V5_VERSION,
+        &[(1, -75.0)],
+        &[ConvergencePattern::Converged],
+    );
+
+    let adapter = VaspAdapter;
+    let log = adapter.parse_trace(VASP_VARIANT_V5_VERSION).unwrap();
+    let has_v5 = log.events.iter().any(|event| {
+        matches!(
+            &event.kind,
+            EventKind::ResourceStatus { platform_type, .. }
+                if platform_type.to_ascii_lowercase().contains("vasp.5")
+        )
+    });
+    assert!(has_v5);
+}
+
+#[test]
+fn test_vasp_variant_truncated_outcar() {
+    setup();
+    let combined = format!(
+        "--- INCAR ---\n{}\n--- OSZICAR ---\n{}\n--- OUTCAR ---\n{}",
+        VASP_INCAR_SAMPLE, VASP_OSZICAR_SAMPLE, VASP_OUTCAR_TRUNCATED
+    );
+    assert_vasp_execution_status(&combined, ExecutionOutcome::Timeout);
+
+    let adapter = VaspAdapter;
+    let log = adapter.parse_trace(&combined).unwrap();
+    let timeout = log
+        .events
+        .iter()
+        .find(|event| {
+            matches!(
+                event.kind,
+                EventKind::ExecutionStatus {
+                    status: ExecutionOutcome::Timeout,
+                    ..
+                }
+            )
+        })
+        .expect("Expected timeout execution status");
+    match &timeout.confidence.completeness {
+        Completeness::PartiallyInferred { inference_method } => {
+            assert_eq!(inference_method, "no completion marker in OUTCAR");
+        }
+        other => panic!("Expected PartiallyInferred completeness, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_vasp_variant_error_very_bad_news() {
+    setup();
+    let combined = format!(
+        "--- INCAR ---\n{}\n--- OSZICAR ---\n{}\n--- OUTCAR ---\n{}",
+        VASP_INCAR_SAMPLE, VASP_OSZICAR_SAMPLE, VASP_OUTCAR_ERROR
+    );
+    assert_vasp_variant(
+        &combined,
+        &[(1, -114.01725), (2, -114.11725)],
+        &[ConvergencePattern::Divergent],
+    );
+    assert_vasp_execution_status(&combined, ExecutionOutcome::CrashDivergent);
+}
+
+#[test]
+fn test_vasp_variant_energy_count_cross_source() {
+    setup();
+    assert_vasp_parses_energy_count(VASP_FILE_CONVERGED_RELAXATION, 4);
+    assert_vasp_parses_energy_count(VASP_FILE_NONCONVERGED_SCF, 1);
+    assert_vasp_parses_energy_count(VASP_FILE_MIXED_SCF_DAV_RMM, 3);
 }
 
 fn test_convergence_event(
