@@ -159,6 +159,70 @@
       "slug": "monitoring-hooks-aggregate-contract",
       "goal": "Implement continuous monitoring hooks (triggers T1-T5, contract metadata emission, deterministic drift report) for the locked AggregateScore contract, converting Session 9's one-time acceptance proof into an ongoing regression alarm system.",
       "framework": "RISEN"
+    },
+    {
+      "sequence": 21,
+      "filename": "prompt_021_2026-02-22_ci-gate-contract-enforcement.md",
+      "created": "2026-02-22T20:10:02.286973",
+      "slug": "ci-gate-contract-enforcement",
+      "goal": "Implement a GitHub Actions CI gate that runs both acceptance_test.py and monitoring_hooks.py on every push/PR to master, failing on non-zero exit, uploading artifacts, with FINDINGS.md Session 11 entry and bead management",
+      "framework": "RISEN"
+    },
+    {
+      "sequence": 22,
+      "filename": "prompt_022_2026-02-22_branch-protection-enforcement-proof.md",
+      "created": "2026-02-22T21:14:53.426187",
+      "slug": "branch-protection-enforcement-proof",
+      "goal": "Enforce contract-gate CI check via GitHub branch protection on master requiring contract-verification, prove with pass/fail PRs, record Session 12 evidence in FINDINGS.md",
+      "framework": "RISEN"
+    },
+    {
+      "sequence": 23,
+      "filename": "prompt_023_2026-02-22_admin-bypass-closure-direct-push.md",
+      "created": "2026-02-22T22:38:26.100247",
+      "slug": "admin-bypass-closure-direct-push",
+      "goal": "Close admin direct-push bypass on master with enforce_admins=true, prove direct push rejected, confirm PR path works, clean up S12 PRs, record Session 13 evidence",
+      "framework": "RISEN"
+    },
+    {
+      "sequence": 24,
+      "filename": "prompt_024_2026-02-22_governance-audit-runbook-break-glass.md",
+      "created": "2026-02-22T23:49:51.465435",
+      "slug": "governance-audit-runbook-break-glass",
+      "goal": "Codify governance chain into repeatable audit runbook with exact commands and break-glass procedure with explicit guardrails",
+      "framework": "RISEN"
+    },
+    {
+      "sequence": 25,
+      "filename": "prompt_025_2026-02-23_session-16-audit-automation-drill.md",
+      "created": "2026-02-23T12:00:16.112965",
+      "slug": "session-16-audit-automation-drill",
+      "goal": "Build a Session 16 plan that automates the governance audit via a read-only C1-C7 script, rehearses break-glass as a tabletop drill, and defines per-check escalation thresholds",
+      "framework": "RISEN"
+    },
+    {
+      "sequence": 26,
+      "filename": "prompt_026_2026-02-23_session-17-break-glass-outage-resilience.md",
+      "created": "2026-02-23T13:18:22.536364",
+      "slug": "session-17-break-glass-outage-resilience",
+      "goal": "Extend break-glass procedure with outage-mode fallback paths, operator decision tree, evidence capture, and tabletop drill",
+      "framework": "RISEN"
+    },
+    {
+      "sequence": 27,
+      "filename": "prompt_027_2026-02-23_session-18-sandboxed-live-drill.md",
+      "created": "2026-02-23T14:40:55.960061",
+      "slug": "session-18-sandboxed-live-drill",
+      "goal": "Sandboxed live drill of Mode B and Mode C outage procedures with real timestamps, evidence capture, and policy window validation",
+      "framework": "RISEN"
+    },
+    {
+      "sequence": 28,
+      "filename": "prompt_028_2026-02-23_session-19-wdk41-closure-wdk43.md",
+      "created": "2026-02-23T15:54:52.429397",
+      "slug": "session-19-wdk41-closure-wdk43",
+      "goal": "Close WDK#41 bookkeeping, begin WDK#43 convergence-summary derivation for GROMACS/OpenMM",
+      "framework": "RISEN"
     }
   ]
 }
