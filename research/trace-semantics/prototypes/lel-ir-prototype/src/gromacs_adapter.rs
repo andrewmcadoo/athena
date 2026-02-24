@@ -1,5 +1,6 @@
 use crate::adapter::{AdapterError, DslAdapter};
 use crate::common::*;
+use crate::convergence;
 use crate::event_kinds::EventKind;
 use crate::lel::*;
 
@@ -7,8 +8,6 @@ pub struct GromacsAdapter;
 
 const MDP_MARKER: &str = "--- MDP ---";
 const LOG_MARKER: &str = "--- LOG ---";
-const GROMACS_MIN_CONVERGENCE_WINDOW: usize = 4;
-const GROMACS_REL_DELTA_THRESHOLD: f64 = 1.0e-4;
 
 pub fn classify_mdp_parameter(
     key: &str,
@@ -531,127 +530,6 @@ pub fn parse_log(content: &str, seq_offset: u64) -> Result<Vec<TraceEvent>, Adap
     Ok(events)
 }
 
-fn gromacs_energy_total(event: &TraceEvent) -> Option<f64> {
-    match &event.kind {
-        EventKind::EnergyRecord {
-            total: Value::Known(total, _),
-            ..
-        } => Some(*total),
-        _ => None,
-    }
-}
-
-fn derive_gromacs_convergence_summary(events: &[TraceEvent]) -> Option<TraceEvent> {
-    let energy_events: Vec<(&TraceEvent, f64)> = events
-        .iter()
-        .filter_map(|event| gromacs_energy_total(event).map(|total| (event, total)))
-        .collect();
-
-    if energy_events.len() < GROMACS_MIN_CONVERGENCE_WINDOW {
-        return None;
-    }
-
-    let window = &energy_events[energy_events.len() - GROMACS_MIN_CONVERGENCE_WINDOW..];
-    let deltas: Vec<f64> = window.windows(2).map(|pair| pair[1].1 - pair[0].1).collect();
-    if deltas.is_empty() {
-        return None;
-    }
-
-    let energy_scale =
-        (window.iter().map(|(_, value)| value.abs()).sum::<f64>() / window.len() as f64).max(1.0);
-    let rel_abs_deltas: Vec<f64> = deltas
-        .iter()
-        .map(|delta| delta.abs() / energy_scale)
-        .collect();
-    let max_rel_delta = rel_abs_deltas
-        .iter()
-        .copied()
-        .fold(0.0_f64, f64::max);
-    let mean_rel_delta = rel_abs_deltas.iter().sum::<f64>() / rel_abs_deltas.len() as f64;
-    let sign_changes = deltas
-        .windows(2)
-        .filter(|pair| pair[0] * pair[1] < 0.0)
-        .count();
-
-    let (metric_name, metric_value, converged, note) =
-        if sign_changes >= 2 && mean_rel_delta > GROMACS_REL_DELTA_THRESHOLD {
-            (
-                "derived_oscillation_rel_delta_mean",
-                mean_rel_delta,
-                Some(false),
-                "energy deltas alternate sign across the derivation window",
-            )
-        } else if max_rel_delta <= GROMACS_REL_DELTA_THRESHOLD {
-            (
-                "derived_convergence_rel_delta_max",
-                max_rel_delta,
-                Some(true),
-                "max relative energy delta is below convergence threshold",
-            )
-        } else {
-            (
-                "derived_stall_rel_delta_mean",
-                mean_rel_delta,
-                Some(false),
-                "energy deltas remain above threshold without oscillation",
-            )
-        };
-
-    let mut causal_refs = window
-        .iter()
-        .map(|(event, _)| event.id)
-        .collect::<Vec<_>>();
-    if let Some(exec_event) = events
-        .iter()
-        .rev()
-        .find(|event| matches!(event.kind, EventKind::ExecutionStatus { .. }))
-    {
-        causal_refs.push(exec_event.id);
-    }
-    if let Some(numerical_event) = events
-        .iter()
-        .rev()
-        .find(|event| matches!(event.kind, EventKind::NumericalStatus { .. }))
-    {
-        causal_refs.push(numerical_event.id);
-    }
-
-    let from_elements = causal_refs.iter().map(|id| ElementId(id.0)).collect();
-    let simulation_step = window.last().map(|(event, _)| event.temporal.simulation_step)?;
-    let logical_sequence = events
-        .last()
-        .map(|event| event.temporal.logical_sequence + 1)
-        .unwrap_or(1);
-
-    Some(
-        TraceEventBuilder::new()
-            .layer(Layer::Methodology)
-            .kind(EventKind::ConvergencePoint {
-                iteration: simulation_step,
-                metric_name: metric_name.to_string(),
-                metric_value: Value::Known(metric_value, "relative".to_string()),
-                converged,
-            })
-            .temporal(TemporalCoord {
-                simulation_step,
-                wall_clock_ns: None,
-                logical_sequence,
-            })
-            .causal_refs(causal_refs)
-            .provenance(ProvenanceAnchor {
-                source_file: "simulation.log".to_string(),
-                source_location: SourceLocation::ExternalInput,
-                raw_hash: 0,
-            })
-            .confidence(ConfidenceMeta {
-                completeness: Completeness::Derived { from_elements },
-                field_coverage: 1.0,
-                notes: vec![note.to_string()],
-            })
-            .build(),
-    )
-}
-
 impl DslAdapter for GromacsAdapter {
     fn parse_trace(&self, raw: &str) -> Result<LayeredEventLog, AdapterError> {
         let mdp_marker_pos = raw.find(MDP_MARKER);
@@ -715,7 +593,9 @@ impl DslAdapter for GromacsAdapter {
             }
         }
 
-        if let Some(summary_event) = derive_gromacs_convergence_summary(&log_events) {
+        if let Some(summary_event) =
+            convergence::derive_energy_convergence_summary(&log_events, "simulation.log")
+        {
             log_events.push(summary_event);
         }
 
