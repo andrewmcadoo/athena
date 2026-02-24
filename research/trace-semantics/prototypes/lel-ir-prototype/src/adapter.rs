@@ -38,14 +38,19 @@ pub trait DslAdapter {
     fn parse_trace(&self, raw: &str) -> Result<LayeredEventLog, AdapterError>;
 }
 
-fn parse_openmm_energy_series(raw: &str) -> Vec<(u64, f64)> {
+pub(crate) fn parse_openmm_energy_series(raw: &str) -> Vec<(u64, f64)> {
     let non_empty_lines: Vec<&str> = raw
         .lines()
         .map(str::trim)
         .filter(|line| !line.is_empty())
         .collect();
     if let Some(first_line) = non_empty_lines.first().copied() {
-        if first_line.starts_with("#\"Step\"") || first_line.starts_with("#\"") {
+        let normalized_header =
+            first_line.trim_start_matches('\u{feff}').trim_start_matches('#');
+        let header_is_csv = normalized_header.contains(',')
+            && normalized_header.contains("Step")
+            && normalized_header.contains("Potential Energy");
+        if header_is_csv {
             return parse_openmm_csv_energy_series(&non_empty_lines);
         }
     }
@@ -69,6 +74,7 @@ fn parse_openmm_csv_fields(line: &str) -> Vec<String> {
     line.split(',')
         .map(|field| {
             field
+                .trim_start_matches('\u{feff}')
                 .trim()
                 .trim_start_matches('#')
                 .trim()

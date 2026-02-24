@@ -1,6 +1,6 @@
 use std::sync::Once;
 
-use crate::adapter::{DslAdapter, MockOpenMmAdapter};
+use crate::adapter::{parse_openmm_energy_series, DslAdapter, MockOpenMmAdapter};
 use crate::common::*;
 use crate::convergence::{
     classify_all_convergence, classify_convergence, ConvergenceConfidence, ConvergencePattern,
@@ -2456,6 +2456,76 @@ const OPENMM_CSV_BOUNDARY: &str = r#"
 300,0.600,0.0003,300.20
 "#;
 
+const OPENMM_REAL_CSV_DEFAULT_KJ: &str =
+    include_str!("../../testdata/openmm_state_datareporter/openmm84_default_kj.csv");
+const OPENMM_REAL_CSV_REORDERED_EXTRA_COLUMNS: &str = include_str!(
+    "../../testdata/openmm_state_datareporter/openmm84_progress_volume_density_speed.csv"
+);
+const OPENMM_REAL_CSV_MINIMAL_COLUMNS: &str =
+    include_str!("../../testdata/openmm_state_datareporter/openmm84_minimal_step_potential.csv");
+const OPENMM_REAL_CSV_WINDOWS_CRLF: &str =
+    include_str!("../../testdata/openmm_state_datareporter/openmm84_crlf.csv");
+const OPENMM_REAL_CSV_BOM_PREFIX: &str =
+    include_str!("../../testdata/openmm_state_datareporter/openmm84_bom.csv");
+
+const OPENMM_SOURCE_DERIVED_CSV_KCAL_UNITS: &str = r#"
+#"Step","Time (ps)","Potential Energy (kcal/mol)","Temperature (K)"
+100,0.200,0.0,300.0
+200,0.400,0.0,300.0
+300,0.600,0.0,300.0
+400,0.800,0.0,300.0
+"#;
+
+const OPENMM_SOURCE_DERIVED_CSV_UNQUOTED_HEADER: &str = r#"
+Step,Time (ps),Potential Energy (kJ/mole),Temperature (K)
+100,0.200,0.0,300.0
+200,0.400,0.0,300.0
+300,0.600,0.0,300.0
+400,0.800,0.0,300.0
+"#;
+
+const OPENMM_SOURCE_DERIVED_CSV_EMPTY_TRAILING_COLUMNS: &str = r#"
+#"Step","Time (ps)","Potential Energy (kJ/mole)","Temperature (K)",
+100,0.200,0.0,300.0,
+200,0.400,0.0,300.0,
+300,0.600,0.0,300.0,
+400,0.800,0.0,300.0,
+"#;
+
+const OPENMM_EXPECTED_REAL_ZERO_SERIES_5: [(u64, f64); 5] = [
+    (100, 0.0),
+    (200, 0.0),
+    (300, 0.0),
+    (400, 0.0),
+    (500, 0.0),
+];
+const OPENMM_EXPECTED_ZERO_SERIES_4: [(u64, f64); 4] =
+    [(100, 0.0), (200, 0.0), (300, 0.0), (400, 0.0)];
+
+fn assert_openmm_csv_variant(
+    raw: &str,
+    expected_pairs: &[(u64, f64)],
+    expected_pattern: ConvergencePattern,
+) {
+    let parsed = parse_openmm_energy_series(raw);
+    assert_eq!(parsed.len(), expected_pairs.len());
+    for ((actual_step, actual_energy), (expected_step, expected_energy)) in
+        parsed.iter().zip(expected_pairs.iter())
+    {
+        assert_eq!(*actual_step, *expected_step);
+        assert!((*actual_energy - *expected_energy).abs() < 1e-12);
+    }
+
+    let adapter = MockOpenMmAdapter;
+    let log = adapter.parse_trace(raw).unwrap();
+    let canonical = classify_all_convergence(&log, "openmm");
+    let first_pattern = canonical
+        .first()
+        .map(|entry| entry.pattern.clone())
+        .unwrap_or(ConvergencePattern::InsufficientData);
+    assert_eq!(first_pattern, expected_pattern);
+}
+
 #[test]
 fn test_mock_adapter() {
     setup();
@@ -2705,6 +2775,96 @@ fn test_openmm_csv_divergent_fixture_emits_nan_status() {
             }
         )
     }));
+}
+
+#[test]
+fn test_openmm_csv_variant_reordered_columns() {
+    setup();
+    assert_openmm_csv_variant(
+        OPENMM_REAL_CSV_REORDERED_EXTRA_COLUMNS,
+        &OPENMM_EXPECTED_REAL_ZERO_SERIES_5,
+        ConvergencePattern::Converged,
+    );
+}
+
+#[test]
+fn test_openmm_csv_variant_optional_extra_columns() {
+    setup();
+    assert_openmm_csv_variant(
+        OPENMM_REAL_CSV_REORDERED_EXTRA_COLUMNS,
+        &OPENMM_EXPECTED_REAL_ZERO_SERIES_5,
+        ConvergencePattern::Converged,
+    );
+}
+
+#[test]
+fn test_openmm_csv_variant_minimal_columns() {
+    setup();
+    assert_openmm_csv_variant(
+        OPENMM_REAL_CSV_MINIMAL_COLUMNS,
+        &OPENMM_EXPECTED_REAL_ZERO_SERIES_5,
+        ConvergencePattern::Converged,
+    );
+}
+
+#[test]
+fn test_openmm_csv_variant_kcal_units() {
+    setup();
+    assert_openmm_csv_variant(
+        OPENMM_SOURCE_DERIVED_CSV_KCAL_UNITS,
+        &OPENMM_EXPECTED_ZERO_SERIES_4,
+        ConvergencePattern::Converged,
+    );
+}
+
+#[test]
+fn test_openmm_csv_variant_quoted_header() {
+    setup();
+    assert_openmm_csv_variant(
+        OPENMM_REAL_CSV_DEFAULT_KJ,
+        &OPENMM_EXPECTED_REAL_ZERO_SERIES_5,
+        ConvergencePattern::Converged,
+    );
+}
+
+#[test]
+fn test_openmm_csv_variant_unquoted_header() {
+    setup();
+    assert_openmm_csv_variant(
+        OPENMM_SOURCE_DERIVED_CSV_UNQUOTED_HEADER,
+        &OPENMM_EXPECTED_ZERO_SERIES_4,
+        ConvergencePattern::Converged,
+    );
+}
+
+#[test]
+fn test_openmm_csv_variant_empty_trailing_columns() {
+    setup();
+    assert_openmm_csv_variant(
+        OPENMM_SOURCE_DERIVED_CSV_EMPTY_TRAILING_COLUMNS,
+        &OPENMM_EXPECTED_ZERO_SERIES_4,
+        ConvergencePattern::Converged,
+    );
+}
+
+#[test]
+fn test_openmm_csv_variant_windows_crlf() {
+    setup();
+    assert_openmm_csv_variant(
+        OPENMM_REAL_CSV_WINDOWS_CRLF,
+        &OPENMM_EXPECTED_REAL_ZERO_SERIES_5,
+        ConvergencePattern::Converged,
+    );
+}
+
+#[test]
+fn test_openmm_csv_variant_bom_prefix() {
+    setup();
+    assert_openmm_csv_variant(
+        OPENMM_REAL_CSV_BOM_PREFIX,
+        &OPENMM_EXPECTED_REAL_ZERO_SERIES_5,
+        ConvergencePattern::Converged,
+    );
 }
 
 #[test]

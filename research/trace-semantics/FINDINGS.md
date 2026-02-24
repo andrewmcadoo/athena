@@ -17,7 +17,7 @@ What intermediate representation (IR) can translate raw DSL trace logs from stru
 
 ## Status
 
-IN PROGRESS — Steps 1-7 and all synthesis steps (1d, 2c, 3b) complete. Step 5a (candidate IR schemas) complete: Hybrid LEL+DGR recommended (94/100). Step 5b (LEL prototype) complete. Step 5c (open thread resolution) complete: 5/5 threads resolved/narrowed/deferred with evidence. Step 6 (Hybrid LEL+DGR Phase 2 prototype) complete: `by_id` index implemented, `CausalOverlay` + R14 confounder query implemented. Step 7 (R17+R18 query implementation) complete: `compare_predictions` + `implicate_causal_nodes` implemented with depth-aware BFS helper. Step 9 complete: GROMACS adapter implemented on existing LEL types (`src/gromacs_adapter.rs`). Step 10 complete: VASP adapter implemented on existing LEL types (`src/vasp_adapter.rs`) with first adapter-level use of `ConvergencePoint` and `StateSnapshot`. Step 11 complete: hidden confounder prototype litmus validated end-to-end on VASP-derived traces. Step 12 complete: R17 quantitative comparison formalization narrowed with a trace-semantics-to-adversarial-reward interface contract. Step 13 complete (NARROWED): convergence trajectory representation recommends a hybrid raw-plus-summary design (Option D) with ComparisonProfileV1-compatible outputs and explicit WDK#40 hook. Step 14 complete (NARROWED): minimal `UncertaintySummary` schema direction selected (layered point summary + optional tagged distribution payload) with six-consumer trace and cross-adapter feasibility evidence. Session 19 added WDK#41 bookkeeping closure and WDK#43 prototype derivation rules for GROMACS/OpenMM convergence summaries. Session 20 resolves WDK#42 and WDK#44 in prototype scope via shared convergence derivation extraction, canonical taxonomy projection, OpenMM CSV support, and cross-framework equivalence tests. Crate now passes 119/119 tests with strict clippy clean.
+IN PROGRESS — Steps 1-7 and all synthesis steps (1d, 2c, 3b) complete. Step 5a (candidate IR schemas) complete: Hybrid LEL+DGR recommended (94/100). Step 5b (LEL prototype) complete. Step 5c (open thread resolution) complete: 5/5 threads resolved/narrowed/deferred with evidence. Step 6 (Hybrid LEL+DGR Phase 2 prototype) complete: `by_id` index implemented, `CausalOverlay` + R14 confounder query implemented. Step 7 (R17+R18 query implementation) complete: `compare_predictions` + `implicate_causal_nodes` implemented with depth-aware BFS helper. Step 9 complete: GROMACS adapter implemented on existing LEL types (`src/gromacs_adapter.rs`). Step 10 complete: VASP adapter implemented on existing LEL types (`src/vasp_adapter.rs`) with first adapter-level use of `ConvergencePoint` and `StateSnapshot`. Step 11 complete: hidden confounder prototype litmus validated end-to-end on VASP-derived traces. Step 12 complete: R17 quantitative comparison formalization narrowed with a trace-semantics-to-adversarial-reward interface contract. Step 13 complete (NARROWED): convergence trajectory representation recommends a hybrid raw-plus-summary design (Option D) with ComparisonProfileV1-compatible outputs and explicit WDK#40 hook. Step 14 complete (NARROWED): minimal `UncertaintySummary` schema direction selected (layered point summary + optional tagged distribution payload) with six-consumer trace and cross-adapter feasibility evidence. Session 19 added WDK#41 bookkeeping closure and WDK#43 prototype derivation rules for GROMACS/OpenMM convergence summaries. Session 20 resolved WDK#42 and WDK#44 in prototype scope via shared convergence derivation extraction, canonical taxonomy projection, OpenMM CSV support, and cross-framework equivalence tests. Session 21 validated OpenMM CSV parser behavior against real StateDataReporter variant fixtures and closed Session 20 open thread #1. Crate now passes 128/128 tests with strict clippy clean.
 
 ## Key Definitions
 
@@ -64,36 +64,78 @@ IN PROGRESS — Steps 1-7 and all synthesis steps (1d, 2c, 3b) complete. Step 5a
 
 ## Investigation Log
 
-> **Investigation Log Index** — 26 entries, reverse chronological.
+> **Investigation Log Index** — 27 entries, reverse chronological.
 >
 > | # | Date | Identifier | Scope |
 > | :--- | :--- | :--- | :--- |
-> | 1 | 2026-02-23 | Session 20 | WDK#42 canonical taxonomy + WDK#44 placement decision + OpenMM CSV validation |
-> | 2 | 2026-02-24 | Session 19 | WDK#41 closure + WDK#43 convergence-summary derivation |
-> | 3 | 2026-02-21 | WDK#26 | INCAR classification table completeness |
-> | 4 | 2026-02-21 | WDK#25 | VASP closed-source observability ceiling |
-> | 5 | 2026-02-21 | WDK#39 | prediction_id type harmonization |
-> | 6 | 2026-02-21 | WDK#35 + WDK#36 | ContractTerm value extensions for VASP |
-> | 7 | 2026-02-22 | Step 14 | UncertaintySummary schema for divergence metrics |
-> | 8 | 2026-02-22 | Step 13 | Convergence trajectory representation |
-> | 9 | 2026-02-22 | Step 12 | R17 comparison formalization and interface contract |
-> | 10 | 2026-02-22 | Step 11 | Hidden confounder prototype litmus test |
-> | 11 | 2026-02-22 | Step 10 | VASP adapter implementation |
-> | 12 | 2026-02-21 | Step 9 | GROMACS adapter for cross-framework validation |
-> | 13 | 2026-02-21 | Step 7 | R17+R18 query implementation |
-> | 14 | 2026-02-21 | Step 6 | Hybrid LEL+DGR Phase 2 prototype |
-> | 15 | 2026-02-21 | Step 5c | Open thread resolution |
-> | 16 | 2026-02-20 | Step 5a | Candidate IR schemas with Hybrid recommendation |
-> | 17 | 2026-02-20 | Step 3b | Requirements coverage matrix and gap analysis |
-> | 18 | 2026-02-20 | Step 2c | Comparative IR synthesis |
-> | 19 | 2026-02-20 | Step 1d | Cross-framework trace synthesis |
-> | 20 | 2026-02-20 | — | 21% RCA baseline characterization |
-> | 21 | 2026-02-20 | — | LFI audit to IR requirements mapping |
-> | 22 | 2026-02-20 | — | Provenance and scientific workflow IR survey |
-> | 23 | 2026-02-20 | Entry 1 | RCA and formal verification IR survey |
-> | 24 | 2026-02-20 | Entry 001 | VASP trace output system survey |
-> | 25 | 2026-02-20 | — | GROMACS trace format characterization |
-> | 26 | 2026-02-20 | — | OpenMM trace format characterization |
+> | 1 | 2026-02-24 | Session 21 | OpenMM StateDataReporter CSV reality-check variants |
+> | 2 | 2026-02-23 | Session 20 | WDK#42 canonical taxonomy + WDK#44 placement decision + OpenMM CSV validation |
+> | 3 | 2026-02-24 | Session 19 | WDK#41 closure + WDK#43 convergence-summary derivation |
+> | 4 | 2026-02-21 | WDK#26 | INCAR classification table completeness |
+> | 5 | 2026-02-21 | WDK#25 | VASP closed-source observability ceiling |
+> | 6 | 2026-02-21 | WDK#39 | prediction_id type harmonization |
+> | 7 | 2026-02-21 | WDK#35 + WDK#36 | ContractTerm value extensions for VASP |
+> | 8 | 2026-02-22 | Step 14 | UncertaintySummary schema for divergence metrics |
+> | 9 | 2026-02-22 | Step 13 | Convergence trajectory representation |
+> | 10 | 2026-02-22 | Step 12 | R17 comparison formalization and interface contract |
+> | 11 | 2026-02-22 | Step 11 | Hidden confounder prototype litmus test |
+> | 12 | 2026-02-22 | Step 10 | VASP adapter implementation |
+> | 13 | 2026-02-21 | Step 9 | GROMACS adapter for cross-framework validation |
+> | 14 | 2026-02-21 | Step 7 | R17+R18 query implementation |
+> | 15 | 2026-02-21 | Step 6 | Hybrid LEL+DGR Phase 2 prototype |
+> | 16 | 2026-02-21 | Step 5c | Open thread resolution |
+> | 17 | 2026-02-20 | Step 5a | Candidate IR schemas with Hybrid recommendation |
+> | 18 | 2026-02-20 | Step 3b | Requirements coverage matrix and gap analysis |
+> | 19 | 2026-02-20 | Step 2c | Comparative IR synthesis |
+> | 20 | 2026-02-20 | Step 1d | Cross-framework trace synthesis |
+> | 21 | 2026-02-20 | — | 21% RCA baseline characterization |
+> | 22 | 2026-02-20 | — | LFI audit to IR requirements mapping |
+> | 23 | 2026-02-20 | — | Provenance and scientific workflow IR survey |
+> | 24 | 2026-02-20 | Entry 1 | RCA and formal verification IR survey |
+> | 25 | 2026-02-20 | Entry 001 | VASP trace output system survey |
+> | 26 | 2026-02-20 | — | GROMACS trace format characterization |
+> | 27 | 2026-02-20 | — | OpenMM trace format characterization |
+
+### 2026-02-24: Session 21 — OpenMM StateDataReporter CSV Reality-Check Variants
+**Date:** 2026-02-24
+**Scope:** Close Session 20 open thread #1 by validating `parse_openmm_energy_series` against real OpenMM `StateDataReporter` CSV variants (column order, optional/minimal columns, quoting, BOM/CRLF/trailing-edge behavior), and apply only minimal parser fixes required by observed failures.
+**Method:** (1) Generated real OpenMM 8.4 sample CSV outputs using `openmm.app.StateDataReporter` under multiple parameter combinations and encodings, (2) added fixture corpus constants in `src/tests/mod.rs` (real `include_str!` fixtures + source-derived fallback fixtures when reporter-native emission was unavailable), (3) added additive tests `test_openmm_csv_variant_*` that assert both direct parser extraction and full adapter -> `classify_all_convergence` canonical label output, (4) ran targeted + full gates, (5) applied minimal parser fixes only for variants that failed in reality-check execution.
+
+**Findings:**
+
+1. **Reporter-native reordered/optional-column variants parse correctly with no parser changes.** Real OpenMM 8.4 fixture generated with `progress=True, step=True, time=True, potentialEnergy=True, volume=True, density=True, speed=True, elapsedTime=True, remainingTime=True, totalSteps=500` places `"Step"` and `"Potential Energy"` in non-default positions and includes optional fields; parser extracted expected `(step, energy)` pairs and canonical classification was `Converged`.  
+   Evidence: `research/trace-semantics/prototypes/lel-ir-prototype/testdata/openmm_state_datareporter/openmm84_progress_volume_density_speed.csv` (OpenMM 8.4); `research/trace-semantics/prototypes/lel-ir-prototype/src/tests/mod.rs::test_openmm_csv_variant_reordered_columns`; `...::test_openmm_csv_variant_optional_extra_columns`; docs `https://docs.openmm.org/latest/api-python/generated/openmm.app.statedatareporter.StateDataReporter.html`.
+
+2. **Reporter-native minimal-column variant parses correctly with no parser changes.** Real OpenMM 8.4 fixture generated with `step=True, potentialEnergy=True` (and all other report flags false) produced a two-column CSV that parsed and classified as `Converged`.  
+   Evidence: `research/trace-semantics/prototypes/lel-ir-prototype/testdata/openmm_state_datareporter/openmm84_minimal_step_potential.csv` (OpenMM 8.4); `research/trace-semantics/prototypes/lel-ir-prototype/src/tests/mod.rs::test_openmm_csv_variant_minimal_columns`; docs `https://docs.openmm.org/latest/api-python/generated/openmm.app.statedatareporter.StateDataReporter.html`.
+
+3. **Unit-variant (`kcal/mol`) is not reporter-native in OpenMM source; parser remains unit-agnostic and raw-value preserving.** `StateDataReporter` hardcodes potential-energy reporting in `kilojoules_per_mole` and header label `"Potential Energy (kJ/mole)"`; therefore `kcal/mol` fixture was source-derived fallback. Parser matched `"Potential Energy"` column token and extracted numeric values without conversion (as required).  
+   Evidence: OpenMM source `https://raw.githubusercontent.com/openmm/openmm/master/wrappers/python/openmm/app/statedatareporter.py` (`headers.append('Potential Energy (kJ/mole)')`, `value_in_unit(unit.kilojoules_per_mole)`); local source `/home/aj/.cache/uv/archive-v0/oskV9iC5bvCINxagv8qtU/lib/python3.12/site-packages/openmm/app/statedatareporter.py`; `research/trace-semantics/prototypes/lel-ir-prototype/src/tests/mod.rs::test_openmm_csv_variant_kcal_units`.
+
+4. **Quoted-header variant succeeds reporter-native; unquoted-header variant initially failed and required a minimal parser fix.** Real OpenMM output writes quoted headers with leading `#`; parser already handled this. Source-derived unquoted-header fixture failed CSV detection under Session 20 logic, then passed after minimal detection change: strip BOM/leading `#`, then detect CSV via `comma + Step + Potential Energy` tokens.  
+   Evidence: `research/trace-semantics/prototypes/lel-ir-prototype/testdata/openmm_state_datareporter/openmm84_default_kj.csv`; `research/trace-semantics/prototypes/lel-ir-prototype/src/tests/mod.rs::test_openmm_csv_variant_quoted_header`; `...::test_openmm_csv_variant_unquoted_header`; parser fix in `research/trace-semantics/prototypes/lel-ir-prototype/src/adapter.rs::parse_openmm_energy_series`; source behavior for quoted header `print('#\"%s\"' % ('\"'+self._separator+'\"').join(headers), ...)` in `statedatareporter.py`.
+
+5. **Edge-case outcomes:**  
+   - **Empty trailing columns:** source-derived fallback parsed successfully with no parser change.  
+   - **Windows `\r\n` line endings:** reporter-native fixture parsed successfully with no parser change.  
+   - **UTF-8 BOM prefix:** reporter-native fixture initially failed and required minimal parser fix (`trim_start_matches('\u{feff}')` in header detection and CSV field normalization).  
+   Evidence: `research/trace-semantics/prototypes/lel-ir-prototype/src/tests/mod.rs::{test_openmm_csv_variant_empty_trailing_columns,test_openmm_csv_variant_windows_crlf,test_openmm_csv_variant_bom_prefix}`; fixtures `research/trace-semantics/prototypes/lel-ir-prototype/testdata/openmm_state_datareporter/openmm84_crlf.csv` and `.../openmm84_bom.csv`; parser fix in `research/trace-semantics/prototypes/lel-ir-prototype/src/adapter.rs::parse_openmm_energy_series` and `::parse_openmm_csv_fields`.
+
+6. **Session 20 open thread #1 is closed for prototype scope.** Additional real-world reporter variants for column order and optional/minimal columns are now covered with real OpenMM 8.4 outputs; quoting and edge-case robustness is now test-backed; unit/non-native formatting variants are explicitly documented with source-derived fallback provenance.  
+   Evidence: Session 20 open thread text at `research/trace-semantics/FINDINGS.md` line 134 (prior state); Session 21 fixtures/tests above.
+
+7. **Prototype gates remain clean after Session 21 changes.** Full suite now passes 128/128 tests and strict clippy remains warning-free.  
+   Evidence: `cargo test`; `cargo clippy -- -D warnings`.
+
+**Implications:**
+
+- **Session 20 open thread #1 is CLOSED (prototype scope).** OpenMM CSV parser behavior has now been validated against a broader, evidence-backed variant corpus with real reporter outputs where available.
+- **Parser robustness improved with minimal, scoped changes only.** No architecture changes were made to `parse_openmm_energy_series`; dual-mode CSV/whitespace behavior is preserved.
+- **Unit conversion remains intentionally out-of-scope.** Real OpenMM reporter output remains kJ-based; parser behavior is unit-agnostic numeric extraction only.
+
+**Open Threads:**
+
+1. If production indexing needs differ, revisit post-pass architecture only with explicit provenance-preservation proofs and measured Stage 1->2 cost/benefit.
 
 ### 2026-02-23: Session 20 — WDK#42 Canonical Taxonomy + WDK#44 Placement Decision + OpenMM CSV Validation
 **Date:** 2026-02-23
@@ -1776,7 +1818,7 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 
 53. **Prototype Stage 2-3 query surface is now validated end-to-end (`R14 + R17 + R18`).** The crate passes 44/44 tests with zero clippy warnings after adding comparison and implication query coverage. [Step 7 log 2026-02-21; `lel-ir-prototype/src/tests/mod.rs`]
 
-54. **Cross-framework IR generalization remains demonstrated across GROMACS and VASP adapters using existing LEL types, and quality gates remain clean after Sessions 19-20 convergence work.** `src/gromacs_adapter.rs` and `src/vasp_adapter.rs` map MD and DFT trace sources into the same `EventKind`/LEL structures and remain compatible with `CausalOverlay::from_log` + R14 query behavior. Crate quality gates now pass at 119/119 tests with strict clippy clean. [Step 9 log 2026-02-21; Step 10 log 2026-02-22; Session 19 log 2026-02-24; Session 20 log 2026-02-23; `lel-ir-prototype/src/tests/mod.rs`]
+54. **Cross-framework IR generalization remains demonstrated across GROMACS and VASP adapters using existing LEL types, and quality gates remain clean after Sessions 19-20 convergence work.** `src/gromacs_adapter.rs` and `src/vasp_adapter.rs` map MD and DFT trace sources into the same `EventKind`/LEL structures and remain compatible with `CausalOverlay::from_log` + R14 query behavior. Crate quality gates now pass at 128/128 tests with strict clippy clean. [Step 9 log 2026-02-21; Step 10 log 2026-02-22; Session 19 log 2026-02-24; Session 20 log 2026-02-23; Session 21 log 2026-02-24; `lel-ir-prototype/src/tests/mod.rs`]
 
 55. **WDK#12 is resolved in prototype scope: one IR schema accommodates both DFT and MD traces.** Step 10 VASP adapter implementation required no core IR type changes and passed integration/overlay tests alongside OpenMM and GROMACS paths. [Step 10 log 2026-02-22; `lel-ir-prototype/src/vasp_adapter.rs`, `lel-ir-prototype/src/tests/mod.rs`]
 
@@ -1835,6 +1877,8 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 81. **WDK#44 is resolved in prototype scope: convergence derivation remains adapter-inline while duplication is eliminated through shared extraction.** Shared utility `derive_energy_convergence_summary` centralizes GROMACS/OpenMM derivation mechanics without introducing a Stage 1->2 post-pass architecture, preserving natural provenance and reducing maintenance divergence. [Session 20 log 2026-02-23; `lel-ir-prototype/src/convergence.rs`; `lel-ir-prototype/src/gromacs_adapter.rs`; `lel-ir-prototype/src/adapter.rs`]
 
 82. **OpenMM StateDataReporter CSV support is now test-validated with backward compatibility and divergent-signal emission.** CSV and whitespace energy formats both map into the same derived convergence path; non-finite energies now emit numerical-status events required for canonical Divergent override. [Session 20 log 2026-02-23; `lel-ir-prototype/src/adapter.rs`; `lel-ir-prototype/src/tests/mod.rs`]
+
+83. **Session 20 open thread #1 is closed: OpenMM CSV parsing is now validated against a real- and source-backed variant corpus covering reordered columns, optional/minimal columns, quoting variants, BOM/CRLF, and trailing-column edge behavior.** Real OpenMM 8.4 fixtures demonstrate reporter-native behavior for reordered/optional/minimal/quoted/CRLF/BOM cases; source-derived fixtures document non-native variants (`kcal/mol`, unquoted header, empty trailing columns). Minimal parser hardening for BOM and unquoted-header detection keeps the dual-mode CSV/whitespace architecture intact. [Session 21 log 2026-02-24; `lel-ir-prototype/testdata/openmm_state_datareporter/*.csv`; `lel-ir-prototype/src/adapter.rs`; `lel-ir-prototype/src/tests/mod.rs`; `https://docs.openmm.org/latest/api-python/generated/openmm.app.statedatareporter.StateDataReporter.html`; `https://raw.githubusercontent.com/openmm/openmm/master/wrappers/python/openmm/app/statedatareporter.py`]
 
 ### What We Suspect
 
@@ -2000,7 +2044,7 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 | Filename | Purpose | Status | Demonstrated |
 | :--- | :--- | :--- | :--- |
 | `codex-prompt-5b-lel-prototype.md` | Codex prompt to produce the LEL IR Rust crate prototype (Step 5b) | Complete | Specifies LEL core types (§1/§2), OpenMM mock adapter, builder helpers, 11 unit tests; validates event typing, layer tagging, spec separation, Hybrid upgrade path fields |
-| `lel-ir-prototype/` | LEL + Hybrid CausalOverlay Rust prototype crate | Complete | Compiles clean, 119/119 tests pass, clippy zero warnings. Validates: event typing (12 EventKind variants), layer tagging, spec separation (AP1 avoidance), serde roundtrip, `by_id` indexing, CausalOverlay construction/traversal, Stage 2-3 query behavior (`R14 + R17 + R18`), Session 19 convergence-summary derivation/provenance tests, and Session 20 canonical taxonomy + OpenMM CSV convergence coverage across OpenMM, GROMACS, and VASP adapters. |
+| `lel-ir-prototype/` | LEL + Hybrid CausalOverlay Rust prototype crate | Complete | Compiles clean, 128/128 tests pass, clippy zero warnings. Validates: event typing (12 EventKind variants), layer tagging, spec separation (AP1 avoidance), serde roundtrip, `by_id` indexing, CausalOverlay construction/traversal, Stage 2-3 query behavior (`R14 + R17 + R18`), Session 19 convergence-summary derivation/provenance tests, Session 20 canonical taxonomy + OpenMM CSV convergence coverage, and Session 21 real-world OpenMM CSV variant reality checks across OpenMM, GROMACS, and VASP adapters. |
 | `lel-ir-prototype/src/overlay.rs` | CausalOverlay implementation (Steps 6-7) | Complete | Implements index-only overlay entities, `from_log` O(n) construction, `transitive_ancestors` BFS traversal, private `ancestors_with_depth`, `detect_confounders` (R14), `compare_predictions` (R17), and `implicate_causal_nodes` (R18). |
 | `lel-ir-prototype/src/gromacs_adapter.rs` | GROMACS `.mdp`/`.log` parser, DslAdapter impl | Complete | Cross-framework IR generalization: maps GROMACS traces to existing LEL `EventKind`s, preserves provenance, wires causal refs, and (Session 19) derives convergence summaries from existing `EnergyRecord`/`NumericalStatus`/`ExecutionStatus` streams with explicit minimum-window and trend/oscillation rules. |
 | `lel-ir-prototype/src/adapter.rs` | DslAdapter trait + mock OpenMM adapter | Complete | Defines adapter interface and (Session 19) extends mock OpenMM path with reporter-like energy-series parsing plus derived convergence-summary emission under the same minimum-window and uncertainty-preserving rules used for GROMACS. |
