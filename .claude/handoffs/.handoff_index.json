@@ -181,6 +181,13 @@
       "created": "2026-02-23T19:52:38.739457",
       "slug": "gromacs-parser-reality-check",
       "directive": "Real-world GROMACS parser validation \u2014 collect real md.log fixtures, add parser/classification tests, minimal fixes for gaps, update FINDINGS.md"
+    },
+    {
+      "sequence": 27,
+      "filename": "handoff_027_2026-02-23_vasp-reality-check-validation.md",
+      "created": "2026-02-23T21:41:50.697652",
+      "slug": "vasp-reality-check-validation",
+      "directive": "VASP reality-check validation \u2014 third leg of cross-framework parser validation using Session 21/22 methodology"
     }
   ]
 }
