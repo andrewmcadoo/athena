@@ -223,6 +223,30 @@
       "slug": "session-19-wdk41-closure-wdk43",
       "goal": "Close WDK#41 bookkeeping, begin WDK#43 convergence-summary derivation for GROMACS/OpenMM",
       "framework": "RISEN"
+    },
+    {
+      "sequence": 29,
+      "filename": "prompt_029_2026-02-23_session-20-convergence-taxonomy.md",
+      "created": "2026-02-23T17:07:52.121245",
+      "slug": "session-20-convergence-taxonomy",
+      "goal": "Create a structured implementation prompt for ATHENA Session 20 that extracts shared convergence derivation, adds canonical taxonomy with cross-framework mapping (WDK#42), documents placement decision rationale (WDK#44), extends OpenMM CSV parser, writes equivalence tests, and preserves provenance invariants",
+      "framework": "RISEN"
+    },
+    {
+      "sequence": 30,
+      "filename": "prompt_030_2026-02-23_session-21-openmm-csv-reality-check.md",
+      "created": "2026-02-23T18:22:54.903269",
+      "slug": "session-21-openmm-csv-reality-check",
+      "goal": "Validate the Session 20 OpenMM CSV parser against real StateDataReporter output variants (column orders, optional columns, unit labels) to confirm or fix canonical convergence labels before downstream causal reasoning depends on them \u2014 scoped as a reality-check session, not a redesign",
+      "framework": "TIDD-EC"
+    },
+    {
+      "sequence": 31,
+      "filename": "prompt_031_2026-02-23_session-22-gromacs-parser-reality-check.md",
+      "created": "2026-02-23T20:32:15.734334",
+      "slug": "session-22-gromacs-parser-reality-check",
+      "goal": "Validate GROMACS md.log parser against realistic format variations with source tier citations, dual-tier tests, minimal fixes, and FINDINGS.md update",
+      "framework": "RISEN"
     }
   ]
 }

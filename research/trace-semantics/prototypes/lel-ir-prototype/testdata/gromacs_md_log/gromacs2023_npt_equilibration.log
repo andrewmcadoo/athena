@@ -1,0 +1,65 @@
+             :-) GROMACS - gmx mdrun, 2023.3 (-:
+
+Using 1 CPU
+
+   Step           Time
+      0        0.00000
+
+Energies (kJ/mol)
+   Bond          Angle    Proper Dih.          LJ-14     Coulomb-14
+1180.10       2100.20        320.300       410.400       520.500
+   LJ (SR)   Coulomb (SR)   Coul. recip.      Potential    Kinetic En.
+-11111.1      -44444.4        1000.00      -35000.0       24999.9
+   Total Energy   Pressure (bar)       Volume       Density
+-9000.0000          1.0200      32.50000      995.0000
+   Pres-XX      Pres-YY      Pres-ZZ      Pres-XY      Pres-XZ      Pres-YZ
+1.05000      1.00000      1.01000      0.01000      0.00500      0.00200
+   Box-XX       Box-YY       Box-ZZ
+3.20000      3.21000      3.22000
+
+   Step           Time
+    100        0.20000
+
+Energies (kJ/mol)
+   Bond          Angle    Proper Dih.          LJ-14     Coulomb-14
+1180.00       2100.00        320.200       410.300       520.400
+   LJ (SR)   Coulomb (SR)   Coul. recip.      Potential    Kinetic En.
+-11111.2      -44444.5         999.90      -35000.3       24999.7
+   Total Energy   Pressure (bar)       Volume       Density
+-9000.4500          1.0150      32.52000      994.7000
+   Pres-XX      Pres-YY      Pres-ZZ      Pres-XY      Pres-XZ      Pres-YZ
+1.03000      1.00000      1.00500      0.00900      0.00400      0.00200
+   Box-XX       Box-YY       Box-ZZ
+3.20100      3.21100      3.22100
+
+   Step           Time
+    200        0.40000
+
+Energies (kJ/mol)
+   Bond          Angle    Proper Dih.          LJ-14     Coulomb-14
+1179.90       2099.80        320.100       410.200       520.300
+   LJ (SR)   Coulomb (SR)   Coul. recip.      Potential    Kinetic En.
+-11111.3      -44444.6         999.85      -35000.5       24999.5
+   Total Energy   Pressure (bar)       Volume       Density
+-9000.7000          1.0120      32.53000      994.6000
+   Pres-XX      Pres-YY      Pres-ZZ      Pres-XY      Pres-XZ      Pres-YZ
+1.02000      1.00100      1.00400      0.00800      0.00400      0.00100
+   Box-XX       Box-YY       Box-ZZ
+3.20200      3.21200      3.22200
+
+   Step           Time
+    300        0.60000
+
+Energies (kJ/mol)
+   Bond          Angle    Proper Dih.          LJ-14     Coulomb-14
+1179.80       2099.70        320.000       410.100       520.200
+   LJ (SR)   Coulomb (SR)   Coul. recip.      Potential    Kinetic En.
+-11111.4      -44444.7         999.80      -35000.7       24999.3
+   Total Energy   Pressure (bar)       Volume       Density
+-9000.8500          1.0100      32.53500      994.5500
+   Pres-XX      Pres-YY      Pres-ZZ      Pres-XY      Pres-XZ      Pres-YZ
+1.01500      1.00200      1.00300      0.00800      0.00300      0.00100
+   Box-XX       Box-YY       Box-ZZ
+3.20300      3.21300      3.22300
+
+Finished mdrun on rank 0

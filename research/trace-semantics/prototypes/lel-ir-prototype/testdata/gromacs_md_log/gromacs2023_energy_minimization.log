@@ -1,0 +1,29 @@
+             :-) GROMACS - gmx mdrun, 2023.3 (-:
+
+Steepest Descents:
+   Tolerance (Fmax)   =  1.00000e+01
+
+Using 1 CPU
+
+   Step           Time
+      0        0.00000
+
+Energies (kJ/mol)
+   Potential
+-250000.0000
+
+   Step           Time
+      1        0.00000
+
+Energies (kJ/mol)
+   Potential
+-250120.5000
+
+   Step           Time
+      2        0.00000
+
+Energies (kJ/mol)
+   Potential
+-250180.7500
+
+Finished mdrun on rank 0

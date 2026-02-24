@@ -1,0 +1,49 @@
+             :-) GROMACS - gmx mdrun, 2023.3 (-:
+
+Using 1 GPU
+
+   Step           Time
+      0        0.00000
+
+Energies (kJ/mol)
+   Bond          Angle    Proper Dih.          LJ-14     Coulomb-14
+1234.56       2345.67        345.678       456.789       567.890
+   LJ (SR)   Coulomb (SR)   Coul. recip.      Potential    Kinetic En.
+-12345.6      -54321.0        1234.56      -45678.9       12345.6
+   Total Energy   Pressure (bar)
+-10000.0000         1.013
+
+   Step           Time
+    100        0.20000
+
+Energies (kJ/mol)
+   Bond          Angle    Proper Dih.          LJ-14     Coulomb-14
+1234.40       2345.50        345.650       456.700       567.810
+   LJ (SR)   Coulomb (SR)   Coul. recip.      Potential    Kinetic En.
+-12345.7      -54321.1        1234.50      -45679.1       12345.5
+   Total Energy   Pressure (bar)
+-10000.5000         1.011
+
+   Step           Time
+    200        0.40000
+
+Energies (kJ/mol)
+   Bond          Angle    Proper Dih.          LJ-14     Coulomb-14
+1234.30       2345.40        345.620       456.640       567.760
+   LJ (SR)   Coulomb (SR)   Coul. recip.      Potential    Kinetic En.
+-12345.8      -54321.2        1234.45      -45679.2       12345.4
+   Total Energy   Pressure (bar)
+-10000.8000         1.010
+
+   Step           Time
+    300        0.60000
+
+Energies (kJ/mol)
+   Bond          Angle    Proper Dih.          LJ-14     Coulomb-14
+1234.20       2345.30        345.600       456.600       567.720
+   LJ (SR)   Coulomb (SR)   Coul. recip.      Potential    Kinetic En.
+-12345.9      -54321.3        1234.40      -45679.3       12345.3
+   Total Energy   Pressure (bar)
+-10000.9000         1.009
+
+Finished mdrun on rank 0
