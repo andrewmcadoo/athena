@@ -2391,6 +2391,27 @@ fn test_havoc_value() {
     }
 }
 
+const OPENMM_STABLE_ENERGY_SERIES: &str = r#"
+0 -45023.7000
+1000 -45023.9000
+2000 -45024.0100
+3000 -45024.0500
+"#;
+
+const OPENMM_OSCILLATING_ENERGY_SERIES: &str = r#"
+0 -1000.0
+100 -999.0
+200 -1001.0
+300 -998.0
+400 -1002.0
+"#;
+
+const OPENMM_SHORT_ENERGY_SERIES: &str = r#"
+0 -1000.0
+100 -1000.3
+200 -1000.4
+"#;
+
 #[test]
 fn test_mock_adapter() {
     setup();
@@ -2428,6 +2449,103 @@ fn test_mock_adapter() {
         }
         other => panic!("Expected ExecutionStatus, got {:?}", other),
     }
+}
+
+#[test]
+fn test_mock_adapter_derives_convergence_summary_for_stable_series() {
+    setup();
+    let adapter = MockOpenMmAdapter;
+    let log = adapter.parse_trace(OPENMM_STABLE_ENERGY_SERIES).unwrap();
+
+    let convergence = log
+        .events
+        .iter()
+        .find_map(|event| match &event.kind {
+            EventKind::ConvergencePoint {
+                metric_name,
+                converged,
+                ..
+            } => Some((metric_name, converged)),
+            _ => None,
+        })
+        .expect("Expected derived ConvergencePoint event");
+
+    assert_eq!(convergence.0, "derived_convergence_rel_delta_max");
+    assert_eq!(convergence.1, &Some(true));
+}
+
+#[test]
+fn test_mock_adapter_derives_oscillation_summary_for_non_converging_series() {
+    setup();
+    let adapter = MockOpenMmAdapter;
+    let log = adapter.parse_trace(OPENMM_OSCILLATING_ENERGY_SERIES).unwrap();
+
+    let convergence = log
+        .events
+        .iter()
+        .find_map(|event| match &event.kind {
+            EventKind::ConvergencePoint {
+                metric_name,
+                converged,
+                ..
+            } => Some((metric_name, converged)),
+            _ => None,
+        })
+        .expect("Expected derived ConvergencePoint event");
+
+    assert_eq!(convergence.0, "derived_oscillation_rel_delta_mean");
+    assert_eq!(convergence.1, &Some(false));
+}
+
+#[test]
+fn test_mock_adapter_no_convergence_summary_below_min_window() {
+    setup();
+    let adapter = MockOpenMmAdapter;
+    let log = adapter.parse_trace(OPENMM_SHORT_ENERGY_SERIES).unwrap();
+
+    assert!(!log
+        .events
+        .iter()
+        .any(|event| matches!(event.kind, EventKind::ConvergencePoint { .. })));
+}
+
+#[test]
+fn test_mock_adapter_convergence_summary_provenance_refs() {
+    setup();
+    let adapter = MockOpenMmAdapter;
+    let log = adapter.parse_trace(OPENMM_STABLE_ENERGY_SERIES).unwrap();
+
+    let convergence_event = log
+        .events
+        .iter()
+        .find(|event| matches!(event.kind, EventKind::ConvergencePoint { .. }))
+        .expect("Expected derived ConvergencePoint event");
+    let energy_ids: Vec<EventId> = log
+        .events
+        .iter()
+        .filter(|event| matches!(event.kind, EventKind::EnergyRecord { .. }))
+        .map(|event| event.id)
+        .collect();
+    let execution_id = log
+        .events
+        .iter()
+        .find(|event| matches!(event.kind, EventKind::ExecutionStatus { .. }))
+        .map(|event| event.id)
+        .expect("Expected ExecutionStatus event");
+
+    assert_eq!(energy_ids.len(), 4);
+    for expected_id in &energy_ids {
+        assert!(
+            convergence_event.causal_refs.contains(expected_id),
+            "ConvergencePoint missing source EnergyRecord {:?}",
+            expected_id
+        );
+    }
+    assert!(
+        convergence_event.causal_refs.contains(&execution_id),
+        "ConvergencePoint missing source ExecutionStatus {:?}",
+        execution_id
+    );
 }
 
 #[test]
@@ -2594,6 +2712,84 @@ Energies (kJ/mol)
 
 Fatal error: Step 100: The total potential energy is -1e+14
 ";
+
+const GROMACS_LOG_STABLE_SERIES: &str = r#"
+             :-) GROMACS - gmx mdrun, 2023.3 (-:
+Using 1 GPU
+   Step           Time
+      0        0.00000
+Energies (kJ/mol)
+   Total Energy
+-1000.000
+   Step           Time
+      100        0.20000
+Energies (kJ/mol)
+   Total Energy
+-1000.050
+   Step           Time
+      200        0.40000
+Energies (kJ/mol)
+   Total Energy
+-1000.080
+   Step           Time
+      300        0.60000
+Energies (kJ/mol)
+   Total Energy
+-1000.090
+Finished mdrun on rank 0
+"#;
+
+const GROMACS_LOG_OSCILLATING_SERIES: &str = r#"
+             :-) GROMACS - gmx mdrun, 2023.3 (-:
+Using 1 GPU
+   Step           Time
+      0        0.00000
+Energies (kJ/mol)
+   Total Energy
+-1000.000
+   Step           Time
+      100        0.20000
+Energies (kJ/mol)
+   Total Energy
+-998.000
+   Step           Time
+      200        0.40000
+Energies (kJ/mol)
+   Total Energy
+-1001.000
+   Step           Time
+      300        0.60000
+Energies (kJ/mol)
+   Total Energy
+-997.500
+   Step           Time
+      400        0.80000
+Energies (kJ/mol)
+   Total Energy
+-1002.000
+Finished mdrun on rank 0
+"#;
+
+const GROMACS_LOG_SHORT_SERIES: &str = r#"
+             :-) GROMACS - gmx mdrun, 2023.3 (-:
+Using 1 CPU
+   Step           Time
+      0        0.00000
+Energies (kJ/mol)
+   Total Energy
+-1000.000
+   Step           Time
+      100        0.20000
+Energies (kJ/mol)
+   Total Energy
+-1000.050
+   Step           Time
+      200        0.40000
+Energies (kJ/mol)
+   Total Energy
+-1000.080
+Finished mdrun on rank 0
+"#;
 
 #[test]
 fn test_classify_theory_params() {
@@ -2948,6 +3144,119 @@ fn test_gromacs_adapter_combined() {
         log.events
             .iter()
             .any(|event| matches!(event.kind, EventKind::EnergyRecord { .. }))
+    );
+}
+
+#[test]
+fn test_gromacs_adapter_derives_convergence_summary_for_stable_series() {
+    setup();
+    let adapter = GromacsAdapter;
+    let raw = format!(
+        "--- MDP ---\n{}\n--- LOG ---\n{}",
+        GROMACS_MDP_SAMPLE, GROMACS_LOG_STABLE_SERIES
+    );
+    let log = adapter.parse_trace(&raw).unwrap();
+
+    let convergence = log
+        .events
+        .iter()
+        .find_map(|event| match &event.kind {
+            EventKind::ConvergencePoint {
+                metric_name,
+                converged,
+                ..
+            } => Some((metric_name, converged)),
+            _ => None,
+        })
+        .expect("Expected derived ConvergencePoint event");
+
+    assert_eq!(convergence.0, "derived_convergence_rel_delta_max");
+    assert_eq!(convergence.1, &Some(true));
+}
+
+#[test]
+fn test_gromacs_adapter_derives_oscillation_summary_for_non_converging_series() {
+    setup();
+    let adapter = GromacsAdapter;
+    let raw = format!(
+        "--- MDP ---\n{}\n--- LOG ---\n{}",
+        GROMACS_MDP_SAMPLE, GROMACS_LOG_OSCILLATING_SERIES
+    );
+    let log = adapter.parse_trace(&raw).unwrap();
+
+    let convergence = log
+        .events
+        .iter()
+        .find_map(|event| match &event.kind {
+            EventKind::ConvergencePoint {
+                metric_name,
+                converged,
+                ..
+            } => Some((metric_name, converged)),
+            _ => None,
+        })
+        .expect("Expected derived ConvergencePoint event");
+
+    assert_eq!(convergence.0, "derived_oscillation_rel_delta_mean");
+    assert_eq!(convergence.1, &Some(false));
+}
+
+#[test]
+fn test_gromacs_adapter_no_convergence_summary_below_min_window() {
+    setup();
+    let adapter = GromacsAdapter;
+    let raw = format!(
+        "--- MDP ---\n{}\n--- LOG ---\n{}",
+        GROMACS_MDP_SAMPLE, GROMACS_LOG_SHORT_SERIES
+    );
+    let log = adapter.parse_trace(&raw).unwrap();
+
+    assert!(!log
+        .events
+        .iter()
+        .any(|event| matches!(event.kind, EventKind::ConvergencePoint { .. })));
+}
+
+#[test]
+fn test_gromacs_adapter_convergence_summary_provenance_refs() {
+    setup();
+    let adapter = GromacsAdapter;
+    let raw = format!(
+        "--- MDP ---\n{}\n--- LOG ---\n{}",
+        GROMACS_MDP_SAMPLE, GROMACS_LOG_STABLE_SERIES
+    );
+    let log = adapter.parse_trace(&raw).unwrap();
+
+    let convergence_event = log
+        .events
+        .iter()
+        .find(|event| matches!(event.kind, EventKind::ConvergencePoint { .. }))
+        .expect("Expected derived ConvergencePoint event");
+    let energy_ids: Vec<EventId> = log
+        .events
+        .iter()
+        .filter(|event| matches!(event.kind, EventKind::EnergyRecord { .. }))
+        .map(|event| event.id)
+        .collect();
+    let execution_id = log
+        .events
+        .iter()
+        .find(|event| matches!(event.kind, EventKind::ExecutionStatus { .. }))
+        .map(|event| event.id)
+        .expect("Expected ExecutionStatus event");
+
+    assert_eq!(energy_ids.len(), 4);
+    for expected_id in &energy_ids {
+        assert!(
+            convergence_event.causal_refs.contains(expected_id),
+            "ConvergencePoint missing source EnergyRecord {:?}",
+            expected_id
+        );
+    }
+    assert!(
+        convergence_event.causal_refs.contains(&execution_id),
+        "ConvergencePoint missing source ExecutionStatus {:?}",
+        execution_id
     );
 }
 

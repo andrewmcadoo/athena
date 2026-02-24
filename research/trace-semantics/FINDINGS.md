@@ -17,7 +17,7 @@ What intermediate representation (IR) can translate raw DSL trace logs from stru
 
 ## Status
 
-IN PROGRESS — Steps 1-7 and all synthesis steps (1d, 2c, 3b) complete. Step 5a (candidate IR schemas) complete: Hybrid LEL+DGR recommended (94/100). Step 5b (LEL prototype) complete. Step 5c (open thread resolution) complete: 5/5 threads resolved/narrowed/deferred with evidence. Step 6 (Hybrid LEL+DGR Phase 2 prototype) complete: `by_id` index implemented, `CausalOverlay` + R14 confounder query implemented. Step 7 (R17+R18 query implementation) complete: `compare_predictions` + `implicate_causal_nodes` implemented with depth-aware BFS helper. Step 9 complete: GROMACS adapter implemented on existing LEL types (`src/gromacs_adapter.rs`). Step 10 complete: VASP adapter implemented on existing LEL types (`src/vasp_adapter.rs`) with first adapter-level use of `ConvergencePoint` and `StateSnapshot`. Step 11 complete: hidden confounder prototype litmus validated end-to-end on VASP-derived traces. Step 12 complete: R17 quantitative comparison formalization narrowed with a trace-semantics-to-adversarial-reward interface contract. Step 13 complete (NARROWED): convergence trajectory representation recommends a hybrid raw-plus-summary design (Option D) with ComparisonProfileV1-compatible outputs and explicit WDK#40 hook. Step 14 complete (NARROWED): minimal `UncertaintySummary` schema direction selected (layered point summary + optional tagged distribution payload) with six-consumer trace and cross-adapter feasibility evidence. Crate remains at 92/92 tests with strict clippy clean (no prototype code changes in Step 14).
+IN PROGRESS — Steps 1-7 and all synthesis steps (1d, 2c, 3b) complete. Step 5a (candidate IR schemas) complete: Hybrid LEL+DGR recommended (94/100). Step 5b (LEL prototype) complete. Step 5c (open thread resolution) complete: 5/5 threads resolved/narrowed/deferred with evidence. Step 6 (Hybrid LEL+DGR Phase 2 prototype) complete: `by_id` index implemented, `CausalOverlay` + R14 confounder query implemented. Step 7 (R17+R18 query implementation) complete: `compare_predictions` + `implicate_causal_nodes` implemented with depth-aware BFS helper. Step 9 complete: GROMACS adapter implemented on existing LEL types (`src/gromacs_adapter.rs`). Step 10 complete: VASP adapter implemented on existing LEL types (`src/vasp_adapter.rs`) with first adapter-level use of `ConvergencePoint` and `StateSnapshot`. Step 11 complete: hidden confounder prototype litmus validated end-to-end on VASP-derived traces. Step 12 complete: R17 quantitative comparison formalization narrowed with a trace-semantics-to-adversarial-reward interface contract. Step 13 complete (NARROWED): convergence trajectory representation recommends a hybrid raw-plus-summary design (Option D) with ComparisonProfileV1-compatible outputs and explicit WDK#40 hook. Step 14 complete (NARROWED): minimal `UncertaintySummary` schema direction selected (layered point summary + optional tagged distribution payload) with six-consumer trace and cross-adapter feasibility evidence. Session 19 added WDK#41 bookkeeping closure and WDK#43 prototype derivation rules for GROMACS/OpenMM convergence summaries. Crate now passes 100/100 tests with strict clippy clean.
 
 ## Key Definitions
 
@@ -64,34 +64,79 @@ IN PROGRESS — Steps 1-7 and all synthesis steps (1d, 2c, 3b) complete. Step 5a
 
 ## Investigation Log
 
-> **Investigation Log Index** — 24 entries, reverse chronological.
+> **Investigation Log Index** — 25 entries, reverse chronological.
 >
 > | # | Date | Identifier | Scope |
 > | :--- | :--- | :--- | :--- |
-> | 1 | 2026-02-21 | WDK#26 | INCAR classification table completeness |
-> | 2 | 2026-02-21 | WDK#25 | VASP closed-source observability ceiling |
-> | 3 | 2026-02-21 | WDK#39 | prediction_id type harmonization |
-> | 4 | 2026-02-21 | WDK#35 + WDK#36 | ContractTerm value extensions for VASP |
-> | 5 | 2026-02-22 | Step 14 | UncertaintySummary schema for divergence metrics |
-> | 6 | 2026-02-22 | Step 13 | Convergence trajectory representation |
-> | 7 | 2026-02-22 | Step 12 | R17 comparison formalization and interface contract |
-> | 8 | 2026-02-22 | Step 11 | Hidden confounder prototype litmus test |
-> | 9 | 2026-02-22 | Step 10 | VASP adapter implementation |
-> | 10 | 2026-02-21 | Step 9 | GROMACS adapter for cross-framework validation |
-> | 11 | 2026-02-21 | Step 7 | R17+R18 query implementation |
-> | 12 | 2026-02-21 | Step 6 | Hybrid LEL+DGR Phase 2 prototype |
-> | 13 | 2026-02-21 | Step 5c | Open thread resolution |
-> | 14 | 2026-02-20 | Step 5a | Candidate IR schemas with Hybrid recommendation |
-> | 15 | 2026-02-20 | Step 3b | Requirements coverage matrix and gap analysis |
-> | 16 | 2026-02-20 | Step 2c | Comparative IR synthesis |
-> | 17 | 2026-02-20 | Step 1d | Cross-framework trace synthesis |
-> | 18 | 2026-02-20 | — | 21% RCA baseline characterization |
-> | 19 | 2026-02-20 | — | LFI audit to IR requirements mapping |
-> | 20 | 2026-02-20 | — | Provenance and scientific workflow IR survey |
-> | 21 | 2026-02-20 | Entry 1 | RCA and formal verification IR survey |
-> | 22 | 2026-02-20 | Entry 001 | VASP trace output system survey |
-> | 23 | 2026-02-20 | — | GROMACS trace format characterization |
-> | 24 | 2026-02-20 | — | OpenMM trace format characterization |
+> | 1 | 2026-02-24 | Session 19 | WDK#41 closure + WDK#43 convergence-summary derivation |
+> | 2 | 2026-02-21 | WDK#26 | INCAR classification table completeness |
+> | 3 | 2026-02-21 | WDK#25 | VASP closed-source observability ceiling |
+> | 4 | 2026-02-21 | WDK#39 | prediction_id type harmonization |
+> | 5 | 2026-02-21 | WDK#35 + WDK#36 | ContractTerm value extensions for VASP |
+> | 6 | 2026-02-22 | Step 14 | UncertaintySummary schema for divergence metrics |
+> | 7 | 2026-02-22 | Step 13 | Convergence trajectory representation |
+> | 8 | 2026-02-22 | Step 12 | R17 comparison formalization and interface contract |
+> | 9 | 2026-02-22 | Step 11 | Hidden confounder prototype litmus test |
+> | 10 | 2026-02-22 | Step 10 | VASP adapter implementation |
+> | 11 | 2026-02-21 | Step 9 | GROMACS adapter for cross-framework validation |
+> | 12 | 2026-02-21 | Step 7 | R17+R18 query implementation |
+> | 13 | 2026-02-21 | Step 6 | Hybrid LEL+DGR Phase 2 prototype |
+> | 14 | 2026-02-21 | Step 5c | Open thread resolution |
+> | 15 | 2026-02-20 | Step 5a | Candidate IR schemas with Hybrid recommendation |
+> | 16 | 2026-02-20 | Step 3b | Requirements coverage matrix and gap analysis |
+> | 17 | 2026-02-20 | Step 2c | Comparative IR synthesis |
+> | 18 | 2026-02-20 | Step 1d | Cross-framework trace synthesis |
+> | 19 | 2026-02-20 | — | 21% RCA baseline characterization |
+> | 20 | 2026-02-20 | — | LFI audit to IR requirements mapping |
+> | 21 | 2026-02-20 | — | Provenance and scientific workflow IR survey |
+> | 22 | 2026-02-20 | Entry 1 | RCA and formal verification IR survey |
+> | 23 | 2026-02-20 | Entry 001 | VASP trace output system survey |
+> | 24 | 2026-02-20 | — | GROMACS trace format characterization |
+> | 25 | 2026-02-20 | — | OpenMM trace format characterization |
+
+### 2026-02-24: Session 19 — WDK#41 Closure + WDK#43 Convergence-Summary Derivation
+**Date:** 2026-02-24
+**Scope:** Phase 1 bookkeeping closure for WDK#41 (bead + trace-semantics synthesis) and Phase 2 prototype implementation for WDK#43 convergence-summary derivation in GROMACS/OpenMM.
+**Method:** (1) Verified adversarial-reward WDK#41 completion evidence from Session 7 and Accumulated Findings (`research/adversarial-reward/FINDINGS.md`), (2) closed stale bead `athena-apb` with cross-track citation, (3) updated trace-semantics Accumulated Findings to move WDK#41 to resolved, (4) studied VASP `ConvergencePoint` emission pattern (`parse_oszicar`) as reference behavior, (5) implemented per-adapter inline derivation for GROMACS and OpenMM mock adapter from existing `EnergyRecord` / `NumericalStatus` / `ExecutionStatus` events, (6) added synthetic convergence/oscillation/insufficient-data/provenance tests, (7) executed targeted tests plus full quality gates (`cargo test`, `cargo clippy -- -D warnings`).
+
+**Findings:**
+
+1. **WDK#41 bookkeeping closure is complete across tracker + synthesis.** `athena-apb` is now closed with explicit reason citing adversarial-reward Sessions 1-7 and locked recommendation artifact. Trace-semantics Accumulated Findings now marks WDK#41 resolved and removes it from open WDK inventory.  
+   Evidence: `bd show athena-apb --json`; `research/trace-semantics/FINDINGS.md` (Accumulated Findings, Resolved/Narrowed #41); `research/adversarial-reward/FINDINGS.md` Session 7 + What We Know entries.
+
+2. **VASP remains the reference implementation for native convergence events.** `parse_oszicar` emits per-iteration `ConvergencePoint` events from DAV/RMM rows, then back-patches `converged=Some(true)` when ionic-step `F=` lines appear, with adapter-level causal linkage to INCAR and downstream energy events.  
+   Evidence: `research/trace-semantics/prototypes/lel-ir-prototype/src/vasp_adapter.rs`.
+
+3. **GROMACS convergence-summary derivation is now implemented inline in the adapter parse path.** Rules consume existing `EnergyRecord` totals (plus latest `ExecutionStatus`/`NumericalStatus` for provenance) and emit a derived `ConvergencePoint` when minimum data are available.  
+   Minimum input condition: at least 4 `EnergyRecord` points (`GROMACS_MIN_CONVERGENCE_WINDOW=4`).  
+   Rule set:
+   - `derived_convergence_rel_delta_max` + `converged=Some(true)` when `max_rel_delta <= 1e-4`
+   - `derived_oscillation_rel_delta_mean` + `converged=Some(false)` when `sign_changes >= 2` and `mean_rel_delta > 1e-4`
+   - `derived_stall_rel_delta_mean` + `converged=Some(false)` otherwise  
+   Evidence: `research/trace-semantics/prototypes/lel-ir-prototype/src/gromacs_adapter.rs`.
+
+4. **OpenMM convergence-summary derivation is now implemented inline in the mock adapter parse path with matching semantics.** The adapter can parse synthetic reporter-like `<step> <energy>` input and derive `ConvergencePoint` using the same minimum condition and threshold family as GROMACS, while preserving uncertainty (no event emitted under insufficient input).  
+   Minimum input condition: at least 4 parsed energy points (`OPENMM_MIN_CONVERGENCE_WINDOW=4`).  
+   Evidence: `research/trace-semantics/prototypes/lel-ir-prototype/src/adapter.rs`.
+
+5. **Provenance anchoring for derived convergence summaries is explicit and test-validated.** Derived `ConvergencePoint.causal_refs` carry source energy event IDs plus terminal execution (and latest numerical-status if present), and confidence metadata is marked `Completeness::Derived { from_elements }`, preserving traceability without synthetic certainty.  
+   Evidence: `research/trace-semantics/prototypes/lel-ir-prototype/src/gromacs_adapter.rs`; `research/trace-semantics/prototypes/lel-ir-prototype/src/adapter.rs`; tests below.
+
+6. **Prototype quality gates remain clean after Session 19 changes.** New tests cover convergence detection, oscillation detection, insufficient-data suppression, and provenance references for both GROMACS and OpenMM paths. Full suite now passes 100/100 with strict clippy clean.  
+   Evidence: `research/trace-semantics/prototypes/lel-ir-prototype/src/tests/mod.rs`; `cargo test`; `cargo clippy -- -D warnings`.
+
+**Implications:**
+
+- **WDK#43 is resolved in prototype scope,** reducing uncertainty from representation-only discussion to executable derivation rules with reproducible tests.
+- **WDK#42 is narrowed:** taxonomy now has a concrete implemented baseline (converged/stall/oscillation via metric-name conventions), so remaining work is cross-framework naming/confidence harmonization rather than first-principles design.
+- **WDK#44 is narrowed:** prototype placement decision is now explicit (per-adapter inline derivation during parsing, with event-ID provenance anchors). Remaining question is whether Stage 1->2 post-pass placement offers better long-run determinism/indexing tradeoffs.
+
+**Open Threads:**
+
+1. **WDK#42 (narrowed):** finalize cross-framework `ConvergencePattern` naming + confidence semantics that align VASP-native SCF markers with derived GROMACS/OpenMM summaries.
+2. **WDK#44 (narrowed):** evaluate whether convergence-summary derivation should remain adapter-inline or migrate to Stage 1->2 overlay/post-pass for production determinism and indexing strategy.
+3. **OpenMM production path:** validate the same derivation rules against real reporter streams (not just mock parser input) and measure any instrumentation overhead.
+4. **Bead hygiene flag:** `athena-fom` appears potentially stale (branch-protection enforcement proof already established elsewhere); defer closure/investigation to a dedicated cleanup session per scope guard.
 
 ### 2026-02-21: WDK#26 — INCAR Classification Table Completeness
 **Date:** 2026-02-21
@@ -1691,7 +1736,7 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 
 53. **Prototype Stage 2-3 query surface is now validated end-to-end (`R14 + R17 + R18`).** The crate passes 44/44 tests with zero clippy warnings after adding comparison and implication query coverage. [Step 7 log 2026-02-21; `lel-ir-prototype/src/tests/mod.rs`]
 
-54. **Cross-framework IR generalization is now demonstrated across GROMACS and VASP adapters using existing LEL types.** `src/gromacs_adapter.rs` and `src/vasp_adapter.rs` map MD and DFT trace sources into the same `EventKind`/LEL structures and remain compatible with `CausalOverlay::from_log` + R14 query behavior. Crate quality gates now pass at 92/92 tests with strict clippy clean. [Step 9 log 2026-02-21; Step 10 log 2026-02-22; `lel-ir-prototype/src/tests/mod.rs`]
+54. **Cross-framework IR generalization remains demonstrated across GROMACS and VASP adapters using existing LEL types, and quality gates remain clean after Session 19 convergence-summary work.** `src/gromacs_adapter.rs` and `src/vasp_adapter.rs` map MD and DFT trace sources into the same `EventKind`/LEL structures and remain compatible with `CausalOverlay::from_log` + R14 query behavior. Crate quality gates now pass at 100/100 tests with strict clippy clean. [Step 9 log 2026-02-21; Step 10 log 2026-02-22; Session 19 log 2026-02-24; `lel-ir-prototype/src/tests/mod.rs`]
 
 55. **WDK#12 is resolved in prototype scope: one IR schema accommodates both DFT and MD traces.** Step 10 VASP adapter implementation required no core IR type changes and passed integration/overlay tests alongside OpenMM and GROMACS paths. [Step 10 log 2026-02-22; `lel-ir-prototype/src/vasp_adapter.rs`, `lel-ir-prototype/src/tests/mod.rs`]
 
@@ -1705,7 +1750,7 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 
 60. **Current prototype comparison types are insufficient for calibrated information-gain reward in their present form.** `ComparisonOutcome` + scalar `DivergenceMeasure` + `is_falsified` do not encode uncertainty/support metadata required by Bayesian design and active-learning style reward calibration. [Step 12 log 2026-02-22; `lel-ir-prototype/src/common.rs:134-150`; `lel-ir-prototype/src/overlay.rs:230-277`]
 
-61. **Convergence evidence is currently represented asymmetrically across adapters: raw trajectory points are VASP-only.** `ConvergencePoint` emission is implemented in `parse_oszicar` (with `converged` back-patching), while GROMACS and OpenMM paths expose convergence only indirectly through other event kinds (`EnergyRecord`, `NumericalStatus`, `ExecutionStatus`). [Step 13 log 2026-02-22; `lel-ir-prototype/src/vasp_adapter.rs:175-276`; `lel-ir-prototype/src/gromacs_adapter.rs:429-530`; `lel-ir-prototype/src/adapter.rs:82-197`]
+61. **Convergence evidence is now represented across all three adapter paths: native in VASP and derived in GROMACS/OpenMM.** VASP still emits native `ConvergencePoint` trajectories from OSZICAR; Session 19 adds adapter-inline derived `ConvergencePoint` summaries for GROMACS/OpenMM from existing `EnergyRecord`/`NumericalStatus`/`ExecutionStatus` streams with explicit minimum-data guards and provenance refs. [Step 13 log 2026-02-22; Session 19 log 2026-02-24; `lel-ir-prototype/src/vasp_adapter.rs`; `lel-ir-prototype/src/gromacs_adapter.rs`; `lel-ir-prototype/src/adapter.rs`]
 
 62. **Current indexing does not make convergence trajectories first-class query targets.** `EventIndexes.by_variable` indexes only `ParameterRecord` and `ObservableMeasurement`, and VASP convergence events are emitted without `dag_node_ref`, so convergence lookups require stream scans or post-hoc derivation. [Step 13 log 2026-02-22; `lel-ir-prototype/src/lel.rs:130-141`; `lel-ir-prototype/src/vasp_adapter.rs:190-211`]
 
@@ -1736,6 +1781,14 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 74. **WDK#25 narrowed: VASP closed-source ceiling impact is bounded at ~20-30% of failure instances, with asymmetric distribution.** Three-tier observability classification across 16 failure modes: Tier A (fully observable) covers 7 modes, Tier B (partially observable with heuristics) covers 6 modes, Tier C (hard ceiling) covers 3 modes plus internal numerical issues. Weighted across workflow types: ~70-80% of failures allow fault isolation from external outputs. The ceiling concentrates on strongly correlated systems (~35-50% unobservable) and is minimal for bulk metals (~10-15%). [WDK#25 log 2026-02-21; `cross-framework-synthesis.md §3.3, §6.3`]
 
 75. **WDK#26 narrowed: INCAR classification table covers ~20% of commonly used parameters explicitly and has two known gaps (ADDGRID, NBANDS).** Six additional ambiguous parameters identified (ISYM, SYMPREC, LASPH, LMAXMIX, ENAUG, NGX/NGY/NGZ), bringing total ambiguous count to ~12. Classification strategy recommendation: evolve from flat static lookup to static table with context-dependent flags (Strategy B), separating "what conditions matter" (static, testable) from "what conditions hold" (dynamic, requires POSCAR/POTCAR/KPOINTS context). The 70-80% confidence estimate from Decision Gate 1 remains plausible. [WDK#26 log 2026-02-21; `vasp_adapter.rs:12-96`; `cross-framework-synthesis.md §2.3`]
+
+76. **WDK#41 is now resolved cross-track and no longer blocks trace-semantics synthesis.** Bead `athena-apb` is closed with explicit adversarial-reward evidence chain, and trace-semantics Accumulated Findings now treat WDK#41 as resolved with locked recommendation and architecture-integration citations. [Session 19 log 2026-02-24; `bd show athena-apb --json`; `research/adversarial-reward/FINDINGS.md`; `research/adversarial-reward/prototypes/aggregation-candidates/aggregate_score_recommendation.md`]
+
+77. **WDK#43 is resolved in prototype scope: GROMACS and OpenMM now derive convergence summaries from existing event streams without synthetic certainty.** Both adapters emit derived `ConvergencePoint` events from observed energy trajectories and existing terminal/numerical events, rather than inventing hidden signals. [Session 19 log 2026-02-24; `lel-ir-prototype/src/gromacs_adapter.rs`; `lel-ir-prototype/src/adapter.rs`]
+
+78. **Minimum-data and classification rules for convergence derivation are now explicit and test-backed.** Minimum input condition is a 4-point energy window; classification uses relative-delta thresholds (`1e-4`) to separate convergence (`max_rel_delta`), oscillation (`sign_changes` + `mean_rel_delta`), and stall (`mean_rel_delta` without oscillation). [Session 19 log 2026-02-24; `lel-ir-prototype/src/gromacs_adapter.rs`; `lel-ir-prototype/src/adapter.rs`; tests]
+
+79. **Derived convergence summaries preserve provenance and uncertainty structure.** `ConvergencePoint.causal_refs` include contributing source event IDs (energy window + execution/numerical context), and confidence metadata is explicitly `Completeness::Derived { from_elements }`, preserving evidence traceability for downstream query layers. [Session 19 log 2026-02-24; `lel-ir-prototype/src/gromacs_adapter.rs`; `lel-ir-prototype/src/adapter.rs`; tests]
 
 ### What We Suspect
 
@@ -1852,19 +1905,15 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 
 **Candidate IR Schemas**
 
-41. **How to standardize profile aggregation into a bounded, monotonic reward scalar** that remains calibratable under ARCHITECTURE.md §5.4 feedback and robust against Noisy-TV style reward hacking. [Step 12 log 2026-02-22; ARCHITECTURE.md §5.4; VISION.md §6.2]
+42. **What minimal cross-framework `ConvergencePattern` taxonomy should be adopted, and how pattern confidence should be calibrated.** NARROWED: Session 19 operationalizes three derived summary states for non-VASP adapters (`derived_convergence_rel_delta_max`, `derived_stall_rel_delta_mean`, `derived_oscillation_rel_delta_mean`) with explicit thresholds and minimum-data guards. Remaining work is taxonomy naming harmonization and confidence semantics across VASP-native and derived summaries. [Step 13 log 2026-02-22; Session 19 log 2026-02-24; `lel-ir-prototype/src/gromacs_adapter.rs`; `lel-ir-prototype/src/adapter.rs`]
 
-42. **What minimal cross-framework `ConvergencePattern` taxonomy should be adopted, and how pattern confidence should be calibrated.** Step 13 narrowed representation direction to hybrid raw+summary, but taxonomy boundaries (e.g., monotonic/oscillatory/stalled/two-plateau/divergent) and confidence semantics remain open and require domain expert input. [Step 13 log 2026-02-22]
-
-43. **How to derive convergence summaries for GROMACS/OpenMM when no native `ConvergencePoint` stream exists.** The current prototype has VASP-native convergence trajectories; equivalent summary derivation for other adapters must be specified from existing events (`EnergyRecord`, `NumericalStatus`, `ExecutionStatus`) without introducing synthetic certainty. [Step 13 log 2026-02-22; `lel-ir-prototype/src/gromacs_adapter.rs`; `lel-ir-prototype/src/adapter.rs`]
-
-44. **Where convergence summary computation should occur and how it should attach graph/query anchors.** Step 13 recommends Stage 1->2 boundary derivation, but exact timing (`CausalOverlay::from_log` vs post-pass), index strategy, and `dag_node_ref`/`parameter_refs` anchoring rules remain unresolved and may affect determinism/performance. [Step 13 log 2026-02-22; `lel-ir-prototype/src/overlay.rs:54-84`; `lel-ir-prototype/src/lel.rs:130-149`]
+44. **Where convergence summary computation should occur and how it should attach graph/query anchors.** NARROWED: Prototype now uses per-adapter inline derivation during parsing for GROMACS/OpenMM, with source-event `causal_refs` and `Completeness::Derived` confidence metadata. Remaining uncertainty is production placement tradeoff (keep adapter-inline vs Stage 1->2 post-pass for indexing/determinism). [Session 19 log 2026-02-24; `lel-ir-prototype/src/gromacs_adapter.rs`; `lel-ir-prototype/src/adapter.rs`; `lel-ir-prototype/src/overlay.rs:54-84`]
 
 **Resolved / Narrowed — No Longer Blocking**
 
 12. ~~**Whether a single IR schema can accommodate both DFT codes (VASP) and MD codes (OpenMM, GROMACS)** or whether structural differences require fundamentally different IR designs with a common interface.~~ RESOLVED: Step 10 VASP adapter maps INCAR/OSZICAR/OUTCAR into existing LEL/EventKind structures with no schema changes, alongside existing OpenMM/GROMACS paths. See What We Know #55. [Step 10 log 2026-02-22; `lel-ir-prototype/src/vasp_adapter.rs`, `lel-ir-prototype/src/tests/mod.rs`]
 
-13. ~~**How convergence trajectories should be represented in the IR** (raw time series, classified patterns, or derived features).~~ NARROWED: Step 13 recommends Option D (hybrid raw canonical trajectory + Stage 1->2 summary derivation with derived features, optional pattern classification, and provenance anchors). Remaining uncertainty is implementation detail: pattern taxonomy/confidence, cross-framework derivation rules (especially GROMACS/OpenMM), and summary timing/index strategy. See What We Know #61-#65 and WDK items #42-#44. [Step 13 log 2026-02-22]
+13. ~~**How convergence trajectories should be represented in the IR** (raw time series, classified patterns, or derived features).~~ NARROWED: Step 13 recommends Option D (hybrid raw canonical trajectory + Stage 1->2 summary derivation with derived features, optional pattern classification, and provenance anchors). Session 19 resolves cross-framework derivation rules for GROMACS/OpenMM and narrows remaining uncertainty to pattern taxonomy/confidence and long-run placement strategy. See What We Know #61-#65, #77-#79 and WDK items #42 and #44. [Step 13 log 2026-02-22; Session 19 log 2026-02-24]
 
 23. ~~**Which causal reasoning substrate best matches the LFI's actual query patterns.**~~ RESOLVED: per-stage answer. Stage 1: sequential search sufficient. Stages 2-3: graph traversal required. See What We Know #47. [Candidate IR schemas log 2026-02-20; candidate-ir-schemas.md §8 OQ3]
 
@@ -1894,16 +1943,21 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 
 39. ~~**Whether `EventKind::ComparisonResult.prediction_id: String` should be harmonized with `PredictionRecord.id: SpecElementId` in production.**~~ RESOLVED (design level): Yes — change `ComparisonResult.prediction_id` to `SpecElementId` (Option a). Zero adapter impact since `ComparisonResult` is a derived event type (no adapter constructs it). Aligns with all four spec element types and ComparisonProfileV1 forward design. Parse-at-query-time workaround has four failure modes (silent mismatch, partial-success, whitespace, overflow). Change scope: 1 type in `event_kinds.rs`, 1 method in `overlay.rs`, 6 test sites. [WDK#39 log 2026-02-21; `event_kinds.rs:88`; `overlay.rs:261`]
 
-40. ~~**What minimal `UncertaintySummary` schema should accompany each divergence metric** so one comparison profile can support both V&V/effect-size reporting and Bayesian/active-learning reward calibration without adapter-specific branching.~~ NARROWED: Step 14 recommends Candidate C (layered point uncertainty + optional tagged distribution payload + explicit `NoUncertainty` reason) as the minimal adapter-agnostic direction. Remaining work is implementation/field canonicalization and downstream aggregation/pattern-taxonomy dependencies (WDK#41-44), not baseline schema shape. [Step 14 log 2026-02-22]
+40. ~~**What minimal `UncertaintySummary` schema should accompany each divergence metric** so one comparison profile can support both V&V/effect-size reporting and Bayesian/active-learning reward calibration without adapter-specific branching.~~ NARROWED: Step 14 recommends Candidate C (layered point uncertainty + optional tagged distribution payload + explicit `NoUncertainty` reason) as the minimal adapter-agnostic direction. Remaining work is implementation/field canonicalization and downstream pattern-taxonomy dependencies (WDK#42-44), not baseline schema shape. [Step 14 log 2026-02-22]
+
+41. ~~**How to standardize profile aggregation into a bounded, monotonic reward scalar** that remains calibratable under ARCHITECTURE.md §5.4 feedback and robust against Noisy-TV style reward hacking.~~ RESOLVED: Work completed in adversarial-reward track. See `research/adversarial-reward/FINDINGS.md` WDK#41 Sessions 1-7, locked recommendation at `research/adversarial-reward/prototypes/aggregation-candidates/aggregate_score_recommendation.md`, and architecture integration in Session 7.
+
+43. ~~**How to derive convergence summaries for GROMACS/OpenMM when no native `ConvergencePoint` stream exists.**~~ RESOLVED (prototype scope): Session 19 implements adapter-inline derived `ConvergencePoint` emission for GROMACS and OpenMM from existing `EnergyRecord`, `NumericalStatus`, and `ExecutionStatus` streams, with explicit minimum-data condition (`window >= 4`), converged/non-converged outcomes, and provenance-carrying causal references validated by tests. [Session 19 log 2026-02-24; `lel-ir-prototype/src/gromacs_adapter.rs`; `lel-ir-prototype/src/adapter.rs`; `lel-ir-prototype/src/tests/mod.rs`]
 
 ## Prototype Index
 
 | Filename | Purpose | Status | Demonstrated |
 | :--- | :--- | :--- | :--- |
 | `codex-prompt-5b-lel-prototype.md` | Codex prompt to produce the LEL IR Rust crate prototype (Step 5b) | Complete | Specifies LEL core types (§1/§2), OpenMM mock adapter, builder helpers, 11 unit tests; validates event typing, layer tagging, spec separation, Hybrid upgrade path fields |
-| `lel-ir-prototype/` | LEL + Hybrid CausalOverlay Rust prototype crate | Complete | Compiles clean, 92/92 tests pass, clippy zero warnings. Validates: event typing (12 EventKind variants), layer tagging, spec separation (AP1 avoidance), serde roundtrip, `by_id` indexing, CausalOverlay construction/traversal, and Stage 2-3 query behavior (`R14 + R17 + R18`) across OpenMM, GROMACS, and VASP adapters. |
+| `lel-ir-prototype/` | LEL + Hybrid CausalOverlay Rust prototype crate | Complete | Compiles clean, 100/100 tests pass, clippy zero warnings. Validates: event typing (12 EventKind variants), layer tagging, spec separation (AP1 avoidance), serde roundtrip, `by_id` indexing, CausalOverlay construction/traversal, Stage 2-3 query behavior (`R14 + R17 + R18`), and Session 19 convergence-summary derivation/provenance tests across OpenMM, GROMACS, and VASP adapters. |
 | `lel-ir-prototype/src/overlay.rs` | CausalOverlay implementation (Steps 6-7) | Complete | Implements index-only overlay entities, `from_log` O(n) construction, `transitive_ancestors` BFS traversal, private `ancestors_with_depth`, `detect_confounders` (R14), `compare_predictions` (R17), and `implicate_causal_nodes` (R18). |
-| `lel-ir-prototype/src/gromacs_adapter.rs` | GROMACS `.mdp`/`.log` parser, DslAdapter impl | Complete | Cross-framework IR generalization: maps GROMACS traces to existing LEL `EventKind`s, preserves provenance, wires causal refs, and validates overlay + confounder queries with new integration tests. |
+| `lel-ir-prototype/src/gromacs_adapter.rs` | GROMACS `.mdp`/`.log` parser, DslAdapter impl | Complete | Cross-framework IR generalization: maps GROMACS traces to existing LEL `EventKind`s, preserves provenance, wires causal refs, and (Session 19) derives convergence summaries from existing `EnergyRecord`/`NumericalStatus`/`ExecutionStatus` streams with explicit minimum-window and trend/oscillation rules. |
+| `lel-ir-prototype/src/adapter.rs` | DslAdapter trait + mock OpenMM adapter | Complete | Defines adapter interface and (Session 19) extends mock OpenMM path with reporter-like energy-series parsing plus derived convergence-summary emission under the same minimum-window and uncertainty-preserving rules used for GROMACS. |
 | `lel-ir-prototype/src/vasp_adapter.rs` | VASP INCAR/OSZICAR/OUTCAR -> LEL adapter | Complete | DFT compatibility on existing IR types, section-marker composition across 3 files, and first adapter-level exercise of `ConvergencePoint` + `StateSnapshot`. |
 | `lel-ir-prototype/src/bench.rs` | CausalOverlay construction benchmark | Complete | Benchmarks real `CausalOverlay::from_log` at 4 scales (10^3-10^6). Latest result: 251.82ms overlay construction at 10^6 events (22.62ms at 10^5), confirming practical O(n) behavior. |
 
@@ -1924,11 +1978,11 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 
 6. **Hybrid LEL+DGR Phase 2 prototype (CausalOverlay + R14 query)** — **COMPLETE.** `by_id` index added; `src/overlay.rs` implemented with O(n) construction and BFS traversal; R14 confounder detection query implemented and tested. Baseline Step 6 crate state was 29/29 tests passing with strict clippy clean; subsequent Step 7 query expansion now validates 44/44 tests with strict clippy clean. Benchmark uses real overlay path and reports 251.82ms at 10^6 events. (Tracking updates: #37 closed, #38 narrowed/validated)
 
-7. **R17 quantitative comparison formalization and bridge contract (Step 12)** — **COMPLETE (NARROWED).** Literature survey + prototype mapping + candidate scoring completed. Recommendation: Candidate B (Multi-Metric Divergence Profile) with optional posterior hooks. Trace-semantics now defines a contract (`ComparisonProfileV1` assumptions) that adversarial-reward can consume once that track starts. Remaining work moved to What We Don't Know #40 and #41.
+7. **R17 quantitative comparison formalization and bridge contract (Step 12)** — **COMPLETE (NARROWED).** Literature survey + prototype mapping + candidate scoring completed. Recommendation: Candidate B (Multi-Metric Divergence Profile) with optional posterior hooks. Trace-semantics now defines a contract (`ComparisonProfileV1` assumptions) that adversarial-reward can consume once that track starts. Remaining work moved to What We Don't Know #40, #42, and #44 (WDK#41 resolved cross-track; WDK#43 resolved in Session 19 prototype scope).
 
-8. **Convergence trajectory representation (Step 13)** — **COMPLETE (NARROWED).** Empirical adapter inventory + A/B/C steel-man stress tests + external survey + consumer trace completed. Recommendation: Option D hybrid (raw canonical trajectory + Stage 1->2 summary). Remaining work moved to What We Don't Know #42, #43, and #44, with WDK#40 linkage retained for uncertainty schema coupling.
+8. **Convergence trajectory representation (Step 13)** — **COMPLETE (NARROWED).** Empirical adapter inventory + A/B/C steel-man stress tests + external survey + consumer trace completed. Recommendation: Option D hybrid (raw canonical trajectory + Stage 1->2 summary). Session 19 resolves WDK#43 in prototype scope; remaining open items are WDK#42 and WDK#44, with WDK#40 linkage retained for uncertainty schema coupling.
 
-9. **UncertaintySummary schema for divergence metrics (Step 14)** — **COMPLETE (NARROWED).** External survey + six-consumer trace + cross-adapter feasibility + A/B/C stress-test completed. Recommendation: Candidate C (mandatory point uncertainty + optional tagged distribution payload + explicit missingness reason) with shared numeric core across `MetricComponent` and `ConvergenceSummary` uncertainty fields. Remaining dependencies moved/linked to WDK#41-44.
+9. **UncertaintySummary schema for divergence metrics (Step 14)** — **COMPLETE (NARROWED).** External survey + six-consumer trace + cross-adapter feasibility + A/B/C stress-test completed. Recommendation: Candidate C (mandatory point uncertainty + optional tagged distribution payload + explicit missingness reason) with shared numeric core across `MetricComponent` and `ConvergenceSummary` uncertainty fields. Remaining dependencies now link to WDK#42 and WDK#44 (WDK#41 resolved cross-track; WDK#43 resolved in Session 19 prototype scope).
 
 **Synthesis steps needed before Step 5:**
 
