@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use crate::common::{
     Completeness, ConfidenceMeta, ElementId, ExecutionOutcome, Layer, NumericalEventType,
     ProvenanceAnchor, SourceLocation, TemporalCoord, Value,
@@ -153,6 +155,112 @@ pub fn derive_energy_convergence_summary(
     )
 }
 
+pub fn derive_vasp_scf_convergence_summary(
+    events: &[TraceEvent],
+    source_file: &str,
+) -> Option<TraceEvent> {
+    let de_events: Vec<&TraceEvent> = events
+        .iter()
+        .filter(|event| {
+            matches!(
+                event.kind,
+                EventKind::ConvergencePoint { ref metric_name, .. } if metric_name == "dE"
+            )
+        })
+        .collect();
+
+    let converged_steps: HashSet<u64> = de_events
+        .iter()
+        .filter_map(|event| match &event.kind {
+            EventKind::ConvergencePoint {
+                converged: Some(true),
+                ..
+            } => Some(event.temporal.simulation_step),
+            _ => None,
+        })
+        .collect();
+
+    let non_converged_de_events: Vec<(&TraceEvent, f64)> = de_events
+        .into_iter()
+        .filter(|event| !converged_steps.contains(&event.temporal.simulation_step))
+        .filter_map(|event| match &event.kind {
+            EventKind::ConvergencePoint {
+                metric_value: Value::Known(value, _),
+                ..
+            } => Some((event, *value)),
+            _ => None,
+        })
+        .collect();
+
+    if non_converged_de_events.len() < MIN_CONVERGENCE_WINDOW {
+        return None;
+    }
+
+    let window =
+        &non_converged_de_events[non_converged_de_events.len() - MIN_CONVERGENCE_WINDOW..];
+    let window_values: Vec<f64> = window.iter().map(|(_, value)| *value).collect();
+    let sign_changes = window_values
+        .windows(2)
+        .filter(|pair| pair[0] * pair[1] < 0.0)
+        .count();
+
+    let first_abs = window_values.first()?.abs();
+    let normalization_scale = first_abs.max(1.0);
+    let normalized_abs_values: Vec<f64> = window_values
+        .iter()
+        .map(|value| value.abs() / normalization_scale)
+        .collect();
+    let mean_normalized =
+        normalized_abs_values.iter().sum::<f64>() / normalized_abs_values.len() as f64;
+
+    let (metric_name, note) =
+        if sign_changes >= 2 && mean_normalized > REL_DELTA_THRESHOLD {
+            (
+                "derived_vasp_scf_oscillation_dE",
+                "SCF dE values alternate sign across the derivation window",
+            )
+        } else {
+            (
+                "derived_vasp_scf_stall_dE",
+                "SCF dE values remain above threshold without oscillation",
+            )
+        };
+
+    let last_event = window.last().map(|(event, _)| *event)?;
+    let simulation_step = last_event.temporal.simulation_step;
+    let logical_sequence = last_event.temporal.logical_sequence + 1;
+    let causal_refs = window.iter().map(|(event, _)| event.id).collect::<Vec<_>>();
+    let from_elements = causal_refs.iter().map(|id| ElementId(id.0)).collect();
+
+    Some(
+        TraceEventBuilder::new()
+            .layer(Layer::Methodology)
+            .kind(EventKind::ConvergencePoint {
+                iteration: simulation_step,
+                metric_name: metric_name.to_string(),
+                metric_value: Value::Known(mean_normalized, "relative".to_string()),
+                converged: Some(false),
+            })
+            .temporal(TemporalCoord {
+                simulation_step,
+                wall_clock_ns: None,
+                logical_sequence,
+            })
+            .causal_refs(causal_refs)
+            .provenance(ProvenanceAnchor {
+                source_file: source_file.to_string(),
+                source_location: SourceLocation::ExternalInput,
+                raw_hash: 0,
+            })
+            .confidence(ConfidenceMeta {
+                completeness: Completeness::Derived { from_elements },
+                field_coverage: 1.0,
+                notes: vec![note.to_string()],
+            })
+            .build(),
+    )
+}
+
 fn confidence_from_completeness(completeness: &Completeness) -> ConvergenceConfidence {
     match completeness {
         Completeness::FullyObserved => ConvergenceConfidence::Direct,
@@ -234,6 +342,16 @@ pub fn classify_convergence(
         (ConvergencePattern::Converged, completeness_confidence)
     } else if framework_is_vasp && metric_name == "dE" && converged.is_none() {
         (ConvergencePattern::InsufficientData, completeness_confidence)
+    } else if framework_is_vasp
+        && metric_name == "derived_vasp_scf_oscillation_dE"
+        && *converged == Some(false)
+    {
+        (ConvergencePattern::Oscillating, completeness_confidence)
+    } else if framework_is_vasp
+        && metric_name == "derived_vasp_scf_stall_dE"
+        && *converged == Some(false)
+    {
+        (ConvergencePattern::Stalled, completeness_confidence)
     } else {
         (
             ConvergencePattern::InsufficientData,
