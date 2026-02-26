@@ -4358,6 +4358,10 @@ const VASP_FILE_T1_HONEYCOMB_PT52: &str = include_str!("../../testdata/vasp/t1_h
 const VASP_FILE_T1_LARGE_APPROX: &str = include_str!("../../testdata/vasp/t1_large_approx.vasp");
 const VASP_FILE_T1_SIGMA_PT56_SUBSTRATE: &str =
     include_str!("../../testdata/vasp/t1_sigma_pt56_substrate.vasp");
+const VASP_FILE_T1_NOMAD_NONCONV_OSCILLATING: &str =
+    include_str!("../../testdata/vasp/t1_nomad_nonconv_oscillating.vasp");
+const VASP_FILE_T1_NOMAD_NONCONV_STALLED: &str =
+    include_str!("../../testdata/vasp/t1_nomad_nonconv_stalled.vasp");
 
 const VASP_VARIANT_ERROR_EDDDAV: &str = r#"--- INCAR ---
 GGA = PE
@@ -5522,6 +5526,34 @@ fn test_vasp_t1_sigma_pt56_substrate() {
         ExecutionOutcome::Success,
     );
     assert_vasp_parses_energy_count(VASP_FILE_T1_SIGMA_PT56_SUBSTRATE, 2);
+}
+
+#[test]
+fn test_vasp_t1_nomad_nonconv_oscillating() {
+    setup();
+    assert_vasp_variant(
+        VASP_FILE_T1_NOMAD_NONCONV_OSCILLATING,
+        &[],
+        &[ConvergencePattern::Oscillating],
+    );
+    assert_vasp_execution_status(
+        VASP_FILE_T1_NOMAD_NONCONV_OSCILLATING,
+        ExecutionOutcome::Timeout,
+    );
+}
+
+#[test]
+fn test_vasp_t1_nomad_nonconv_stalled() {
+    setup();
+    assert_vasp_variant(
+        VASP_FILE_T1_NOMAD_NONCONV_STALLED,
+        &[],
+        &[ConvergencePattern::Stalled],
+    );
+    assert_vasp_execution_status(
+        VASP_FILE_T1_NOMAD_NONCONV_STALLED,
+        ExecutionOutcome::Timeout,
+    );
 }
 
 fn test_convergence_event(
