@@ -17,7 +17,7 @@ What intermediate representation (IR) can translate raw DSL trace logs from stru
 
 ## Status
 
-IN PROGRESS — Steps 1-7 and all synthesis steps (1d, 2c, 3b) complete. Step 5a (candidate IR schemas) complete: Hybrid LEL+DGR recommended (94/100). Step 5b (LEL prototype) complete. Step 5c (open thread resolution) complete: 5/5 threads resolved/narrowed/deferred with evidence. Step 6 (Hybrid LEL+DGR Phase 2 prototype) complete: `by_id` index implemented, `CausalOverlay` + R14 confounder query implemented. Step 7 (R17+R18 query implementation) complete: `compare_predictions` + `implicate_causal_nodes` implemented with depth-aware BFS helper. Step 9 complete: GROMACS adapter implemented on existing LEL types (`src/gromacs_adapter.rs`). Step 10 complete: VASP adapter implemented on existing LEL types (`src/vasp_adapter.rs`) with first adapter-level use of `ConvergencePoint` and `StateSnapshot`. Step 11 complete: hidden confounder prototype litmus validated end-to-end on VASP-derived traces. Step 12 complete: R17 quantitative comparison formalization narrowed with a trace-semantics-to-adversarial-reward interface contract. Step 13 complete (NARROWED): convergence trajectory representation recommends a hybrid raw-plus-summary design (Option D) with ComparisonProfileV1-compatible outputs and explicit WDK#40 hook. Step 14 complete (NARROWED): minimal `UncertaintySummary` schema direction selected (layered point summary + optional tagged distribution payload) with six-consumer trace and cross-adapter feasibility evidence. Session 19 added WDK#41 bookkeeping closure and WDK#43 prototype derivation rules for GROMACS/OpenMM convergence summaries. Session 20 resolved WDK#42 and WDK#44 in prototype scope via shared convergence derivation extraction, canonical taxonomy projection, OpenMM CSV support, and cross-framework equivalence tests. Session 21 validated OpenMM CSV parser behavior against real StateDataReporter variant fixtures and closed Session 20 open thread #1. Session 22 validated GROMACS md.log parser behavior against a Tier 2 source-derived variant corpus (file and inline fixtures), including NPT and EM-no-total-energy cases. Session 23 validated VASP INCAR/OSZICAR/OUTCAR parser behavior against a Tier 2 variant corpus. Session 24 upgraded VASP validation to Tier 1 real production logs and closed Session 23 open thread #1 (Tier 1 fixture corpus acquisition). Crate now passes 151/151 tests with strict clippy clean.
+IN PROGRESS — Steps 1-7 and all synthesis steps (1d, 2c, 3b) complete. Step 5a (candidate IR schemas) complete: Hybrid LEL+DGR recommended (94/100). Step 5b (LEL prototype) complete. Step 5c (open thread resolution) complete: 5/5 threads resolved/narrowed/deferred with evidence. Step 6 (Hybrid LEL+DGR Phase 2 prototype) complete: `by_id` index implemented, `CausalOverlay` + R14 confounder query implemented. Step 7 (R17+R18 query implementation) complete: `compare_predictions` + `implicate_causal_nodes` implemented with depth-aware BFS helper. Step 9 complete: GROMACS adapter implemented on existing LEL types (`src/gromacs_adapter.rs`). Step 10 complete: VASP adapter implemented on existing LEL types (`src/vasp_adapter.rs`) with first adapter-level use of `ConvergencePoint` and `StateSnapshot`. Step 11 complete: hidden confounder prototype litmus validated end-to-end on VASP-derived traces. Step 12 complete: R17 quantitative comparison formalization narrowed with a trace-semantics-to-adversarial-reward interface contract. Step 13 complete (NARROWED): convergence trajectory representation recommends a hybrid raw-plus-summary design (Option D) with ComparisonProfileV1-compatible outputs and explicit WDK#40 hook. Step 14 complete (NARROWED): minimal `UncertaintySummary` schema direction selected (layered point summary + optional tagged distribution payload) with six-consumer trace and cross-adapter feasibility evidence. Session 19 added WDK#41 bookkeeping closure and WDK#43 prototype derivation rules for GROMACS/OpenMM convergence summaries. Session 20 resolved WDK#42 and WDK#44 in prototype scope via shared convergence derivation extraction, canonical taxonomy projection, OpenMM CSV support, and cross-framework equivalence tests. Session 21 validated OpenMM CSV parser behavior against real StateDataReporter variant fixtures and closed Session 20 open thread #1. Session 22 validated GROMACS md.log parser behavior against a Tier 2 source-derived variant corpus (file and inline fixtures), including NPT and EM-no-total-energy cases. Session 23 validated VASP INCAR/OSZICAR/OUTCAR parser behavior against a Tier 2 variant corpus. Session 24 upgraded VASP validation to Tier 1 real production logs and closed Session 23 open thread #1 (Tier 1 fixture corpus acquisition). Session 25 resolved Session 23 open thread #2 by deriving VASP SCF oscillation/stall summaries, extending canonical mapping branches, and adding VASP coverage to equivalence scenarios B/C. Session 26 validated real non-converged NOMAD traces against the frozen classifier and closed the NOMAD raw-file retrieval blocker with current endpoint evidence (`A/B/C = 200` across tested entries). Crate now passes 161/161 tests with strict clippy clean.
 
 ## Key Definitions
 
@@ -31,6 +31,8 @@ IN PROGRESS — Steps 1-7 and all synthesis steps (1d, 2c, 3b) complete. Step 5a
 
 - [Research Question](#research-question)
 - [Investigation Log](#investigation-log)
+  - [2026-02-26: Session 26 — Real Non-Converged VASP SCF Field Validation (NOMAD)](#2026-02-26-session-26--real-non-converged-vasp-scf-field-validation-nomad)
+  - [2026-02-25: Session 25 — VASP SCF Convergence Classification (Oscillating/Stalled)](#2026-02-25-session-25--vasp-scf-convergence-classification-oscillatingstalled)
   - [2026-02-24: Session 24 — VASP Tier 1 Real-Log Validation](#2026-02-24-session-24--vasp-tier-1-real-log-validation)
   1. [2026-02-21: WDK#26 — INCAR Classification Table Completeness](#2026-02-21-wdk26--incar-classification-table-completeness)
   2. [2026-02-21: WDK#25 — VASP Closed-Source Observability Ceiling](#2026-02-21-wdk25--vasp-closed-source-observability-ceiling)
@@ -65,40 +67,118 @@ IN PROGRESS — Steps 1-7 and all synthesis steps (1d, 2c, 3b) complete. Step 5a
 
 ## Investigation Log
 
-> **Investigation Log Index** — 30 entries, reverse chronological.
+> **Investigation Log Index** — 32 entries, reverse chronological.
 >
 > | # | Date | Identifier | Scope |
 > | :--- | :--- | :--- | :--- |
-> | 1 | 2026-02-24 | Session 24 | VASP Tier 1 real-log validation |
-> | 2 | 2026-02-23 | Session 23 | VASP parser reality-check variants |
-> | 3 | 2026-02-23 | Session 22 | GROMACS md.log reality-check variants |
-> | 4 | 2026-02-24 | Session 21 | OpenMM StateDataReporter CSV reality-check variants |
-> | 5 | 2026-02-23 | Session 20 | WDK#42 canonical taxonomy + WDK#44 placement decision + OpenMM CSV validation |
-> | 6 | 2026-02-24 | Session 19 | WDK#41 closure + WDK#43 convergence-summary derivation |
-> | 7 | 2026-02-21 | WDK#26 | INCAR classification table completeness |
-> | 8 | 2026-02-21 | WDK#25 | VASP closed-source observability ceiling |
-> | 9 | 2026-02-21 | WDK#39 | prediction_id type harmonization |
-> | 10 | 2026-02-21 | WDK#35 + WDK#36 | ContractTerm value extensions for VASP |
-> | 11 | 2026-02-22 | Step 14 | UncertaintySummary schema for divergence metrics |
-> | 12 | 2026-02-22 | Step 13 | Convergence trajectory representation |
-> | 13 | 2026-02-22 | Step 12 | R17 comparison formalization and interface contract |
-> | 14 | 2026-02-22 | Step 11 | Hidden confounder prototype litmus test |
-> | 15 | 2026-02-22 | Step 10 | VASP adapter implementation |
-> | 16 | 2026-02-21 | Step 9 | GROMACS adapter for cross-framework validation |
-> | 17 | 2026-02-21 | Step 7 | R17+R18 query implementation |
-> | 18 | 2026-02-21 | Step 6 | Hybrid LEL+DGR Phase 2 prototype |
-> | 19 | 2026-02-21 | Step 5c | Open thread resolution |
-> | 20 | 2026-02-20 | Step 5a | Candidate IR schemas with Hybrid recommendation |
-> | 21 | 2026-02-20 | Step 3b | Requirements coverage matrix and gap analysis |
-> | 22 | 2026-02-20 | Step 2c | Comparative IR synthesis |
-> | 23 | 2026-02-20 | Step 1d | Cross-framework trace synthesis |
-> | 24 | 2026-02-20 | — | 21% RCA baseline characterization |
-> | 25 | 2026-02-20 | — | LFI audit to IR requirements mapping |
-> | 26 | 2026-02-20 | — | Provenance and scientific workflow IR survey |
-> | 27 | 2026-02-20 | Entry 1 | RCA and formal verification IR survey |
-> | 28 | 2026-02-20 | Entry 001 | VASP trace output system survey |
-> | 29 | 2026-02-20 | — | GROMACS trace format characterization |
-> | 30 | 2026-02-20 | — | OpenMM trace format characterization |
+> | 1 | 2026-02-26 | Session 26 | Real non-converged VASP SCF field validation (NOMAD) |
+> | 2 | 2026-02-25 | Session 25 | VASP SCF oscillating/stalled convergence classification |
+> | 3 | 2026-02-24 | Session 24 | VASP Tier 1 real-log validation |
+> | 4 | 2026-02-23 | Session 23 | VASP parser reality-check variants |
+> | 5 | 2026-02-23 | Session 22 | GROMACS md.log reality-check variants |
+> | 6 | 2026-02-24 | Session 21 | OpenMM StateDataReporter CSV reality-check variants |
+> | 7 | 2026-02-23 | Session 20 | WDK#42 canonical taxonomy + WDK#44 placement decision + OpenMM CSV validation |
+> | 8 | 2026-02-24 | Session 19 | WDK#41 closure + WDK#43 convergence-summary derivation |
+> | 9 | 2026-02-21 | WDK#26 | INCAR classification table completeness |
+> | 10 | 2026-02-21 | WDK#25 | VASP closed-source observability ceiling |
+> | 11 | 2026-02-21 | WDK#39 | prediction_id type harmonization |
+> | 12 | 2026-02-21 | WDK#35 + WDK#36 | ContractTerm value extensions for VASP |
+> | 13 | 2026-02-22 | Step 14 | UncertaintySummary schema for divergence metrics |
+> | 14 | 2026-02-22 | Step 13 | Convergence trajectory representation |
+> | 15 | 2026-02-22 | Step 12 | R17 comparison formalization and interface contract |
+> | 16 | 2026-02-22 | Step 11 | Hidden confounder prototype litmus test |
+> | 17 | 2026-02-22 | Step 10 | VASP adapter implementation |
+> | 18 | 2026-02-21 | Step 9 | GROMACS adapter for cross-framework validation |
+> | 19 | 2026-02-21 | Step 7 | R17+R18 query implementation |
+> | 20 | 2026-02-21 | Step 6 | Hybrid LEL+DGR Phase 2 prototype |
+> | 21 | 2026-02-21 | Step 5c | Open thread resolution |
+> | 22 | 2026-02-20 | Step 5a | Candidate IR schemas with Hybrid recommendation |
+> | 23 | 2026-02-20 | Step 3b | Requirements coverage matrix and gap analysis |
+> | 24 | 2026-02-20 | Step 2c | Comparative IR synthesis |
+> | 25 | 2026-02-20 | Step 1d | Cross-framework trace synthesis |
+> | 26 | 2026-02-20 | — | 21% RCA baseline characterization |
+> | 27 | 2026-02-20 | — | LFI audit to IR requirements mapping |
+> | 28 | 2026-02-20 | — | Provenance and scientific workflow IR survey |
+> | 29 | 2026-02-20 | Entry 1 | RCA and formal verification IR survey |
+> | 30 | 2026-02-20 | Entry 001 | VASP trace output system survey |
+> | 31 | 2026-02-20 | — | GROMACS trace format characterization |
+> | 32 | 2026-02-20 | — | OpenMM trace format characterization |
+
+### 2026-02-26: Session 26 — Real Non-Converged VASP SCF Field Validation (NOMAD)
+**Date:** 2026-02-26
+**Scope:** Acquire real non-converged VASP SCF traces from public databases (NOMAD first), run the frozen classifier unchanged, and add additive Tier 1 non-converged fixtures/tests (`Oscillating` + `Stalled`) with full provenance and gate evidence.
+**Method:** (1) Re-read Session 24/25 findings and re-ran NOMAD go/no-go probes across required raw URL patterns for three entries, (2) verified current NOMAD raw access behavior with explicit status matrix: Pattern A (`/entries/{entry_id}/raw/`), Pattern B (`/entries/{entry_id}/raw/{filename}`), Pattern C (`/uploads/{upload_id}/raw/{mainfile_path}`), (3) scanned NOMAD entries for real `OSZICAR` traces satisfying the harness-compatible non-converged constraint (`dE` points present, `F=` absent), with binary-safe handling for compressed artifacts, (4) selected two real NOMAD non-converged fixtures and assembled combined files in existing `t1_nomad_nonconv_*` paths, trimming OUTCAR to essential lines only, (5) executed one-test-at-a-time validation for new fixtures, then full gates.
+
+**Findings:**
+
+1. **NOMAD raw retrieval is currently reachable and no longer blocked by 404-only behavior.** For three tested entries (`s3GetSY7LXn6RC4Y9O_pc8om9Q__`, `NLs_Trf7emjsUfOUJsPc-SWyTHvh`, `i5hIcAaQ_GnWq96lUJgp5q1FMVR7`), all required patterns returned `200`: Pattern A (`/entries/{entry_id}/raw/`), Pattern B (`/entries/{entry_id}/raw/{filename}` using `OSZICAR` basename), and Pattern C (`/uploads/{upload_id}/raw/{mainfile_path}`).
+   Evidence: session probe outputs on 2026-02-26.
+
+2. **Real NOMAD non-converged fixture pair was acquired and is classifier-compatible without code changes.**  
+   - **Oscillating fixture (expected `Oscillating`)**: `entry_id=s3GetSY7LXn6RC4Y9O_pc8om9Q__`, `upload_id=d9h3vufdTKCkLssIjs6ijw`, paths under `.../Ta-V/001-surface/tatac-new-bis/` (`INCAR`, `OSZICAR`, `OUTCAR`), download date `2026-02-26`.  
+   - **Stalled fixture (expected `Stalled`)**: `entry_id=NLs_Trf7emjsUfOUJsPc-SWyTHvh`, `upload_id=f0FCzVPrTgCgkV2Tz5gOQQ`, paths under `.../In2O3/PBEsol/001-surface/1/` (`INCAR`, `OSZICAR`, `OUTCAR`), download date `2026-02-26`.  
+   Both fixtures preserve raw non-converged SCF `DAV` lines (`F=` absent) so `assert_vasp_variant(..., &[])` remains valid.
+   Evidence: `research/trace-semantics/prototypes/lel-ir-prototype/testdata/vasp/t1_nomad_nonconv_oscillating.vasp`; `.../t1_nomad_nonconv_stalled.vasp`.
+
+3. **Field-validation classification outcomes matched expectations under frozen classifier/parser code.**  
+   - `test_vasp_t1_nomad_nonconv_oscillating`: expected `Oscillating` + `ExecutionOutcome::Timeout`, actual PASS.  
+   - `test_vasp_t1_nomad_nonconv_stalled`: expected `Stalled` + `ExecutionOutcome::Timeout`, actual PASS.  
+   No changes were made to `src/convergence.rs` or `src/vasp_adapter.rs`.
+   Evidence: targeted test runs 2026-02-26; unchanged frozen files.
+
+4. **Gates remain clean after additive real non-converged coverage.** Full crate now passes `161/161` tests with strict clippy warning-free.
+   Evidence: `cargo test`; `cargo clippy -- -D warnings` in `research/trace-semantics/prototypes/lel-ir-prototype`.
+
+5. **NOMAD data-shape nuance surfaced during field scan:** some non-converged `f=0` oscillating traces include explicit divergent markers (`EDDDAV`) while others are timeout-inferred; candidate selection must enforce execution-status expectations in addition to `dE`-shape classification.
+   Evidence: scanned candidate matrix `/tmp/rosendo_f0_binarysafe.csv` during Session 26.
+
+6. **Strict stalled+energy-marker replacement remains unavailable in-session after corrected `OSZICAR` `dE` parsing (`DAV:`/`RMM:` column extraction).** Additional upload-scoped scans after fixture replacement (`f0FCzVPrTgCgkV2Tz5gOQQ`, `d9h3vufdTKCkLssIjs6ijw`, `dfGeTOCTTbmJL6p3b26BSQ`) confirmed non-converged `f=0` traces exist (including stalled), but no stalled candidate with `OUTCAR` `free energy`/`TOTEN` markers was found under the harness-compatible `F=`-absent constraint.
+   Evidence: Session 26 continuation scan logs on 2026-02-26 (`f0`: `f0=3`, `stalled=1`, `stalled_toten=0`; `d9h3`: `f0=1`, `stalled=0`; `dfGe` mainfile-path scan: `f0=0`; direct `i5h...` check confirms stalled `f=0` but `out_toten_count=0`).
+
+**Implications:**
+
+- **Session 24 open thread #2 and Session 25 open thread #1 (NOMAD raw retrieval blocker) are CLOSED for current NOMAD API state.** Raw endpoint access is currently functional with reproducible `200` status evidence.
+- **Real non-converged external-validity evidence is now added to VASP convergence classification.** Session 25 logic is validated beyond synthetic fixtures using public NOMAD traces.
+- **Current harness constraint (`&[]` energies for non-converged tests) remains load-bearing for fixture selection.** Real traces with `F=` lines are valid physics but not compatible with this specific non-converged test convention.
+- **Session 26 replacement attempt narrows an acquisition limitation rather than a classifier issue.** Stalled real traces are available and correctly classified, but stalled traces with explicit `OUTCAR` energy markers were not found in the scanned NOMAD upload subsets when preserving harness-compatible non-converged semantics.
+
+**Open Threads:**
+
+1. Expand real non-converged corpus breadth with additional NOMAD/AFLOW cases, especially stalled traces that also expose rich OUTCAR energy-marker sections under the same `F=0` harness constraint (current Session 26 continuation scans did not locate one).
+2. **Sign-direction blindness in `derive_vasp_scf_convergence_summary`.** The classifier counts sign changes in the last 4 dE values but does not check whether dE values are predominantly positive (energy increasing = divergence) vs. negative (energy decreasing = approaching convergence). Both NOMAD fixtures have predominantly positive dE trajectories that the classifier cannot distinguish from oscillation around a minimum.
+3. **Narrow 4-point window sensitivity.** `MIN_CONVERGENCE_WINDOW = 4` means 2 sign changes (the Oscillating threshold) can be triggered by a single noise point. The window is too narrow for statistical confidence in the classification.
+4. **No data-driven Divergent path for VASP SCF.** `ConvergencePattern::Divergent` exists but is only triggered by NaN/Inf or crash markers (`EDDDAV`). Sustained positive-dE drift — as seen in both NOMAD fixtures — has no pathway to Divergent. A data-driven Divergent classification (e.g., monotonic positive dE over the window) would correctly label these cases.
+
+### 2026-02-25: Session 25 — VASP SCF Convergence Classification (Oscillating/Stalled)
+**Date:** 2026-02-25
+**Scope:** Implement VASP-native SCF convergence classification for non-converged ionic steps so VASP `dE` trajectories map to canonical `Oscillating` or `Stalled` instead of defaulting to `InsufficientData`.
+**Method:** (1) Added `derive_vasp_scf_convergence_summary()` in `src/convergence.rs` using VASP-specific normalization (last 4 non-converged SCF `dE` values, normalize `|dE|` by first-window `|dE|.max(1.0)`, classify from sign-change count and mean normalized magnitude), (2) added canonical mapping branches for `derived_vasp_scf_oscillation_dE` and `derived_vasp_scf_stall_dE` in `classify_convergence`, (3) wired VASP adapter inline derivation in `src/vasp_adapter.rs` immediately after OSZICAR causal-reference assignment, (4) added oscillating fixture `testdata/vasp/oscillating_scf.vasp`, (5) added eight targeted tests and updated one intentional expectation in `test_vasp_variant_nonconverged_scf` (`InsufficientData` -> `Stalled`), (6) updated equivalence scenarios B and C to include VASP via `classify_all_convergence(...).contains(...)`, and ran all required gates (`cargo test`, targeted tests, `cargo clippy -- -D warnings`) after each batch.
+
+**Findings:**
+
+1. **VASP SCF summaries are now derived directly from native `dE` convergence streams with provenance-preserving metadata.** Derived events use `Layer::Methodology`, `Completeness::Derived`, and source-window `causal_refs` while preserving adapter-inline derivation placement.
+   Evidence: `research/trace-semantics/prototypes/lel-ir-prototype/src/convergence.rs::derive_vasp_scf_convergence_summary`; `.../src/vasp_adapter.rs`.
+
+2. **Oscillating/Stalled separation is now explicit for non-converged VASP SCF windows.** Oscillation requires `sign_changes >= 2` and mean normalized `|dE| > 1e-4`; all other non-converged windows map to stall under the current prototype rule.
+   Evidence: `research/trace-semantics/prototypes/lel-ir-prototype/src/convergence.rs`; tests in `.../src/tests/mod.rs`.
+
+3. **Canonical taxonomy projection now includes VASP-derived SCF metric names.** `classify_convergence` maps `derived_vasp_scf_oscillation_dE` -> `Oscillating` and `derived_vasp_scf_stall_dE` -> `Stalled` with derived confidence semantics.
+   Evidence: `research/trace-semantics/prototypes/lel-ir-prototype/src/convergence.rs`; tests `test_classify_convergence_vasp_scf_oscillation_derived`, `test_classify_convergence_vasp_scf_stall_derived`.
+
+4. **Session 23 nonconverged fixture semantics are upgraded as intended.** `test_vasp_variant_nonconverged_scf` now verifies `Stalled`; oscillating fixture verifies `Oscillating`; equivalence scenarios B and C now include VASP alongside GROMACS/OpenMM.
+   Evidence: `research/trace-semantics/prototypes/lel-ir-prototype/src/tests/mod.rs`.
+
+5. **Quality gates remain clean after the upgrade.** Prototype now passes `159/159` tests with strict clippy warning-free.
+   Evidence: `cargo test`; `cargo clippy -- -D warnings` in `research/trace-semantics/prototypes/lel-ir-prototype`.
+
+**Implications:**
+
+- **Session 23 open thread #2 is CLOSED.** VASP canonical mapping now includes explicit oscillation/stall detection for non-converged SCF `dE` traces.
+- **Cross-framework convergence-equivalence coverage is strengthened.** VASP now participates in scenario B (Oscillating) and scenario C (Stalled) checks in the prototype equivalence suite.
+
+**Open Threads:**
+
+1. ~~NOMAD direct raw-file retrieval path remains unresolved in-session (metadata reachable, tested raw endpoints returned `404`), so future Tier 1 expansion may need a validated NOMAD download workflow.~~ CLOSED in Session 26 with reproducible Pattern A/B/C `200` status evidence across three tested entries.
 
 ### 2026-02-24: Session 24 — VASP Tier 1 Real-Log Validation
 **Date:** 2026-02-24
@@ -146,8 +226,8 @@ IN PROGRESS — Steps 1-7 and all synthesis steps (1d, 2c, 3b) complete. Step 5a
 
 **Open Threads:**
 
-1. Session 23 open thread #2 remains: VASP canonical mapping still lacks explicit oscillation/stall detection branches for native VASP `dE` streams (current VASP direct mapping is converged/insufficient plus divergence override).
-2. NOMAD direct raw-file retrieval path remains unresolved in-session (metadata reachable, tested raw endpoints returned `404`), so future Tier 1 expansion may need a validated NOMAD download workflow.
+1. ~~Session 23 open thread #2 remains: VASP canonical mapping still lacks explicit oscillation/stall detection branches for native VASP `dE` streams (current VASP direct mapping is converged/insufficient plus divergence override).~~ CLOSED in Session 25 with derived VASP SCF oscillation/stall summaries and canonical mapping branches.
+2. ~~NOMAD direct raw-file retrieval path remains unresolved in-session (metadata reachable, tested raw endpoints returned `404`), so future Tier 1 expansion may need a validated NOMAD download workflow.~~ CLOSED in Session 26 with verified Pattern A/B/C `200` responses and successful raw triple acquisition.
 
 ### 2026-02-23: Session 23 — VASP Parser Reality-Check Variants
 **Date:** 2026-02-23
@@ -196,7 +276,7 @@ IN PROGRESS — Steps 1-7 and all synthesis steps (1d, 2c, 3b) complete. Step 5a
 **Open Threads:**
 
 1. ~~Add Tier 1 real VASP fixture corpus when accessible and rerun the same matrix with source-tier upgrade notes.~~ CLOSED in Session 24 with three real Zenodo-backed Tier 1 fixtures and additive `test_vasp_t1_*` coverage.
-2. VASP canonical taxonomy still lacks oscillation/stall detection mappings (currently only direct `dE` converged/insufficient plus divergence override).
+2. ~~VASP canonical taxonomy still lacks oscillation/stall detection mappings (currently only direct `dE` converged/insufficient plus divergence override).~~ CLOSED in Session 25 with `derive_vasp_scf_convergence_summary` + canonical branch mapping.
 
 ### 2026-02-23: Session 22 — GROMACS md.log Reality-Check Variants
 **Date:** 2026-02-23
@@ -2035,6 +2115,13 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 85. **Energy minimization runs without `Total Energy` are now explicitly characterized as a known limitation path rather than silent parser loss.** Current behavior emits `NumericalStatus::ConvergenceFailure` warnings and no convergence-summary `EnergyRecord` points; canonical output is `InsufficientData` until semantics are intentionally revised. [Session 22 log 2026-02-23; `lel-ir-prototype/src/gromacs_adapter.rs`; `lel-ir-prototype/src/tests/mod.rs`]
 
 86. **VASP parser behavior is now validated under Tier 1 real production logs, closing the Tier 1 acquisition gap from Session 23.** Session 24 added three real file-backed fixtures (`t1_honeycomb_pt52`, `t1_large_approx`, `t1_sigma_pt56_substrate`) sourced from Zenodo DOI `10.5281/zenodo.7007289` (VASP 5.4.4 production outputs) and additive `test_vasp_t1_*` coverage. All Tier 1 tests passed with no parser changes (`src/vasp_adapter.rs` delta = 0 lines), bringing crate gates to `151/151` with strict clippy clean. [Session 24 log 2026-02-24; `lel-ir-prototype/testdata/vasp/t1_*.vasp`; `lel-ir-prototype/src/tests/mod.rs`]
+87. **VASP non-converged SCF traces are now canonically classifiable as `Oscillating` or `Stalled` via derived summaries.** Session 25 added `derive_vasp_scf_convergence_summary` with VASP-specific first-delta normalization on the last 4 non-converged `dE` points and sign-change-based pattern detection. [Session 25 log 2026-02-25; `lel-ir-prototype/src/convergence.rs`; `lel-ir-prototype/src/tests/mod.rs`]
+88. **VASP now participates in cross-framework equivalence scenarios B and C.** Scenario B checks now include VASP `Oscillating` detection (oscillating SCF fixture), and scenario C checks include VASP `Stalled` detection (nonconverged SCF fixture) using `classify_all_convergence(...).contains(...)` semantics. [Session 25 log 2026-02-25; `lel-ir-prototype/src/tests/mod.rs`]
+89. **Session 23 open thread #2 is resolved in prototype scope, and gate scale has advanced to `159/159` tests with strict clippy clean.** The intentional semantic upgrade reclassifies `test_vasp_variant_nonconverged_scf` from `InsufficientData` to `Stalled` while preserving existing converged/divergent behavior. [Session 25 log 2026-02-25; `lel-ir-prototype/src/tests/mod.rs`; `lel-ir-prototype/src/convergence.rs`; `lel-ir-prototype/src/vasp_adapter.rs`]
+90. **NOMAD raw-file retrieval blocker is resolved for the current API state.** Session 26 re-tested required endpoints and obtained `200` for Pattern A (`/entries/{entry_id}/raw/`), Pattern B (`/entries/{entry_id}/raw/{filename}`), and Pattern C (`/uploads/{upload_id}/raw/{mainfile_path}`) across three entries, replacing prior 404-only observations from Sessions 24/25. [Session 26 log 2026-02-26; session probe matrix]
+91. **Real non-converged NOMAD fixtures exercise frozen VASP SCF classification paths and expose three structural weaknesses: sign-direction blindness, narrow 4-point window sensitivity, and missing data-driven Divergent pathway.** Both fixtures classify mechanically as expected (`Oscillating`/`Stalled` + `Timeout`) with no code edits, but both show energy climbing 160-170 eV upward — physical divergence that the classifier cannot detect. The Oscillating label triggers on 2 sign changes in the last 4 dE values from a single -0.19 eV noise dip amid 8 consecutive positive-dE steps; the Stalled label triggers on 0 sign changes where all 4 last dE values are positive (decelerating uphill drift). [Session 26 log 2026-02-26; `lel-ir-prototype/testdata/vasp/t1_nomad_nonconv_*.vasp`; `lel-ir-prototype/src/tests/mod.rs`]
+92. **Prototype gate scale advanced to `161/161` tests with strict clippy clean after real non-converged additions.** Session 26 preserved additive-only test semantics and maintained warning-free quality gates. [Session 26 log 2026-02-26; `cargo test`; `cargo clippy -- -D warnings`]
+93. **Session 26 continuation narrowed a data-availability edge case: stalled `F=0` traces are obtainable from NOMAD, but stalled traces with explicit `OUTCAR` energy-marker (`free energy`/`TOTEN`) lines were not found in the scanned upload subsets (`f0`, `d9h3`, `dfGe`) under harness-compatible constraints.** This is currently an acquisition/fixture-composition limitation, not a classifier regression. [Session 26 continuation scans 2026-02-26; Session 26 log]
 
 ### What We Suspect
 
@@ -2202,7 +2289,9 @@ Evaluated each IR against: spec-vs-execution separation, causal ordering represe
 | Filename | Purpose | Status | Demonstrated |
 | :--- | :--- | :--- | :--- |
 | `codex-prompt-5b-lel-prototype.md` | Codex prompt to produce the LEL IR Rust crate prototype (Step 5b) | Complete | Specifies LEL core types (§1/§2), OpenMM mock adapter, builder helpers, 11 unit tests; validates event typing, layer tagging, spec separation, Hybrid upgrade path fields |
-| `lel-ir-prototype/` | LEL + Hybrid CausalOverlay Rust prototype crate | Complete | Compiles clean, 151/151 tests pass, clippy zero warnings. Validates: event typing (12 EventKind variants), layer tagging, spec separation (AP1 avoidance), serde roundtrip, `by_id` indexing, CausalOverlay construction/traversal, Stage 2-3 query behavior (`R14 + R17 + R18`), Session 19 convergence-summary derivation/provenance tests, Session 20 canonical taxonomy + OpenMM CSV convergence coverage, Session 21 real-world OpenMM CSV variant reality checks, Session 22 GROMACS variant corpus checks, Session 23 VASP Tier 2 variant checks, and Session 24 VASP Tier 1 real-log checks across OpenMM, GROMACS, and VASP adapters. |
+| `lel-ir-prototype/` | LEL + Hybrid CausalOverlay Rust prototype crate | Complete | Compiles clean, 161/161 tests pass, clippy zero warnings. Validates: event typing (12 EventKind variants), layer tagging, spec separation (AP1 avoidance), serde roundtrip, `by_id` indexing, CausalOverlay construction/traversal, Stage 2-3 query behavior (`R14 + R17 + R18`), Session 19 convergence-summary derivation/provenance tests, Session 20 canonical taxonomy + OpenMM CSV convergence coverage, Session 21 real-world OpenMM CSV variant reality checks, Session 22 GROMACS variant corpus checks, Session 23 VASP Tier 2 variant checks, Session 24 VASP Tier 1 real-log checks, Session 25 VASP SCF oscillating/stalled convergence classification, and Session 26 real non-converged NOMAD field validation. |
+| `lel-ir-prototype/testdata/vasp/t1_nomad_nonconv_oscillating.vasp` | Tier 1 real NOMAD non-converged VASP fixture (`Oscillating`) | Complete | Combined INCAR+OSZICAR+trimmed OUTCAR from NOMAD entry `s3GetSY7LXn6RC4Y9O_pc8om9Q__` (`upload_id=d9h3vufdTKCkLssIjs6ijw`), with non-converged `dE` sequence (`F=` absent), timeout-style OUTCAR, and additive test coverage in Session 26. |
+| `lel-ir-prototype/testdata/vasp/t1_nomad_nonconv_stalled.vasp` | Tier 1 real NOMAD non-converged VASP fixture (`Stalled`) | Complete | Combined INCAR+OSZICAR+trimmed OUTCAR from NOMAD entry `NLs_Trf7emjsUfOUJsPc-SWyTHvh` (`upload_id=f0FCzVPrTgCgkV2Tz5gOQQ`), with non-converged `dE` sequence (`F=` absent), timeout-style OUTCAR, and additive test coverage in Session 26. |
 | `lel-ir-prototype/src/overlay.rs` | CausalOverlay implementation (Steps 6-7) | Complete | Implements index-only overlay entities, `from_log` O(n) construction, `transitive_ancestors` BFS traversal, private `ancestors_with_depth`, `detect_confounders` (R14), `compare_predictions` (R17), and `implicate_causal_nodes` (R18). |
 | `lel-ir-prototype/src/gromacs_adapter.rs` | GROMACS `.mdp`/`.log` parser, DslAdapter impl | Complete | Cross-framework IR generalization: maps GROMACS traces to existing LEL `EventKind`s, preserves provenance, wires causal refs, and (Session 19) derives convergence summaries from existing `EnergyRecord`/`NumericalStatus`/`ExecutionStatus` streams with explicit minimum-window and trend/oscillation rules. |
 | `lel-ir-prototype/src/adapter.rs` | DslAdapter trait + mock OpenMM adapter | Complete | Defines adapter interface and (Session 19) extends mock OpenMM path with reporter-like energy-series parsing plus derived convergence-summary emission under the same minimum-window and uncertainty-preserving rules used for GROMACS. |

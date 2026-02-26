@@ -4350,12 +4350,18 @@ const VASP_FILE_CONVERGED_RELAXATION: &str =
     include_str!("../../testdata/vasp/converged_relaxation.vasp");
 const VASP_FILE_NONCONVERGED_SCF: &str =
     include_str!("../../testdata/vasp/nonconverged_scf.vasp");
+const VASP_FILE_OSCILLATING_SCF: &str =
+    include_str!("../../testdata/vasp/oscillating_scf.vasp");
 const VASP_FILE_MIXED_SCF_DAV_RMM: &str =
     include_str!("../../testdata/vasp/mixed_scf_dav_rmm.vasp");
 const VASP_FILE_T1_HONEYCOMB_PT52: &str = include_str!("../../testdata/vasp/t1_honeycomb_pt52.vasp");
 const VASP_FILE_T1_LARGE_APPROX: &str = include_str!("../../testdata/vasp/t1_large_approx.vasp");
 const VASP_FILE_T1_SIGMA_PT56_SUBSTRATE: &str =
     include_str!("../../testdata/vasp/t1_sigma_pt56_substrate.vasp");
+const VASP_FILE_T1_NOMAD_NONCONV_OSCILLATING: &str =
+    include_str!("../../testdata/vasp/t1_nomad_nonconv_oscillating.vasp");
+const VASP_FILE_T1_NOMAD_NONCONV_STALLED: &str =
+    include_str!("../../testdata/vasp/t1_nomad_nonconv_stalled.vasp");
 
 const VASP_VARIANT_ERROR_EDDDAV: &str = r#"--- INCAR ---
 GGA = PE
@@ -5163,7 +5169,7 @@ fn test_vasp_variant_nonconverged_scf() {
     assert_vasp_variant(
         VASP_FILE_NONCONVERGED_SCF,
         &[],
-        &[ConvergencePattern::InsufficientData],
+        &[ConvergencePattern::Stalled],
     );
     assert_vasp_execution_status(VASP_FILE_NONCONVERGED_SCF, ExecutionOutcome::Timeout);
 }
@@ -5206,6 +5212,145 @@ fn test_vasp_variant_mixed_scf_dav_rmm() {
         &[ConvergencePattern::Converged],
     );
     assert_vasp_execution_status(VASP_FILE_MIXED_SCF_DAV_RMM, ExecutionOutcome::Success);
+}
+
+#[test]
+fn test_vasp_variant_oscillating_scf() {
+    setup();
+    let oszicar = VASP_FILE_OSCILLATING_SCF
+        .split("--- OSZICAR ---")
+        .nth(1)
+        .and_then(|section| section.split("--- OUTCAR ---").next())
+        .expect("Expected OSZICAR section");
+
+    let energy_pairs = parse_vasp_oszicar_energy_pairs(oszicar);
+    assert!(energy_pairs.is_empty());
+
+    let oszicar_events = parse_oszicar(oszicar, 0).unwrap();
+    let unconverged_count = oszicar_events
+        .iter()
+        .filter(|event| {
+            matches!(
+                event.kind,
+                EventKind::ConvergencePoint {
+                    converged: None,
+                    ..
+                }
+            )
+        })
+        .count();
+    assert_eq!(unconverged_count, 6);
+
+    assert_vasp_variant(
+        VASP_FILE_OSCILLATING_SCF,
+        &[],
+        &[ConvergencePattern::Oscillating],
+    );
+    assert_vasp_execution_status(VASP_FILE_OSCILLATING_SCF, ExecutionOutcome::Timeout);
+}
+
+#[test]
+fn test_vasp_adapter_derives_oscillation_summary_for_non_converging_scf() {
+    setup();
+    let adapter = VaspAdapter;
+    let log = adapter.parse_trace(VASP_FILE_OSCILLATING_SCF).unwrap();
+
+    let convergence = log
+        .events
+        .iter()
+        .find_map(|event| match &event.kind {
+            EventKind::ConvergencePoint {
+                metric_name,
+                converged,
+                ..
+            } if metric_name == "derived_vasp_scf_oscillation_dE" => {
+                Some((metric_name, converged))
+            }
+            _ => None,
+        })
+        .expect("Expected derived oscillation ConvergencePoint event");
+
+    assert_eq!(convergence.0, "derived_vasp_scf_oscillation_dE");
+    assert_eq!(convergence.1, &Some(false));
+}
+
+#[test]
+fn test_vasp_adapter_derives_stall_summary_for_non_converging_scf() {
+    setup();
+    let adapter = VaspAdapter;
+    let log = adapter.parse_trace(VASP_FILE_NONCONVERGED_SCF).unwrap();
+
+    let convergence = log
+        .events
+        .iter()
+        .find_map(|event| match &event.kind {
+            EventKind::ConvergencePoint {
+                metric_name,
+                converged,
+                ..
+            } if metric_name == "derived_vasp_scf_stall_dE" => Some((metric_name, converged)),
+            _ => None,
+        })
+        .expect("Expected derived stall ConvergencePoint event");
+
+    assert_eq!(convergence.0, "derived_vasp_scf_stall_dE");
+    assert_eq!(convergence.1, &Some(false));
+}
+
+#[test]
+fn test_vasp_adapter_no_scf_convergence_summary_below_min_window() {
+    setup();
+    let adapter = VaspAdapter;
+    let raw = format!(
+        "--- INCAR ---\n{}\n--- OSZICAR ---\n{}\n--- OUTCAR ---\n{}",
+        VASP_INCAR_SAMPLE, VASP_OSZICAR_NO_F_SAMPLE, VASP_OUTCAR_SAMPLE
+    );
+    let log = adapter.parse_trace(&raw).unwrap();
+
+    assert!(!log.events.iter().any(|event| {
+        matches!(
+            &event.kind,
+            EventKind::ConvergencePoint { metric_name, .. } if metric_name.starts_with("derived_vasp_scf_")
+        )
+    }));
+}
+
+#[test]
+fn test_vasp_adapter_scf_convergence_summary_provenance_refs() {
+    setup();
+    let adapter = VaspAdapter;
+    let log = adapter.parse_trace(VASP_FILE_NONCONVERGED_SCF).unwrap();
+
+    let convergence_event = log
+        .events
+        .iter()
+        .find(|event| {
+            matches!(
+                &event.kind,
+                EventKind::ConvergencePoint { metric_name, .. } if metric_name == "derived_vasp_scf_stall_dE"
+            )
+        })
+        .expect("Expected derived stall ConvergencePoint event");
+
+    assert!(convergence_event.causal_refs.len() >= 4);
+    assert!(matches!(
+        convergence_event.confidence.completeness,
+        Completeness::Derived { .. }
+    ));
+}
+
+#[test]
+fn test_vasp_adapter_no_scf_convergence_summary_for_converged_run() {
+    setup();
+    let adapter = VaspAdapter;
+    let log = adapter.parse_trace(VASP_FILE_CONVERGED_RELAXATION).unwrap();
+
+    assert!(!log.events.iter().any(|event| {
+        matches!(
+            &event.kind,
+            EventKind::ConvergencePoint { metric_name, .. } if metric_name.starts_with("derived_vasp_scf_")
+        )
+    }));
 }
 
 #[test]
@@ -5383,6 +5528,34 @@ fn test_vasp_t1_sigma_pt56_substrate() {
     assert_vasp_parses_energy_count(VASP_FILE_T1_SIGMA_PT56_SUBSTRATE, 2);
 }
 
+#[test]
+fn test_vasp_t1_nomad_nonconv_oscillating() {
+    setup();
+    assert_vasp_variant(
+        VASP_FILE_T1_NOMAD_NONCONV_OSCILLATING,
+        &[],
+        &[ConvergencePattern::Oscillating],
+    );
+    assert_vasp_execution_status(
+        VASP_FILE_T1_NOMAD_NONCONV_OSCILLATING,
+        ExecutionOutcome::Timeout,
+    );
+}
+
+#[test]
+fn test_vasp_t1_nomad_nonconv_stalled() {
+    setup();
+    assert_vasp_variant(
+        VASP_FILE_T1_NOMAD_NONCONV_STALLED,
+        &[],
+        &[ConvergencePattern::Stalled],
+    );
+    assert_vasp_execution_status(
+        VASP_FILE_T1_NOMAD_NONCONV_STALLED,
+        ExecutionOutcome::Timeout,
+    );
+}
+
 fn test_convergence_event(
     metric_name: &str,
     converged: Option<bool>,
@@ -5499,6 +5672,44 @@ fn test_classify_convergence_vasp_de_insufficient_direct() {
     let canonical = classify_convergence(event, "vasp", &log);
     assert_eq!(canonical.pattern, ConvergencePattern::InsufficientData);
     assert_eq!(canonical.confidence, ConvergenceConfidence::Direct);
+}
+
+#[test]
+fn test_classify_convergence_vasp_scf_oscillation_derived() {
+    setup();
+    let convergence = test_convergence_event(
+        "derived_vasp_scf_oscillation_dE",
+        Some(false),
+        Completeness::Derived {
+            from_elements: vec![ElementId(12)],
+        },
+        12,
+    );
+    let log = test_log_from_events(vec![convergence]);
+    let event = log.events.first().expect("Expected ConvergencePoint");
+
+    let canonical = classify_convergence(event, "vasp", &log);
+    assert_eq!(canonical.pattern, ConvergencePattern::Oscillating);
+    assert_eq!(canonical.confidence, ConvergenceConfidence::Derived);
+}
+
+#[test]
+fn test_classify_convergence_vasp_scf_stall_derived() {
+    setup();
+    let convergence = test_convergence_event(
+        "derived_vasp_scf_stall_dE",
+        Some(false),
+        Completeness::Derived {
+            from_elements: vec![ElementId(13)],
+        },
+        13,
+    );
+    let log = test_log_from_events(vec![convergence]);
+    let event = log.events.first().expect("Expected ConvergencePoint");
+
+    let canonical = classify_convergence(event, "vasp", &log);
+    assert_eq!(canonical.pattern, ConvergencePattern::Stalled);
+    assert_eq!(canonical.confidence, ConvergenceConfidence::Derived);
 }
 
 #[test]
@@ -5665,6 +5876,9 @@ fn test_equivalence_scenario_b_oscillating() {
     let openmm_adapter = MockOpenMmAdapter;
     let openmm_log = openmm_adapter.parse_trace(OPENMM_CSV_OSCILLATING).unwrap();
 
+    let vasp_adapter = VaspAdapter;
+    let vasp_log = vasp_adapter.parse_trace(VASP_FILE_OSCILLATING_SCF).unwrap();
+
     assert_eq!(
         first_pattern_or_insufficient(&gromacs_log, "gromacs"),
         ConvergencePattern::Oscillating
@@ -5673,8 +5887,11 @@ fn test_equivalence_scenario_b_oscillating() {
         first_pattern_or_insufficient(&openmm_log, "openmm"),
         ConvergencePattern::Oscillating
     );
-    // VASP is intentionally N/A: oscillation detection here is ionic-level for MD,
-    // while VASP convergence semantics are SCF-level and represented differently.
+    let vasp_patterns: Vec<ConvergencePattern> = classify_all_convergence(&vasp_log, "vasp")
+        .into_iter()
+        .map(|canonical| canonical.pattern)
+        .collect();
+    assert!(vasp_patterns.contains(&ConvergencePattern::Oscillating));
 }
 
 #[test]
@@ -5690,6 +5907,9 @@ fn test_equivalence_scenario_c_stalled() {
     let openmm_adapter = MockOpenMmAdapter;
     let openmm_log = openmm_adapter.parse_trace(OPENMM_CSV_DRIFTING).unwrap();
 
+    let vasp_adapter = VaspAdapter;
+    let vasp_log = vasp_adapter.parse_trace(VASP_FILE_NONCONVERGED_SCF).unwrap();
+
     assert_eq!(
         first_pattern_or_insufficient(&gromacs_log, "gromacs"),
         ConvergencePattern::Stalled
@@ -5698,8 +5918,11 @@ fn test_equivalence_scenario_c_stalled() {
         first_pattern_or_insufficient(&openmm_log, "openmm"),
         ConvergencePattern::Stalled
     );
-    // VASP is intentionally N/A: stall detection in this prototype is not mapped
-    // from ionic-level patterns for VASP traces.
+    let vasp_patterns: Vec<ConvergencePattern> = classify_all_convergence(&vasp_log, "vasp")
+        .into_iter()
+        .map(|canonical| canonical.pattern)
+        .collect();
+    assert!(vasp_patterns.contains(&ConvergencePattern::Stalled));
 }
 
 #[test]

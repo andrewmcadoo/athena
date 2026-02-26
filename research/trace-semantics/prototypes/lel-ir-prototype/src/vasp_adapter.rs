@@ -1,5 +1,6 @@
 use crate::adapter::{AdapterError, DslAdapter};
 use crate::common::*;
+use crate::convergence;
 use crate::event_kinds::EventKind;
 use crate::lel::*;
 
@@ -563,6 +564,12 @@ impl DslAdapter for VaspAdapter {
                 }
                 _ => {}
             }
+        }
+
+        if let Some(summary_event) =
+            convergence::derive_vasp_scf_convergence_summary(&oszicar_events, "OSZICAR")
+        {
+            oszicar_events.push(summary_event);
         }
 
         for event in &mut outcar_events {
